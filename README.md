@@ -32,6 +32,24 @@ you can do:
 $ lein run
 ```
 
+### MacOs Darwin arm64 build
+
+To build the secp256k1 native lib, which is not currently available in central repos,
+recursive clone https://github.com/ACINQ/secp256k1-kmp and run
+
+```
+$ TARGET=darwin ./native/build.sh
+$ TARGET=darwin ./jni/jvm/build.sh
+```
+
+This will create a dylib file which you can patch into a jar in the local maven repo, for example:
+
+```
+$ mkdir -p ./fr/acinq/secp256k1/jni/native/darwin-aarch64
+$ cp ./jni/jvm/build/darwin/libsecp256k1-jni.dylib fr/acinq/secp256k1/jni/native/darwin-aarch64
+$ jar uf ~/.m2/repository/fr/acinq/secp256k1/secp256k1-kmp-jni-jvm-darwin/0.7.1/secp256k1-kmp-jni-jvm-darwin-0.7.1.jar fr
+```
+
 
 ### TODO
 * seen-on relays w/ popup
