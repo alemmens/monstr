@@ -1,4 +1,4 @@
-# me.untethr.nostr-desk
+# Monstr: Nostr on the desktop (written in Clojure)
 
 
 * work-in-progress
@@ -24,6 +24,14 @@ How to run:
 ```
 $ make run
 ```
+
+Alternatively, if you have Leiningen (https://leiningen.org) installed,
+you can do:
+
+```
+$ lein run
+```
+
 
 ### TODO
 * seen-on relays w/ popup
