@@ -1,0 +1,210 @@
+@font-face {
+    font-family: 'Roboto';
+    src: url('/monstr/font/Roboto-Regular.ttf');
+}
+
+@font-face {
+    font-family: 'Roboto Bold';
+    src: url('/monstr/font/Roboto-Bold.ttf');
+}
+
+* {
+    -nd-basic-border-color: #aaa;
+    -nd-hover-background-color: #eee;
+    -nd-timeline-item-pubkey-color: #0097a7;
+    -nd-timeline-item-name-color: #e64a19;
+    -nd-publish-button-color: #2262ba;
+}
+
+.hyperlink {
+    -fx-fill: blue;
+}
+
+.ndesk-lhs-pane {
+    -fx-pref-width: 275;
+    -fx-border-color: transparent -nd-basic-border-color transparent transparent;
+    -fx-padding: 5px;
+    -fx-background-color: white;
+}
+
+.ndesk-keycard {
+    -fx-padding: 5px;
+    -fx-border-insets: 2px;
+    -fx-background-insets: 5px;
+    -fx-border-color: -nd-basic-border-color;
+    -fx-background-color: white;
+    -fx-cursor: hand;
+}
+
+.ndesk-keycard-active {
+    -fx-border-width: 5px;
+}
+
+.ndesk-keycard-photo {
+    -fx-alignment: center;
+    -fx-font-size: 24pt;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+
+.ndesk-keycard-name {
+    -fx-min-height: 50;
+    -fx-padding: 0 0 0 10px;
+    -fx-font-weight: bold;
+}
+
+.ndesk-keycard-pubkey {
+    -fx-min-height: 50;
+    -fx-padding: 0 10px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -nd-timeline-item-pubkey-color;
+}
+
+.ndesk-keycard-about {
+    -fx-padding: 3px;
+}
+
+.ndesk-status-bar {
+    -fx-border-color: -nd-basic-border-color transparent transparent transparent;
+}
+
+.ndesk-status-relays {
+    -fx-padding: 3px;
+}
+
+.ndesk-table-view {
+    -fx-border-color: -nd-basic-border-color;
+}
+
+.ndesk-timeline-item-missing {
+    /* -fx-background-color: darkblue; */
+    /*-fx-alignment: center;*/
+}
+
+.ndesk-timeline-item-missing-hyperlink {
+    -fx-font-weight: bold;
+    -fx-text-fill: black;
+}
+
+.ndesk-timeline-item-photo {
+    -fx-alignment: center;
+    -fx-font-size: 12pt;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+
+.ndesk-timeline-item-name {
+    -fx-font-size: 10pt;
+    -fx-font-weight: bold;
+    -fx-text-fill: -nd-timeline-item-name-color;
+    -fx-padding: 3px;
+}
+
+.ndesk-timeline-item-pubkey {
+    -fx-font-size: 10pt;
+    -fx-font-weight: bold;
+    -fx-text-fill: -nd-timeline-item-pubkey-color;
+    -fx-padding: 3px;
+}
+
+.ndesk-timeline-item-content-outer {
+    -fx-padding: 10px;
+}
+
+.ndesk-timeline-item-content {
+    -fx-font-family: "Roboto";
+    -fx-font-size: 12pt;
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+}
+
+.ndesk-publish-box {
+    -fx-font-family: "Roboto";
+    -fx-font-size: 12pt;
+    -fx-pref-height: 1em;
+}
+
+.ndesk-publish-box:focused {
+    -fx-pref-height: 5em;
+}
+
+.ndesk-reply-box {
+    -fx-font-family: "Roboto";
+    -fx-font-size: 12pt;
+    -fx-pref-height: 5em;
+}
+
+.ndesk-publish-button {
+    -fx-font-family: "Roboto Bold";
+    -fx-background-color: -nd-publish-button-color;
+    -fx-text-fill: white;
+    -fx-cursor: hand;
+    -fx-pref-width: 6em;
+    -fx-pref-height: 2em;
+    /*-fx-font-weight: bold; ...negates the boldness somehow*/
+}
+
+.ndesk-reply-button {
+    -fx-font-family: "Roboto Bold";
+    -fx-font-size: 10pt;
+    -fx-pref-width: 5em;
+    -fx-padding: 2px;
+    -fx-background-color: -nd-publish-button-color;
+    -fx-text-fill: white;
+    -fx-cursor: hand;
+    /*-fx-font-weight: bold; ...negates the boldness somehow*/
+}
+
+.ndesk-timeline-item-info-link,
+.ndesk-timeline-item-info-link:hover,
+.ndesk-timeline-item-info-link:hover:visited {
+    -fx-text-fill: #aaa;
+    -fx-padding: 0 5px;
+}
+
+.ndesk-info-popup-region {
+    -fx-font-family: "Roboto";
+}
+
+.ndesk-info-popup-region > .hyperlink:focused {
+    -fx-border-width: 0;
+}
+
+.ndesk-info-popup-region > .hyperlink:visited {
+    -fx-text-fill: -fx-accent;
+}
+
+.ndesk-contact-list {
+    -fx-background: white; /* not -fx-background-color b/c scroll-pane */
+    /*-fx-pref-width: 275px;*/
+    /*-fx-min-width: 275px;*/
+    /*-fx-max-width: 275px;*/
+}
+
+.ndesk-contact-card {
+    -fx-padding: 10px;
+    -fx-cursor: hand;
+    -fx-border-color: #eee;
+}
+
+.ndesk-contact-card-active {
+    -fx-border-width: 5px;
+}
+
+.ndesk-contact-photo {
+    -fx-alignment: center;
+    -fx-font-size: 18pt;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+.ndesk-contact-pubkey {
+    -fx-font-weight: bold;
+    -fx-text-fill: -nd-timeline-item-pubkey-color;
+}
+
+.ndesk-add-contact {
+    -fx-padding: 5px;
+    -fx-border-color: -nd-basic-border-color;
+    -fx-background-color: white;
+    -fx-cursor: hand;
+}

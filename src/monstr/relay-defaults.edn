@@ -1,0 +1,11 @@
+[#monstr.domain.Relay{:url "wss://nostr-relay.untethr.me", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://nostr-pub.wellorder.net", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://relayer.fiatjaf.com", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://nostr.drss.io", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://nostr-pub.semisol.dev", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://nostr.bitcoiner.social", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://nostr.rocks", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://relay.damus.io", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://nostr.zebedee.cloud", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://nostr.semisol.dev", :read? true, :write? true}
+ ]

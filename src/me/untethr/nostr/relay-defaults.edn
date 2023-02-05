@@ -1,4 +1,0 @@
-[#me.untethr.nostr.domain.Relay{:url "wss://nostr-relay.untethr.me", :read? true, :write? true}
- #me.untethr.nostr.domain.Relay{:url "wss://nostr-pub.wellorder.net", :read? true, :write? true}
- #me.untethr.nostr.domain.Relay{:url "wss://nostr-relay.lnmarkets.com", :read? true, :write? true}
- #me.untethr.nostr.domain.Relay{:url "wss://nostr.zebedee.cloud", :read? true, :write? true}]
