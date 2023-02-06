@@ -44,10 +44,7 @@
                      "ndesk-keycard-active")]
      :on-mouse-clicked {:event/type :click-keycard :public-key public-key}
      :children
-     [(if picture-url
-        {:fx/type avatar
-         :picture-url picture-url
-         :width avatar-dim}
+     [(if (str/blank? picture-url)
         {:fx/type :label
          :min-width avatar-dim
          :min-height avatar-dim
@@ -55,7 +52,10 @@
          :max-height avatar-dim
          :style {:-fx-background-color avatar-color}
          :style-class "ndesk-keycard-photo"
-         :text (subs public-key 0 3)})
+         :text (subs public-key 0 3)}
+        {:fx/type avatar
+         :picture-url picture-url
+         :width avatar-dim})
       {:fx/type :v-box
        :h-box/hgrow :always
        :children
@@ -109,10 +109,7 @@
      :children
      [{:fx/type :h-box
        :children
-       [(if picture-url
-          {:fx/type avatar
-           :picture-url picture-url
-           :width avatar-dim}
+       [(if (str/blank? picture-url)
           {:fx/type :label
            :min-width avatar-dim
            :min-height avatar-dim
@@ -120,7 +117,10 @@
            :max-height avatar-dim
            :style {:-fx-background-color avatar-color}
            :style-class "ndesk-contact-photo"
-           :text (subs public-key 0 3)})
+           :text (subs public-key 0 3)}
+          {:fx/type avatar
+           :picture-url picture-url
+           :width avatar-dim})
         {:fx/type :v-box
          :children
          [{:fx/type :label
