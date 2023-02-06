@@ -1,6 +1,7 @@
 (ns monstr.timeline-new
   (:require [cljfx.api :as fx]
             [clojure.set :as set]
+            [clojure.tools.logging :as log]
             [monstr.domain :as domain]
             [monstr.parse :as parse]
             [monstr.util :as util]
@@ -24,7 +25,7 @@
   ;; NOTE: we're querying and subscribing to all of time but for now, for ux
   ;; experience, we filter underlying data by n days
   ;; todo we'll really wish to query/subscribe at an epoch and only update it on scroll etc.
-  (let [init-timeline-epoch (-> (util/days-ago 20) .getEpochSecond)
+  (let [init-timeline-epoch (-> (util/days-ago 7) .getEpochSecond)
         timeline-epoch-vol (volatile! init-timeline-epoch)
         observable-list (FXCollections/observableArrayList)
         filtered-list (FilteredList. observable-list
@@ -104,6 +105,7 @@
         ;; *within* the swap! *state b/c we can get invoked multiple times by
         ;; swap!. should move this .setItems outside of swap! really and just
         ;; get the value by derefing the state.
+        (log/debugf "Updating active flat timeline for %s" public-key)
         (.setItems home-ux-new
           ^ObservableList (or
                             (:adapted-list (get identity-timeline-new public-key))

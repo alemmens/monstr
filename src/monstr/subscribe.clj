@@ -13,8 +13,9 @@
 
 (defn overwrite-subscriptions!
   [identities contact-lists]
-  ;; todo note: since here is a stop-gap protection .. really we would like to track a durable "watermark" for stable subscriptions
-  (let [use-since (-> (util/days-ago 45) .getEpochSecond)
+  ;; todo note: since here is a stop-gap protection .. really we would like to track a
+  ;; durable "watermark" for stable subscriptions
+  (let [use-since (-> (util/days-ago 7) .getEpochSecond)
         pubkeys (mapv :public-key identities)]
     (when-not (empty? pubkeys)
       (let [filters (filterv
