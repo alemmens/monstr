@@ -13,6 +13,7 @@
 
 (defonce active-load-event-info (atom {}))
 
+;; Is this obsolete? It refers to the old timeline. [Arthur]
 (defn async-load-event!
   [*state db ^ScheduledExecutorService executor event-id]
   (log/info "loading event" {:event-id event-id})

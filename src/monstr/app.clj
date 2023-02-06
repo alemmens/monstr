@@ -52,11 +52,13 @@
   []
   (let [relays (store/load-relays db)]
     (swap! *state assoc :relays relays :refresh-relays-ts (System/currentTimeMillis))
+    (log/debugf "Loaded %d relays." (count relays))
     (relay-conn/update-relays! relays)))
 
 (defn- load-identities!
   []
   (let [identities (store/load-identities db)]
+    (log/debugf "Loaded %d identities." (count identities))
     (hydrate/hydrate! *state db daemon-scheduled-executor identities)))
 
 (defn- update-connected-info!

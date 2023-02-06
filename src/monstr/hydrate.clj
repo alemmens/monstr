@@ -22,7 +22,7 @@
         identity-timeline (into {}
                             (map #(vector % (timeline/new-timeline))) new-public-keys)
         identity-timeline-new (into {}
-                                (map #(vector % (timeline-new/new-timeline))) new-public-keys)]
+                                    (map #(vector % (timeline-new/new-timeline))) new-public-keys)]
     (swap! *state
       (fn [curr-state]
         (-> curr-state
@@ -35,7 +35,9 @@
           ;; todo also limit timeline events to something, some cardinality?
           ;; todo also load watermarks and include in new subscriptions
           timeline-data (store/load-timeline-events db closure-public-keys)]
+      (log/debugf "Loaded %d timeline events" (count timeline-data))
       (when-let [first-identity-key (first new-public-keys)]
+        (log/debugf "Hydrating with first identity key %s" first-identity-key)
         (timeline/update-active-timeline! *state first-identity-key)
         (timeline-new/update-active-timeline! *state first-identity-key))
       ;; todo consider transduce iterate over timeline-data and throttling

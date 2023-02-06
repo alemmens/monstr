@@ -84,47 +84,22 @@
     :raw_event_tuple
     raw-event-tuple->event-obj))
 
+(defn timeline-query
+  [pubkeys]
+  [(format (str "select raw_event_tuple from n_events"
+                    " where pubkey in (%s) and kind = 1"
+                    " limit 500")
+               (str/join ", " (map #(str "'" % "'") pubkeys)))])
+
+
 (defn load-timeline-events
   [db pubkeys]
+  (log/debugf "Loading timeline events for %d pubkeys" (count pubkeys))
   (when-not (empty? pubkeys)
     (mapv (comp raw-event-tuple->event-obj :raw_event_tuple)
-      (jdbc/execute! db
-        (vec
-          (concat
-            [(str/join " UNION "
-               (repeat (count pubkeys)
-                 (str
-                   ;; @see https://stackoverflow.com/questions/4696947/sql-select-with-union-order-by-and-limit
-                   "select * from ("
-                   "select e.raw_event_tuple from n_events e"
-                   " left join p_tags p on e.id = p.source_event_id"
-                   "    and p.tagged_pubkey = ?"
-                   " where (e.pubkey = ? or p.tagged_pubkey = ?) and kind = 1"
-                   ;; todo consider " order by created_at desc limit 500"
-                   ")")))]
-            (interleave pubkeys pubkeys pubkeys)))
-        {:builder-fn rs/as-unqualified-lower-maps}))))
-
-(defn ^:deprecated load-timeline-events-
-  [db pubkeys]
-  (when-not (empty? pubkeys)
-    (mapv (comp raw-event-tuple->event-obj :raw_event_tuple)
-      (jdbc/execute! db
-        (vec
-          (concat
-            [(format
-               (str
-                 "select raw_event_tuple from n_events where id in ("
-                 (str
-                   "select distinct e.id from n_events e"
-                   " left join p_tags p on e.id = p.source_event_id"
-                   " where (e.pubkey in (%s) or p.tagged_pubkey in (%s)) and kind = 1")
-                 ")")
-               (str/join "," (repeat (count pubkeys) "?"))
-               (str/join "," (repeat (count pubkeys) "?")))]
-            pubkeys
-            pubkeys))
-        {:builder-fn rs/as-unqualified-lower-maps}))))
+          (jdbc/execute! db
+                         (timeline-query pubkeys)
+                         {:builder-fn rs/as-unqualified-lower-maps}))))
 
 ;; --
 
@@ -180,6 +155,7 @@
 (defn load-contact-lists
   "Answers {<pubkey> ContactList}."
   [db identities]
+  (log/debugf "Loading contact lists for %d identities." (count identities))
   (let [public-keys (mapv :public-key identities)]
     (into
       {}
