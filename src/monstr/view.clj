@@ -26,8 +26,9 @@
            (javafx.beans.property ReadOnlyProperty)))
 
 (defn avatar [{:keys [width picture-url]}]
-  {:fx/type :image-view
-   :image (cache/get* avatar/image-cache [picture-url width])})
+  (when-not (str/blank? picture-url)
+    {:fx/type :image-view
+     :image (cache/get* avatar/image-cache [picture-url width])}))
 
 (defn keycard
   [{:keys [active?]

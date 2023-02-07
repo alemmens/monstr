@@ -76,7 +76,7 @@
             (resubscribe! *state executor resubscribe-future-vol)))))))
 
 (defn consume-direct-message [db relay-url event-obj]
-  (log/info "direct message (TODO): " relay-url (:id event-obj))
+  #_(log/info "direct message (TODO): " relay-url (:id event-obj))
   )
 
 (defn- consume-verified-event
