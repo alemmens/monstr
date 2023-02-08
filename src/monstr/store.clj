@@ -2,6 +2,7 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
+            [monstr.file-sys :as file-sys]            
             [monstr.domain :as domain]
             [monstr.json :as json]
             [monstr.parse :as parse]
@@ -35,6 +36,8 @@
   [path]
   (doto (get-datasource* path)
     apply-schema!))
+
+(defonce db (init! (file-sys/db-path)))
 
 ;; --
 
@@ -207,7 +210,16 @@
           ["select relay_url from relay_event_id where event_id = ?" event-id]
           {:builder-fn rs/as-unqualified-lower-maps})))))
 
+(defn count-events-on-relays
+  [db]
+  (let [result (jdbc/execute! db
+                              ["select relay_url, count(*) from relay_event_id group by relay_url"])]
+    (zipmap (map :relay_event_id/relay_url result)
+            (map (keyword "count(*)") result))))
+             
+  
 (defn event-signature-by-id
+  "Returns a map from relay urls to event counts."
   [db event-id]
   (:signature_
     (jdbc/execute-one! db

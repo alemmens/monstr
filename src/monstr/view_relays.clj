@@ -5,6 +5,7 @@
     [monstr.style :as style]
     [monstr.domain :as domain]
     [monstr.style :as style :refer [BORDER|]]
+    [monstr.store :as store]
     [clojure.string :as str])
   (:import
     (javafx.scene.control ButtonType ButtonBar$ButtonData DialogEvent Dialog DialogPane TableView TextField CheckBox)
@@ -44,12 +45,17 @@
           (result-converter r d))))))
 
 (defn row
-  [{{:keys [url read? write?]} :relay}]
+  [{{:keys [url read? write? event-count]} :relay}]
   ;; result converter is very sensitive to our layout here so if this
   ;; changes that needs to, as well.
   {:fx/type :h-box
    :children
    [{:fx/type :text-field
+     :disable true
+     :style {:-fx-pref-width "6em"
+             :-fx-alignment "center_right"}
+     :text (str event-count)}
+    {:fx/type :text-field
      :h-box/hgrow :always
      :text url}
     {:fx/type :label
@@ -73,15 +79,19 @@
 ;; result-converter above) and go from there.
 (defn content
   [{:keys [relays refresh-relays-ts]}]
-  {:fx/type :v-box
-   :children
-   (map-indexed
-     #(identity
-        {:fx/type row
-         :fx/key (str %1 ":" refresh-relays-ts)
-         :relay %2})
-     (concat relays
-       (repeatedly 10 #(domain/->Relay "" true true))))})
+  (let [event-counts (store/count-events-on-relays store/db)]
+    (log/debug "Event counts %s" event-counts)
+    {:fx/type :v-box
+     :children (map-indexed
+                #(identity
+                   {:fx/type row
+                    :fx/key (str %1 ":" refresh-relays-ts)
+                    :relay (assoc %2 :event-count (get event-counts (:url %2)))})
+                ;; Add 10 more empty rows.
+                (concat relays
+                        (repeatedly 10 #(domain/->Relay "" true true))))}))
+
+;; 
 
 (defn dialog
   [{:keys [show-relays? relays refresh-relays-ts]}]

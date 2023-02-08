@@ -122,13 +122,13 @@
 (defn show-relays-effect
   [show-relays?]
   [[:fg
-    (fn [*state _ _]
+    (fn [*state db _]
       (swap! *state assoc
-        :show-relays? show-relays?
-        ;; this is especially necessary when user is close-cancelling; they
-        ;; may have mutated some text fields; and this forces a complete
-        ;; re-render of the text fields, wiping out their mutations.
-        :refresh-relays-ts (System/currentTimeMillis)))]])
+             :show-relays? show-relays?
+             ;; this is especially necessary when user is close-cancelling; they
+             ;; may have mutated some text fields; and this forces a complete
+             ;; re-render of the text fields, wiping out their mutations.
+             :refresh-relays-ts (System/currentTimeMillis)))]])
 
 (defn relays-close-request
   [{^DialogEvent dialog-event :fx/event}]

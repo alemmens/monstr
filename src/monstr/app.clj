@@ -7,7 +7,6 @@
   (:require
    [cljfx.api :as fx]
    [monstr.consume :as consume]
-   [monstr.file-sys :as file-sys]
    [monstr.hydrate :as hydrate]
    [monstr.metadata :as metadata]
    [monstr.relay-conn :as relay-conn]
@@ -23,9 +22,7 @@
     (java.util.concurrent ThreadFactory Executors ScheduledExecutorService TimeUnit))
   (:gen-class))
 
-(defonce db (store/init! (file-sys/db-path)))
-
-(defonce metadata-cache (metadata/create-cache db))
+(defonce metadata-cache (metadata/create-cache store/db))
 
 (defonce ^ScheduledExecutorService daemon-scheduled-executor
   (let [factory (reify ThreadFactory
@@ -40,26 +37,26 @@
     (domain/initial-state)))
 
 (defonce home-ux
-  (view-home/create-list-view *state db metadata-cache daemon-scheduled-executor))
+  (view-home/create-list-view *state store/db metadata-cache daemon-scheduled-executor))
 
 (defonce home-ux-new
-  (view-home-new/create-list-view *state db metadata-cache daemon-scheduled-executor))
+  (view-home-new/create-list-view *state store/db metadata-cache daemon-scheduled-executor))
 
 (swap! *state assoc :home-ux home-ux)
 (swap! *state assoc :home-ux-new home-ux-new)
 
 (defn- load-relays!
   []
-  (let [relays (store/load-relays db)]
+  (let [relays (store/load-relays store/db)]
     (swap! *state assoc :relays relays :refresh-relays-ts (System/currentTimeMillis))
     (log/debugf "Loaded %d relays." (count relays))
     (relay-conn/update-relays! relays)))
 
 (defn- load-identities!
   []
-  (let [identities (store/load-identities db)]
+  (let [identities (store/load-identities store/db)]
     (log/debugf "Loaded %d identities." (count identities))
-    (hydrate/hydrate! *state db daemon-scheduled-executor identities)))
+    (hydrate/hydrate! *state store/db daemon-scheduled-executor identities)))
 
 (defn- update-connected-info!
   []
@@ -68,14 +65,14 @@
 
 (defn fg-effect [f dispatch!]
   (fx/on-fx-thread
-    (f *state db dispatch!)))
+    (f *state store/db dispatch!)))
 
 (defn bg-effect [f dispatch!]
   (.submit daemon-scheduled-executor
     ^Runnable
     (fn []
       (try
-        (f *state db daemon-scheduled-executor #(fx/on-fx-thread (dispatch! %)))
+        (f *state store/db daemon-scheduled-executor #(fx/on-fx-thread (dispatch! %)))
         (catch Throwable t
           (log/error t "on bg"))))))
 
@@ -91,7 +88,7 @@
 (defn -main
   [& _]
   (fx/mount-renderer *state renderer)
-  (consume/start! db *state metadata-cache daemon-scheduled-executor)
+  (consume/start! store/db *state metadata-cache daemon-scheduled-executor)
   (util/schedule! daemon-scheduled-executor load-identities! 1000)
   (util/schedule! daemon-scheduled-executor load-relays! 3000)
   (util/schedule-with-fixed-delay!
