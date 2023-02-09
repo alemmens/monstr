@@ -18,10 +18,12 @@
    ^HashMap author-pubkey->item-id-set
    ^HashMap item-id->index
    ^HashSet item-ids
-   timeline-epoch-vol])
+   timeline-epoch-vol
+   relays ;; Sequence of relay urls for this timeline.
+   ])
 
 (defn new-timeline
-  []
+  [relays]
   ;; NOTE: we're querying and subscribing to all of time but for now, for ux
   ;; experience, we filter underlying data by n days
   ;; todo we'll really wish to query/subscribe at an epoch and only update it on scroll etc.
@@ -40,7 +42,13 @@
       (HashMap.)
       (HashMap.)
       (HashSet.)
-      timeline-epoch-vol)))
+      timeline-epoch-vol
+      relays)))
+
+(defn new-timelines
+  [relays]
+  (log/debugf "Creating new timelines for relays %s" relays)
+  (map #(new-timeline (list %)) relays))
 
 (defn accept-text-note?
   [*state identity-pubkey parsed-ptags {:keys [pubkey] :as _event-obj}]
@@ -62,52 +70,76 @@
 (defn dispatch-metadata-update!
   [*state {:keys [pubkey] :as _event-obj}]
   (fx/run-later
-    (let [{:keys [identity-timeline-new]} @*state]
-      (doseq [[_identity-pubkey timeline] identity-timeline-new]
-        (let [{:keys [^ObservableList observable-list
-                      ^HashMap author-pubkey->item-id-set
-                      ^HashMap item-id->index]} timeline]
-          (doseq [item-id (seq (.get author-pubkey->item-id-set pubkey))]
-            (when-let [item-idx (.get item-id->index item-id)]
-              (let [curr-wrapper (.get observable-list item-idx)]
-                ;; todo why doesn't this refresh timeline immediately?
-                (.set observable-list item-idx
-                  (assoc curr-wrapper :touch-ts (System/currentTimeMillis)))))))))))
+   (doseq [[identity-pubkey timelines] (:identity-timeline-new @*state)]
+     (doseq [timeline timelines]
+       (let [{:keys [^ObservableList observable-list
+                     ^HashMap author-pubkey->item-id-set
+                     ^HashMap item-id->index]}
+             timeline]
+         (doseq [item-id (seq (.get author-pubkey->item-id-set pubkey))]
+           (when-let [item-idx (.get item-id->index item-id)]
+             (let [curr-wrapper (.get observable-list item-idx)]
+               ;; todo why doesn't this refresh timeline immediately?
+               (.set observable-list item-idx
+                     (assoc curr-wrapper :touch-ts (System/currentTimeMillis)))))))))))
+
+(defn event-is-relevant-for-timeline?
+  "An event is relevant for a timeline if the timeline's relays have some overlap with the
+   event's relays."
+  [event timeline]
+  (not-empty (set/intersection (set (:relays timeline))
+                               (set (:relays event)))))
 
 (defn dispatch-text-note!
-  [*state {:keys [id pubkey created_at content] :as event-obj}]
+  "Dispatch a text note to all timelines for which the given event is relevant."
+  [*state {:keys [id pubkey created_at content relays] :as event-obj}]
   {:pre [(some? pubkey)]}
-  ;; CONSIDER if is this too much usage of on-fx-thread - do we need to batch/debounce
+  ;; CONSIDER if is this too much usage of on-fx-thread - do we need to batch/debounce?
   (fx/run-later
-    (let [{:keys [identity-timeline-new] :as _state-snap} @*state]
-      (doseq [[identity-pubkey timeline] identity-timeline-new]
-        (let [{:keys [^ObservableList observable-list
-                      ^HashMap author-pubkey->item-id-set
-                      ^HashMap item-id->index
-                      ^HashSet item-ids]} timeline]
-          (when-not (.contains item-ids id)
-            (let [ptag-ids (parse/parse-tags event-obj "p")]
-              (when (accept-text-note? *state identity-pubkey ptag-ids event-obj)
-                (.add item-ids id)
-                (.merge author-pubkey->item-id-set pubkey (HashSet. [id])
-                  (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
-                (let [init-idx (.size observable-list)
-                      init-note (domain/->UITextNoteNew event-obj created_at)]
-                  (.put item-id->index id init-idx)
-                  (.add observable-list init-note))))))))))
+   #_(log/debugf "Dispatching text note %s" event-obj)
+   (doseq [[identity-pubkey timelines] (:identity-timeline-new @*state)]
+     #_(log/debugf "Dispatching for pubkey %s (%d timelines)"
+                 identity-pubkey
+                 (count timelines))
+     (doseq [timeline timelines]
+       (when (event-is-relevant-for-timeline? event-obj timeline)
+         (let [{:keys [^ObservableList observable-list
+                       ^HashMap author-pubkey->item-id-set
+                       ^HashMap item-id->index
+                       ^HashSet item-ids]}
+               timeline]
+           #_(log/debugf "Found timeline for event %s and relays %s"
+                       event-obj
+                       (:relays timeline))
+           (when-not (.contains item-ids id)
+             (let [ptag-ids (parse/parse-tags event-obj "p")]
+               (when (accept-text-note? *state identity-pubkey ptag-ids event-obj)
+                 ; (log/debugf "Adding id %s to item-ids %s" id item-ids)
+                 (.add item-ids id)
+                 (.merge author-pubkey->item-id-set pubkey (HashSet. [id])
+                         (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
+                 (let [init-idx (.size observable-list)
+                       init-note (domain/->UITextNoteNew event-obj created_at)]
+                   (.put item-id->index id init-idx)
+                   (.add observable-list init-note)))))))))))
 
-(defn update-active-timeline!
+(defn update-active-timelines!
+  "Update the active timelines for the identity with the given public key."
   [*state public-key] ;; note public-key may be nil!
   (fx/run-later
-    (swap! *state
-      (fn [{:keys [^ListView home-ux-new identity-timeline-new] :as curr-state}]
-        ;; oops this is a misuse here of swap! - we probably shouldn't setItems here
-        ;; *within* the swap! *state b/c we can get invoked multiple times by
-        ;; swap!. should move this .setItems outside of swap! really and just
-        ;; get the value by derefing the state.
-        (log/debugf "Updating active flat timeline for %s" public-key)
-        (.setItems home-ux-new
-          ^ObservableList (or
-                            (:adapted-list (get identity-timeline-new public-key))
-                            (FXCollections/emptyObservableList)))
-        (assoc curr-state :active-key public-key)))))
+   (log/debugf "Updating active flat timelines for %s" public-key)
+   (doseq [timeline (get (:identity-timeline-new @*state) public-key)]
+     ;; Find the relevant home (listview) and update it.
+     (log/debugf "Relay url list %s" (domain/relay-urls timeline))
+     (let [relay-urls (set (:relays timeline))
+           home (get (:homes @*state) relay-urls)]
+       (log/debugf "Found home %s for relays %s" home relay-urls)
+       (when home
+         (.setItems home
+                    ^ObservableList (or (:adapted-list timeline)
+                                        (FXCollections/emptyObservableList))))))
+   ;; Update the state's active public key.
+   (swap! *state
+          (fn [state]
+            (assoc state :active-key public-key)))))
+

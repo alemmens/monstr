@@ -200,7 +200,7 @@
                     :filter view-common/text-formatter-filter*}})
 
 (defn main-pane
-  [{:keys [home-ux can-publish? active-reply-context]}]
+  [{:keys [home can-publish? active-reply-context]}]
   {:fx/type fx/ext-let-refs
    :refs {:dialog {:fx/type view-reply/dialog
                    :active-reply-context active-reply-context}}
@@ -225,7 +225,7 @@
                   :style-class ["button" "ndesk-publish-button"]
                   :text "Publish"}}]}
      {:fx/type fx/ext-instance-factory
-      :create #(doto home-ux
+      :create #(doto home
                  (VBox/setVgrow Priority/ALWAYS))}]}})
 
 (defn tab*
@@ -236,29 +236,28 @@
    :content content})
 
 (defn tab-pane
-  [{:keys [home-ux home-ux-new can-publish? active-reply-context active-contact-list
+  [{:keys [homes can-publish? active-reply-context active-contact-list
            active-contact-pubkey metadata-cache]}]
   {:fx/type :tab-pane
    :side :top
    :pref-width 960
    :pref-height 540
-   :tabs (mapv tab*
-           {"Home" {:fx/type main-pane
-                          :home-ux home-ux-new
-                          :can-publish? can-publish?
-                          :active-reply-context active-reply-context}
-            #_#_"Home (old)" {:fx/type main-pane
-                    :home-ux home-ux
-                    :can-publish? can-publish?
-                    :active-reply-context active-reply-context}
-            "Contacts" {:fx/type contacts
-                        :active-contact-list active-contact-list
-                        :active-contact-pubkey active-contact-pubkey
-                        :metadata-cache metadata-cache}
-            ;"Messages" {:fx/type messages}
-            ;"Profile" {:fx/type profile}
-            ;"Search" {:fx/type search}
-            })})
+   :tabs (concat (mapv (fn [[relay-urls home]]
+                         (tab* [(first relay-urls)  ;; TODO: JUST TEMPORARY. FIX THIS.
+                                {:fx/type main-pane
+                                 :home home
+                                 :can-publish? can-publish?
+                                 :active-reply-context active-reply-context}]))
+                       homes)
+                 (mapv tab*
+                       {"Contacts" {:fx/type contacts
+                                    :active-contact-list active-contact-list
+                                    :active-contact-pubkey active-contact-pubkey
+                                    :metadata-cache metadata-cache}}
+                       ;;"Messages" {:fx/type messages}
+                       ;;"Profile" {:fx/type profile}
+                       ;;"Search" {:fx/type search}
+                       ))})
 
 (defn keycards
   [{:keys [active-key identities identity-metadata show-new-identity?
@@ -340,7 +339,7 @@
            :connected-info connected-info}})
 
 (defn root [{:keys [show-relays? active-key identities identity-metadata relays
-                    refresh-relays-ts connected-info home-ux home-ux-new show-new-identity?
+                    refresh-relays-ts connected-info homes show-new-identity?
                     new-identity-error active-reply-context contact-lists
                     identity-active-contact metadata-cache]}]
   {:fx/type :border-pane
@@ -351,8 +350,7 @@
           :show-new-identity? show-new-identity?
           :new-identity-error new-identity-error}
    :center {:fx/type tab-pane
-            :home-ux home-ux
-            :home-ux-new home-ux-new
+            :homes homes
             :can-publish? (util-domain/can-publish? active-key identities)
             :active-reply-context active-reply-context
             :active-contact-list (get contact-lists active-key)
@@ -365,7 +363,7 @@
             :connected-info connected-info}})
 
 (defn stage [{:keys [show-relays? active-key identities identity-metadata relays
-                     refresh-relays-ts connected-info home-ux home-ux-new show-new-identity?
+                     refresh-relays-ts connected-info homes show-new-identity?
                      new-identity-error active-reply-context contact-lists
                      identity-active-contact metadata-cache]}]
   {:fx/type :stage
@@ -389,6 +387,5 @@
            :relays relays
            :refresh-relays-ts refresh-relays-ts
            :connected-info connected-info
-           :home-ux home-ux
-           :home-ux-new home-ux-new
+           :homes homes
            :metadata-cache metadata-cache}}})

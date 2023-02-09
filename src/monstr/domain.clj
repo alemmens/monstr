@@ -2,24 +2,25 @@
 
 (defn initial-state
   []
-  {:show-relays? false
+  {:show-relays? false  ; indicates if the relays dialog must be shown
    :show-new-identity? false
    :new-identity-error ""
    :active-reply-context nil
-   :identities [] ;; [domain/Identity]
-   :identity-metadata {} ;; pubkey -> domain/ParsedMetadata
-   :contact-lists {} ;; pubkey -> domain/ContactList
+   :identities [] ; [domain/Identity]
+   :identity-metadata {} ; pubkey -> domain/ParsedMetadata
+   :contact-lists {} ; pubkey -> domain/ContactList
    :identity-active-contact {}
    :relays [] ;; [domain/Relay]
    :connected-info {}
    ;; note: changes to active-key and mutations to home-ux, timelines
    ;;   must be done w/in mutex--ie on fx thread!
-   :active-key nil
-   :home-ux nil
-   :home-ux-new nil
-   :identity-timeline {} ;; pubkey -> Timeline
-   :identity-timeline-new {} ;; pubkey -> TimelineNew
+   :active-key nil ; the public key of the active identity
+   :homes nil ; a map from sets of relay urls to Listviews
+   :identity-timeline-new {} ; a map from identity pubkeys to lists of TimelineNew.
    })
+
+(defn relay-urls [state]
+  (doall (map :url (:relays state))))
 
 ;; --
 

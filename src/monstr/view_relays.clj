@@ -80,7 +80,7 @@
 (defn content
   [{:keys [relays refresh-relays-ts]}]
   (let [event-counts (store/count-events-on-relays store/db)]
-    (log/debug "Event counts %s" event-counts)
+    (log/debugf "Event counts %s" event-counts)
     {:fx/type :v-box
      :children (map-indexed
                 #(identity

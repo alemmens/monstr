@@ -7,7 +7,6 @@
     [monstr.modal :as modal]
     [monstr.relay-conn :as relay-conn]
     [monstr.store :as store]
-    [monstr.timeline :as timeline]
     [monstr.timeline-new :as timeline-new]
     [monstr.x.crypt :as crypt]
     [monstr.hydrate :as hydrate]
@@ -27,8 +26,7 @@
   [{:keys [public-key]}]
   [[:bg
     (fn [*state _db _exec _dispatch!]
-      (timeline/update-active-timeline! *state public-key)
-      (timeline-new/update-active-timeline! *state public-key))]])
+      (timeline-new/update-active-timelines! *state public-key))]])
 
 (defn show-new-identity-effect
   [show-new-identity?]

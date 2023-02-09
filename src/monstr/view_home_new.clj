@@ -234,9 +234,9 @@
               :style-class "ndesk-timeline-item-photo"
               :text pubkey-for-avatar})
      :center {:fx/type :border-pane
-              :style (BORDER| :green)
+              :style (BORDER| :white)
               :top {:fx/type :border-pane
-                    :style (BORDER| :purple)
+                    :style (BORDER| :white)
                     :border-pane/margin (Insets. 0.0 5.0 0.0 5.0)
                     :left {:fx/type :h-box
                            :children [{:fx/type :label
@@ -274,8 +274,8 @@
                                                    (domain/->UIReplyContext
                                                      (:id event-obj) item-id)))}]}]}}
      :bottom {:fx/type :h-box
-              :style (BORDER|)
-              :children [{:fx/type :label :text "placeholder"}]
+              :style (BORDER| :lightgrey)
+              :children [{:fx/type :label :text "..."}]
               }}))
 
 (defn timeline-item*
@@ -292,7 +292,7 @@
      :metadata-cache metadata-cache
      :executor executor}))
 
-(defn home [{:keys [*state db metadata-cache executor]}]
+(defn home [{:keys [*state db metadata-cache executor relays]}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created #(.setSelectionModel % util-fx-more/no-selection-model)
    :desc {:fx/type :list-view

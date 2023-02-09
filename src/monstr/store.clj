@@ -90,10 +90,10 @@
 (defn timeline-query
   [pubkeys]
   [(format (str "select raw_event_tuple from n_events"
-                    " where pubkey in (%s) and kind = 1"
-                    " limit 500")
+                " where pubkey in (%s) and kind = 1"
+                " order by created_at"
+                " limit 100")
                (str/join ", " (map #(str "'" % "'") pubkeys)))])
-
 
 (defn load-timeline-events
   [db pubkeys]
@@ -104,6 +104,26 @@
                          (timeline-query pubkeys)
                          {:builder-fn rs/as-unqualified-lower-maps}))))
 
+
+(defn relay-timeline-query
+  [relay-url pubkeys]
+  [(format (str "select raw_event_tuple from n_events e"
+                " inner join relay_event_id r on e.id=r.event_id"
+                " where r.relay_url='" relay-url "'"
+                " and e.pubkey in (%s) and e.kind = 1"
+                " order by e.created_at"
+                " limit 100")
+               (str/join ", " (map #(str "'" % "'") pubkeys)))])
+
+(defn load-relay-timeline-events
+  [db relay-url pubkeys]
+  (log/debugf "Loading timeline events for %s with %d pubkeys" relay-url (count pubkeys))
+  (when-not (empty? pubkeys)
+    (mapv (comp raw-event-tuple->event-obj :raw_event_tuple)
+          (jdbc/execute! db
+                         (relay-timeline-query relay-url pubkeys)
+                         {:builder-fn rs/as-unqualified-lower-maps}))))
+  
 ;; --
 
 (defn load-relays

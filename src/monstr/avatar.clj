@@ -22,5 +22,5 @@
                                        (second (re-find #"\"(http[^\"]+)" picture-url))
                                        picture-url)]
                              (when-not (str/blank? url)
-                               (log/debugf "Image cache for picture url %s" picture-url)
+                               #_(log/debugf "Image cache for picture url %s" picture-url)
                                (Image. url ^double avatar-dim ^double avatar-dim true true true)))))))

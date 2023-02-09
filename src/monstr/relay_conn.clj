@@ -168,7 +168,7 @@
   [relays]
   (let [read-url? (into #{} (comp (filter :read?) (map :url)) relays)
         write-url? (into #{} (comp (filter :write?) (map :url)) relays)]
-    (log/debug "Updating relays...")
+    (log/debugf "Updating relays %s" relays)
     (locking conn-registry
       ;; close all removed write connections AND write connections that we'll promote to
       ;; read connections

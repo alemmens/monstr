@@ -8,13 +8,11 @@
     [monstr.json :as json]
     [monstr.relay-conn :as relay-conn]
     [monstr.metadata :as metadata]
-    [monstr.timeline :as timeline]
     [monstr.domain :as domain]
     [monstr.parse :as parse]
     [monstr.subscribe :as subscribe]
     [monstr.timeline-new :as timeline-new])
-  (:import (monstr.timeline Timeline)
-           (java.util.concurrent ScheduledExecutorService ScheduledFuture TimeUnit)))
+  (:import (java.util.concurrent ScheduledExecutorService ScheduledFuture TimeUnit)))
 
 ;; todo where do we have stream buffers?
 ;; todo add relay info to events
@@ -35,14 +33,14 @@
             (update curr-state :identity-metadata assoc pubkey parsed)
             curr-state)))
       ;; kick timelines...
-      (timeline/dispatch-metadata-update! *state event-obj))
+      (timeline-new/dispatch-metadata-update! *state event-obj))
     (catch Exception e
       (log/warn e "while handling metadata event"))))
 
 (defn consume-text-note [_db *state relay-url event-obj]
   (log/trace "text note: " relay-url (:id event-obj))
-  (timeline/dispatch-text-note! *state event-obj)
-  (timeline-new/dispatch-text-note! *state event-obj))
+  (timeline-new/dispatch-text-note! *state
+                                    (assoc event-obj :relays (list relay-url))))
 
 (defn consume-recommend-server [db relay-url event-obj]
   (log/info "recommend server (TODO): " relay-url (:id event-obj))
