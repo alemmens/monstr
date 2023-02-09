@@ -47,7 +47,6 @@
 
 (defn new-timelines
   [relays]
-  (log/debugf "Creating new timelines for relays %s" relays)
   (map #(new-timeline (list %)) relays))
 
 (defn accept-text-note?
@@ -130,10 +129,10 @@
    (log/debugf "Updating active flat timelines for %s" public-key)
    (doseq [timeline (get (:identity-timeline-new @*state) public-key)]
      ;; Find the relevant home (listview) and update it.
-     (log/debugf "Relay url list %s" (domain/relay-urls timeline))
+     #_(log/debugf "Relay url list %s" (domain/relay-urls timeline))
      (let [relay-urls (set (:relays timeline))
            home (get (:homes @*state) relay-urls)]
-       (log/debugf "Found home %s for relays %s" home relay-urls)
+       #_(log/debugf "Found home %s for relays %s" home relay-urls)
        (when home
          (.setItems home
                     ^ObservableList (or (:adapted-list timeline)

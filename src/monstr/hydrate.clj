@@ -33,7 +33,6 @@
         identity-timeline-new (into {}
                                     (map #(vector % (timeline/new-timelines relay-urls)))
                                     new-public-keys)]
-    (log/debugf "Identity-timeline-new: %s" identity-timeline-new)
     (swap! *state
       (fn [curr-state]
         (-> curr-state

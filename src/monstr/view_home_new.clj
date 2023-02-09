@@ -213,7 +213,7 @@
         item-id (:id event-obj)
         pubkey (:pubkey event-obj)
         pubkey-for-avatar (or (some-> pubkey (subs 0 3)) "?")
-        ;pubkey-short (or (some-> pubkey util/format-pubkey-short) "?")
+        pubkey-short (or (some-> pubkey util/format-pubkey-short) "?")
         timestamp (:created_at event-obj)
         content (:content event-obj)
         tags (:tags event-obj)
@@ -244,7 +244,7 @@
                                        :text name}
                                       {:fx/type :label
                                        :style-class "ndesk-timeline-item-pubkey"
-                                       :text pubkey}]}
+                                       :text pubkey-short}]}
                     :right {:fx/type :h-box
                             :children [{:fx/type :hyperlink
                                         :style-class ["label" "ndesk-timeline-item-info-link"] ;; used for .lookup
@@ -275,7 +275,7 @@
                                                      (:id event-obj) item-id)))}]}]}}
      :bottom {:fx/type :h-box
               :style (BORDER| :lightgrey)
-              :children [{:fx/type :label :text "..."}]
+              :children [{:fx/type :label :text " "}]
               }}))
 
 (defn timeline-item*
@@ -297,6 +297,7 @@
    :on-created #(.setSelectionModel % util-fx-more/no-selection-model)
    :desc {:fx/type :list-view
           :focus-traversable false
+          :pref-height 100000  ; trick to make it stretch vertically
           :cell-factory {:fx/cell-type :list-cell
                          :describe (fn [text-note-new]
                                      {:graphic

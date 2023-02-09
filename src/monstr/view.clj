@@ -234,30 +234,44 @@
    :closable false
    :text label
    :content content})
+  
+(defn main-panes
+  [{:keys [homes can-publish? active-reply-context active-contact-pubkey metadata-cache]}]
+  {:fx/type :h-box
+   :fill-height true
+   :children (mapv (fn [[relay-urls home]]
+                     {:fx/type :v-box
+                      :h-box/margin 5                      
+                      :children [{:fx/type :label
+                                  ;; TODO: For now we assume that the relay-url set
+                                  ;; contains only one element. We probably want to move
+                                  ;; towards arbitrary-sized relay-url sets instead.
+                                  :text (first relay-urls)}
+                                 {:fx/type main-pane
+                                  :home home
+                                  :can-publish? can-publish?
+                                  :active-reply-context active-reply-context}] })
+                   homes)})
 
 (defn tab-pane
   [{:keys [homes can-publish? active-reply-context active-contact-list
            active-contact-pubkey metadata-cache]}]
   {:fx/type :tab-pane
    :side :top
-   :pref-width 960
-   :pref-height 540
-   :tabs (concat (mapv (fn [[relay-urls home]]
-                         (tab* [(first relay-urls)  ;; TODO: JUST TEMPORARY. FIX THIS.
-                                {:fx/type main-pane
-                                 :home home
-                                 :can-publish? can-publish?
-                                 :active-reply-context active-reply-context}]))
-                       homes)
-                 (mapv tab*
-                       {"Contacts" {:fx/type contacts
-                                    :active-contact-list active-contact-list
-                                    :active-contact-pubkey active-contact-pubkey
-                                    :metadata-cache metadata-cache}}
-                       ;;"Messages" {:fx/type messages}
-                       ;;"Profile" {:fx/type profile}
-                       ;;"Search" {:fx/type search}
-                       ))})
+   :tabs (mapv tab*
+               {"Home" {:fx/type main-panes
+                        :homes homes
+                        :active-contact-list active-contact-list
+                        :active-contact-pubkey active-contact-pubkey
+                        :metadata-cache metadata-cache}
+                "Contacts" {:fx/type contacts
+                            :active-contact-list active-contact-list
+                            :active-contact-pubkey active-contact-pubkey
+                            :metadata-cache metadata-cache}
+               ;;"Messages" {:fx/type messages}
+               ;;"Profile" {:fx/type profile}
+               ;;"Search" {:fx/type search}
+               })})
 
 (defn keycards
   [{:keys [active-key identities identity-metadata show-new-identity?
@@ -368,7 +382,7 @@
                      identity-active-contact metadata-cache]}]
   {:fx/type :stage
    :showing true
-   :title "nostr desk"
+   :title "Monstr"
    :width 1272
    :height 800
    :scene

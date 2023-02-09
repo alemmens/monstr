@@ -26,7 +26,8 @@
           ^VBox v-box (last (.getChildren pane))]
       (reduce
         (fn [acc ^HBox h-box]
-          (let [[^TextField tf _ ^CheckBox cb0 _ ^CheckBox cb1] (vec (.getChildren h-box))
+          (let [[^TextField _eventcount ^TextField tf _ ^CheckBox cb0 _ ^CheckBox cb1]
+                (vec (.getChildren h-box))
                 url (str/trim (.getText tf))]
             (if (str/blank? url)
               acc
