@@ -26,7 +26,7 @@
 (defn hydrate!*
   ;; note: first of new-identities will become the active identity
   [*state db ^ScheduledExecutorService executor new-identities]
-  (log/debugf "Hydrating with new identities %s" new-identities)
+  (log/debugf "Hydrating with new identities")
   (let [new-public-keys (mapv :public-key new-identities)
         identity-metadata (store/load-metadata db new-public-keys)
         relay-urls (domain/relay-urls @*state)

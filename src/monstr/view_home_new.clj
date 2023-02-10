@@ -1,6 +1,7 @@
 (ns monstr.view-home-new
   (:require [cljfx.api :as fx]
             [clojure.string :as str]
+            [clojure.tools.logging :as log]
             [monstr.avatar :as avatar]
             [monstr.cache :as cache]
             [monstr.domain :as domain]
@@ -129,11 +130,14 @@
 (defn- show-reply-button!*
   [*state show? ^MouseEvent e]
   (let [{:keys [active-key identities]} @*state]
+    #_(log/debugf "Showing reply button with show?=%s and event=%s" show? e)
     (when-let [^Node target (.getTarget e)]
+      #_(log/debugf "Reply button target=%s" target)
       (some-> target
         (.lookup ".ndesk-timeline-item-info-link")
         (.setVisible show?))
       (when (util-domain/can-publish? active-key identities)
+        #_(log/debugf "Reply button can publish")
         (some-> target
           (.lookup ".ndesk-content-controls")
           (.setVisible show?))))))
@@ -207,6 +211,25 @@
         (- (.getX node-pos) (* 0.5 popup-width))
         (.getY node-pos)))))
 
+(defn- action-button-row
+  [*state event-obj item-id]
+  {:fx/type :h-box
+   :style-class ["ndesk-content-controls"] ;; used for .lookup
+   :style (BORDER| :lightgrey)
+   :visible false
+   :alignment :center
+   :max-width Integer/MAX_VALUE
+   :children [;; Reply button
+              {:fx/type :button
+               :style-class ["button" "ndesk-reply-button"] ;; used for .lookup
+               :h-box/margin 3
+               :text "reply"
+               :on-action
+               (fn [_]
+                 #_(log/debugf "Reply button action")
+                 (swap! *state assoc :active-reply-context
+                        (domain/->UIReplyContext (:id event-obj) item-id)))}]})
+  
 (defn timeline-item
   [{:keys [^UITextNoteNew text-note-new *state db metadata-cache executor]}]
   (let [event-obj (:event-obj text-note-new)
@@ -222,9 +245,7 @@
     {:fx/type :border-pane
      :on-mouse-entered (partial show-reply-button!* *state true)
      :on-mouse-exited (partial show-reply-button!* *state false)
-     :left (if picture-url
-             {:fx/type avatar
-              :picture-url picture-url}
+     :left (if (str/blank? picture-url)
              {:fx/type :label
               :min-width avatar-dim
               :min-height avatar-dim
@@ -232,7 +253,9 @@
               :max-height avatar-dim
               :style {:-fx-background-color avatar-color}
               :style-class "ndesk-timeline-item-photo"
-              :text pubkey-for-avatar})
+              :text pubkey-for-avatar}
+             {:fx/type avatar
+              :picture-url picture-url})
      :center {:fx/type :border-pane
               :style (BORDER| :white)
               :top {:fx/type :border-pane
@@ -259,24 +282,10 @@
                                    :content content
                                    :tags tags
                                    :metadata-cache metadata-cache}
-                                  {:fx/type :h-box
-                                   :style-class ["ndesk-content-controls"] ;; used for .lookup
-                                   :visible false
-                                   :alignment :center-right
-                                   :max-width Integer/MAX_VALUE
-                                   :children [{:fx/type :button
-                                               :style-class ["button" "ndesk-reply-button"] ;; used for .lookup
-                                               :h-box/margin 3
-                                               :text "reply"
-                                               :on-action
-                                               (fn [_]
-                                                 (swap! *state assoc :active-reply-context
-                                                   (domain/->UIReplyContext
-                                                     (:id event-obj) item-id)))}]}]}}
-     :bottom {:fx/type :h-box
-              :style (BORDER| :lightgrey)
-              :children [{:fx/type :label :text " "}]
-              }}))
+                                  ]}}
+     ;; The action buttons (Reply, Thread, ...) are at the bottom of the timeline item.
+     :bottom (action-button-row *state event-obj item-id)}))
+
 
 (defn timeline-item*
   [{:keys [^UITextNoteNew text-note-new *state db metadata-cache executor]}]

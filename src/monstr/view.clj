@@ -261,6 +261,7 @@
    :tabs (mapv tab*
                {"Home" {:fx/type main-panes
                         :homes homes
+                        :can-publish? can-publish?
                         :active-contact-list active-contact-list
                         :active-contact-pubkey active-contact-pubkey
                         :metadata-cache metadata-cache}

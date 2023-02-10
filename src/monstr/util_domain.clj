@@ -1,4 +1,6 @@
-(ns monstr.util-domain)
+(ns monstr.util-domain
+  (:require
+   [clojure.tools.logging :as log]))
 
 (defn ->secret-key*
   [active-key identities]

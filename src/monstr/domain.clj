@@ -5,7 +5,7 @@
   {:show-relays? false  ; indicates if the relays dialog must be shown
    :show-new-identity? false
    :new-identity-error ""
-   :active-reply-context nil
+   :active-reply-context nil  ; for the reply dialog
    :identities [] ; [domain/Identity]
    :identity-metadata {} ; pubkey -> domain/ParsedMetadata
    :contact-lists {} ; pubkey -> domain/ContactList

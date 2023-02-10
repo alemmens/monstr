@@ -15,7 +15,7 @@
   [identities contact-lists]
   ;; todo note: since here is a stop-gap protection .. really we would like to track a
   ;; durable "watermark" for stable subscriptions
-  (let [use-since (-> (util/days-ago 7) .getEpochSecond)
+  (let [use-since (-> (util/days-ago 2) .getEpochSecond)
         pubkeys (mapv :public-key identities)]
     (when-not (empty? pubkeys)
       (let [filters (filterv

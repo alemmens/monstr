@@ -23,6 +23,7 @@
 
 (defn- on-create-dialog
   [^Dialog d]
+  (log/debugf "Creating reply dialog %s" d)
   (doto d
     ;; note we have to set result-converter this way instead of via
     ;; cljfx prop as we need ref to the dialog to do the conversion
