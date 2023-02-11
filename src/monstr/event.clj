@@ -207,6 +207,14 @@
         (fn [{:keys [active-key] :as curr-state}]
           (assoc-in curr-state [:identity-active-contact active-key] contact-pubkey))))]])
 
+(defn click-reply-button
+  [event-obj]
+  [[:bg
+    (fn [*state _db _exec _dispatch!]
+      (log/debugf "Reply button action")
+      (swap! *state assoc :active-reply-context
+             (domain/->UIReplyContext (:id event-obj) (:id event-obj))))]])
+
 (defn handle
   [{:event/keys [type] :as event}]
   (case type
@@ -219,4 +227,5 @@
     :publish! (publish! event)
     :reply-close-request (reply! event)
     :click-contact-card (click-contact-card event)
+    :click-reply-button (click-reply-button event)
     (log/error "no matching clause" type)))

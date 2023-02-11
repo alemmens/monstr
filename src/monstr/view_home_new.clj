@@ -130,14 +130,13 @@
 (defn- show-reply-button!*
   [*state show? ^MouseEvent e]
   (let [{:keys [active-key identities]} @*state]
-    #_(log/debugf "Showing reply button with show?=%s and event=%s" show? e)
     (when-let [^Node target (.getTarget e)]
-      #_(log/debugf "Reply button target=%s" target)
+      ;; Show the info link.
       (some-> target
         (.lookup ".ndesk-timeline-item-info-link")
         (.setVisible show?))
       (when (util-domain/can-publish? active-key identities)
-        #_(log/debugf "Reply button can publish")
+        ;; Show the reply button.
         (some-> target
           (.lookup ".ndesk-content-controls")
           (.setVisible show?))))))
@@ -224,9 +223,10 @@
                :style-class ["button" "ndesk-reply-button"] ;; used for .lookup
                :h-box/margin 3
                :text "reply"
-               :on-action
-               (fn [_]
-                 #_(log/debugf "Reply button action")
+               :on-mouse-clicked {:event/type :click-reply-button}
+               #_:on-action
+               #_(fn [_]
+                 (log/debugf "Reply button action")
                  (swap! *state assoc :active-reply-context
                         (domain/->UIReplyContext (:id event-obj) item-id)))}]})
   

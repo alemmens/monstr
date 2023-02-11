@@ -81,7 +81,7 @@
 
 (defonce map-event-handler
   (-> ev/handle
-    (fx/wrap-effects {:fg fg-effect :bg bg-effect})))
+      (fx/wrap-effects {:fg fg-effect :bg bg-effect})))
 
 (defonce renderer
   (fx/create-renderer

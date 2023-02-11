@@ -35,6 +35,7 @@
 
 (defn dialog
   [{:keys [show-new-identity? new-identity-error]}]
+  (log/debugf "Creating new identity dialog with show-new-identity=%s" show-new-identity?)
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created on-create-dialog
    :desc

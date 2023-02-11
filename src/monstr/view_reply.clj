@@ -51,6 +51,7 @@
 
 (defn dialog
   [{:keys [active-reply-context]}]
+  (log/debugf "Reply dialog with active reply context = %s" active-reply-context)
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created on-create-dialog
    :desc

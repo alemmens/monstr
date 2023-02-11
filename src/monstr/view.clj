@@ -200,33 +200,12 @@
                     :filter view-common/text-formatter-filter*}})
 
 (defn main-pane
-  [{:keys [home can-publish? active-reply-context]}]
-  {:fx/type fx/ext-let-refs
-   :refs {:dialog {:fx/type view-reply/dialog
-                   :active-reply-context active-reply-context}}
-   :desc
-   {:fx/type :v-box
-    :children
-    [{:fx/type :h-box
-      :alignment :center
-      :children
-      [{:fx/type publish-box
-        :can-publish? can-publish?
-        :h-box/margin 5
-        :h-box/hgrow :always}
-       {:fx/type :label
-        :h-box/margin 5
-        :graphic {:fx/type :button
-                  ;; note: :on-action and :on-mouse-clicked don't seem to work
-                  ;;  when the publish text-area has focus but mouse-pressed
-                  ;;  does:
-                  :on-mouse-pressed {:event/type :publish!}
-                  :disable (not can-publish?)
-                  :style-class ["button" "ndesk-publish-button"]
-                  :text "Publish"}}]}
-     {:fx/type fx/ext-instance-factory
-      :create #(doto home
-                 (VBox/setVgrow Priority/ALWAYS))}]}})
+  [{:keys [home can-publish?]}]
+  {:fx/type :v-box
+   :children
+   [{:fx/type fx/ext-instance-factory
+     :create #(doto home
+                (VBox/setVgrow Priority/ALWAYS))}]})
 
 (defn tab*
   [[label content]]
@@ -237,21 +216,48 @@
   
 (defn main-panes
   [{:keys [homes can-publish? active-reply-context active-contact-pubkey metadata-cache]}]
-  {:fx/type :h-box
-   :fill-height true
-   :children (mapv (fn [[relay-urls home]]
-                     {:fx/type :v-box
-                      :h-box/margin 5                      
-                      :children [{:fx/type :label
-                                  ;; TODO: For now we assume that the relay-url set
-                                  ;; contains only one element. We probably want to move
-                                  ;; towards arbitrary-sized relay-url sets instead.
-                                  :text (first relay-urls)}
-                                 {:fx/type main-pane
-                                  :home home
-                                  :can-publish? can-publish?
-                                  :active-reply-context active-reply-context}] })
-                   homes)})
+  (log/debugf "Main panes with active reply context=%s" active-reply-context)
+  {:fx/type fx/ext-let-refs
+   :refs {:dialog {:fx/type view-reply/dialog
+                   :active-reply-context active-reply-context}}
+   :desc
+   {:fx/type :v-box
+    :children [;; The "what's on your mind?" box.
+               {:fx/type :h-box
+                :alignment :center
+                :children [{:fx/type publish-box
+                            :can-publish? can-publish?
+                            :h-box/margin 5
+                            :min-width 300
+                            :max-width 600}
+                           {:fx/type :label
+                            :h-box/margin 5
+                            :graphic {:fx/type :button
+                                      ;; note: :on-action and :on-mouse-clicked don't seem to work
+                                      ;;  when the publish text-area has focus but mouse-pressed
+                                      ;;  does:
+                                      :on-mouse-pressed {:event/type :publish!}
+                                      :disable (not can-publish?)
+                                      :style-class ["button" "ndesk-publish-button"]
+                                      :text "Publish"}}]}
+               ;; Timelines per relay.
+               {:fx/type :h-box
+                :fill-height true
+                :children (mapv (fn [[relay-urls home]]
+                                  {:fx/type :v-box
+                                   :h-box/margin 5
+                                   :h-box/hgrow :always
+                                   :children [{:fx/type :label
+                                               ;; TODO: For now we assume that the relay-url set
+                                               ;; contains only one element. We probably want to move
+                                               ;; towards arbitrary-sized relay-url sets instead.
+                                               :text (first relay-urls)}
+                                              {:fx/type main-pane
+                                               :home home
+                                               :can-publish? can-publish?
+                                               :active-reply-context active-reply-context}]})
+                                homes)}]}})
+
 
 (defn tab-pane
   [{:keys [homes can-publish? active-reply-context active-contact-list
