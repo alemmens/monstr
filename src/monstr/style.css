@@ -146,7 +146,7 @@
 
 .ndesk-reply-button {
     -fx-font-family: "Roboto Bold";
-    -fx-font-size: 10pt;
+    -fx-font-size: 9pt;
     -fx-pref-width: 5em;
     -fx-padding: 2px;
     -fx-background-color: -nd-publish-button-color;
@@ -155,11 +155,26 @@
     /*-fx-font-weight: bold; ...negates the boldness somehow*/
 }
 
-.ndesk-timeline-item-info-link,
+.ndesk-reply-button:hover,
+.ndesk-reply-button:hover:visited {
+    -fx-text-fill: #aaa;
+}
+
+
+.ndesk-timeline-item-info-link {
+    -fx-font-family: "Roboto Bold";
+    -fx-font-size: 9pt;
+    -fx-pref-width: 5em;
+    -fx-padding: 2px;
+    -fx-background-color: -nd-publish-button-color;
+    -fx-text-fill: white;
+    -fx-cursor: hand;
+    /*-fx-font-weight: bold; ...negates the boldness somehow*/
+}
+    
 .ndesk-timeline-item-info-link:hover,
 .ndesk-timeline-item-info-link:hover:visited {
     -fx-text-fill: #aaa;
-    -fx-padding: 0 5px;
 }
 
 .ndesk-info-popup-region {

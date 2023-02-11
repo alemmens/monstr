@@ -127,19 +127,23 @@
    :children [{:fx/type fx/ext-instance-factory
                :create #(create-content-node* content tags metadata-cache)}]})
 
-(defn- show-reply-button!*
+(defn- show-action-row!
   [*state show? ^MouseEvent e]
   (let [{:keys [active-key identities]} @*state]
     (when-let [^Node target (.getTarget e)]
-      ;; Show the info link.
+      ;; Show/hide the action button row.
       (some-> target
-        (.lookup ".ndesk-timeline-item-info-link")
-        (.setVisible show?))
-      (when (util-domain/can-publish? active-key identities)
-        ;; Show the reply button.
-        (some-> target
-          (.lookup ".ndesk-content-controls")
-          (.setVisible show?))))))
+              (.lookup ".ndesk-content-controls")
+              (.setVisible show?))
+      ;; Show/hide the info link.
+      (some-> target
+              (.lookup ".ndesk-timeline-item-info-link")
+              (.setVisible show?))
+      ;; Show/hide the reply button.
+      (some-> target
+              (.lookup ".ndesk-reply-button")
+              (.setVisible (and show?
+                                (util-domain/can-publish? active-key identities)))))))
 
 (defonce ^Popup singleton-popup
   (fx/instance
@@ -182,7 +186,7 @@
                                    (util/put-clipboard! content)))}]}]})))
 
 (defn- ready-popup!
-  ^Popup [db popup-width item-id author-pubkey]
+  ^Popup [db node-pos popup-width item-id author-pubkey]
   (let [event-id-short (util/format-event-id-short item-id)
         seen-on-relays (store/get-seen-on-relays db item-id)
         ^VBox v-box (first (seq (.getContent singleton-popup)))
@@ -194,6 +198,9 @@
     (.setUserData copy-author-pubkey-hyperlink {:author-pubkey author-pubkey})
     (.setText event-id-label (str "Event: " event-id-short))
     (.setText seen-on-label (str/join "\n" (cons "Seen on:" seen-on-relays)))
+    (.relocate v-box
+               (- (.getX node-pos) (* 0.5 popup-width))
+               (.getY node-pos))
     (.setMinWidth v-box popup-width)
     (.setMaxWidth v-box popup-width)
     (.setPrefWidth v-box popup-width)
@@ -201,24 +208,28 @@
 
 (defn- show-info!
   [db item-id author-pubkey ^ActionEvent e]
-  (let [^Hyperlink node (.getSource e)
+  (let [node (.getSource e)
         popup-width 250
-        popup (ready-popup! db popup-width item-id author-pubkey)]
-    (let [bounds (.getBoundsInLocal node)
-          node-pos (.localToScreen node (* 0.5 (.getWidth bounds)) 0.0)]
-      (.show popup node
-        (- (.getX node-pos) (* 0.5 popup-width))
-        (.getY node-pos)))))
+        bounds (.getBoundsInLocal node)
+        node-pos (.localToScreen node (* 0.5 (.getWidth bounds)) 0.0)
+        popup (ready-popup! db node-pos popup-width item-id author-pubkey)]
+      (let [stage (-> node .getScene .getWindow)]
+        (.show popup stage))))
 
 (defn- action-button-row
-  [*state event-obj item-id]
+  [*state db event-obj item-id pubkey]
   {:fx/type :h-box
    :style-class ["ndesk-content-controls"] ;; used for .lookup
    :style (BORDER| :lightgrey)
    :visible false
    :alignment :center
    :max-width Integer/MAX_VALUE
-   :children [;; Reply button
+   :children [;; Info button
+              {:fx/type :button
+               :style-class ["button" "ndesk-timeline-item-info-link"] ;; used for .lookup
+               :text "info"
+               :on-action (partial show-info! db item-id pubkey)}
+              ;; Reply button
               {:fx/type :button
                :style-class ["button" "ndesk-reply-button"] ;; used for .lookup
                :h-box/margin 3
@@ -243,8 +254,8 @@
         {:keys [name about picture-url nip05-id created-at]} (some->> pubkey (metadata/get* metadata-cache))
         avatar-color (or (some-> pubkey avatar/color) :lightgray)]
     {:fx/type :border-pane
-     :on-mouse-entered (partial show-reply-button!* *state true)
-     :on-mouse-exited (partial show-reply-button!* *state false)
+     :on-mouse-entered (partial show-action-row! *state true)
+     :on-mouse-exited (partial show-action-row! *state false)
      :left (if (str/blank? picture-url)
              {:fx/type :label
               :min-width avatar-dim
@@ -268,14 +279,8 @@
                                       {:fx/type :label
                                        :style-class "ndesk-timeline-item-pubkey"
                                        :text pubkey-short}]}
-                    :right {:fx/type :h-box
-                            :children [{:fx/type :hyperlink
-                                        :style-class ["label" "ndesk-timeline-item-info-link"] ;; used for .lookup
-                                        :visible false
-                                        :text "info"
-                                        :on-action (partial show-info! db item-id pubkey)}
-                                       {:fx/type :label
-                                        :text (or (some-> timestamp util/format-timestamp) "?")}]}}
+                    :right {:fx/type :label
+                            :text (or (some-> timestamp util/format-timestamp) "?")}}
               :bottom {:fx/type :h-box
                        :children [{:fx/type timeline-item-content
                                    :h-box/hgrow :always
@@ -284,7 +289,7 @@
                                    :metadata-cache metadata-cache}
                                   ]}}
      ;; The action buttons (Reply, Thread, ...) are at the bottom of the timeline item.
-     :bottom (action-button-row *state event-obj item-id)}))
+     :bottom (action-button-row *state db event-obj item-id pubkey)}))
 
 
 (defn timeline-item*
