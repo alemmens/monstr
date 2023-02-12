@@ -6,8 +6,8 @@
    :show-new-identity? false
    :new-identity-error ""
    :active-reply-context nil  ; for the reply dialog
-   :identities [] ; [domain/Identity]
-   :identity-metadata {} ; pubkey -> domain/ParsedMetadata
+   :identities [] ; sequence of domain/Identity
+   :identity-metadata {} ; map from pubkey to domain/ParsedMetadata
    :contact-lists {} ; pubkey -> domain/ContactList
    :identity-active-contact {}
    :relays [] ;; [domain/Relay]

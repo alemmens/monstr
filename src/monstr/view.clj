@@ -255,9 +255,24 @@
                                homes)}]})
 
 
+(defn profile
+  [{:keys [pubkey identities identity-metadata]}]
+  (let [identity (first (filter (fn [id] (= (:public-key id) pubkey))
+                                identities))]
+    (log/debugf "Profile for %s with identity %s" pubkey identity)
+    (if (and pubkey identity)
+      {:fx/type keycard
+       :fx/key pubkey
+       :active? false
+       :identity_ identity
+       :this-identity-metadata (get identity-metadata pubkey)}
+      {:fx/type :label
+       :text "No pubkey selected for profile"})))
+  
 (defn tab-pane
   [{:keys [homes can-publish? active-reply-context active-contact-list
-           active-contact-pubkey metadata-cache]}]
+           active-key active-contact-pubkey identities
+           identity-metadata metadata-cache]}]
   (log/debugf "Tab pane with active reply context=%s" active-reply-context)
   {:fx/type fx/ext-let-refs
    :refs {:dialog {:fx/type view-reply/dialog
@@ -277,7 +292,10 @@
                                    :active-contact-pubkey active-contact-pubkey
                                    :metadata-cache metadata-cache}
                        ;;"Messages" {:fx/type messages}
-                       ;;"Profile" {:fx/type profile}
+                       "Profile" {:fx/type profile
+                                  :pubkey active-key
+                                  :identities identities
+                                  :identity-metadata identity-metadata}
                        ;;"Search" {:fx/type search}
                        })}})
 
@@ -375,9 +393,12 @@
    :center {:fx/type tab-pane
             :homes homes
             :can-publish? (util-domain/can-publish? active-key identities)
+            :active-key active-key
             :active-reply-context active-reply-context
             :active-contact-list (get contact-lists active-key)
             :active-contact-pubkey (get identity-active-contact active-key)
+            :identities identities
+            :identity-metadata identity-metadata
             :metadata-cache metadata-cache}
    :bottom {:fx/type status-bar
             :show-relays? show-relays?
