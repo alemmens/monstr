@@ -16,6 +16,7 @@
     [monstr.util-fx :as util-fx]
     [monstr.view-common :as view-common]
     [monstr.view-reply :as view-reply]
+    [monstr.timeline-new :as timeline]
     [clojure.string :as str]
     [monstr.metadata :as metadata])
   (:import (javafx.scene.canvas Canvas)
@@ -31,7 +32,7 @@
      :image (cache/get* avatar/image-cache [picture-url width])}))
 
 (defn keycard
-  [{:keys [active?]
+  [{:keys [active? profile?]
     {:keys [public-key] :as identity_} :identity_
     ;; possibly nil:
     {:keys [name about picture-url nip05-id]} :this-identity-metadata}]
@@ -72,7 +73,11 @@
                   true (conj {:fx/type :label
                               :alignment :top-left
                               :style-class ["label" "ndesk-keycard-pubkey"]
-                              :text (util/format-pubkey-short public-key)}))}
+                              :text (if profile?
+                                      ;; In the profile tab we have enough room to
+                                      ;; show the whole public key.
+                                      public-key
+                                      (util/format-pubkey-short public-key))}))}
          :right {:fx/type :hyperlink :text "X"
                  :on-action {:event/type :delete-keycard :identity_ identity_}}}
         {:fx/type :label
@@ -91,10 +96,10 @@
           :on-mouse-clicked {:event/type :show-new-identity}
           :children
           [{:fx/type :label
-            :h-box/hgrow :always
-            :max-width Integer/MAX_VALUE
-            :alignment :center
-            :text "add new identity"}]}})
+            ; :h-box/hgrow :always
+            ; :max-width Integer/MAX_VALUE
+            ; :alignment :center
+            :text "add identity"}]}})
 
 (defn contact-card
   [{:keys [active? parsed-contact parsed-metadata]}]
@@ -243,11 +248,14 @@
                                  {:fx/type :v-box
                                   :h-box/margin 5
                                   :h-box/hgrow :always
-                                  :children [{:fx/type :label
-                                              ;; TODO: For now we assume that the relay-url set
-                                              ;; contains only one element. We probably want to move
-                                              ;; towards arbitrary-sized relay-url sets instead.
-                                              :text (first relay-urls)}
+                                  :children [{:fx/type :h-box
+                                              :alignment :center
+                                              :style-class "relay-timeline-label"
+                                              :children [{:fx/type :label
+                                                          ;; TODO: For now we assume that the relay-url set
+                                                          ;; contains only one element. We probably want to move
+                                                          ;; towards arbitrary-sized relay-url sets instead.
+                                                          :text (first relay-urls)}]}
                                              {:fx/type main-pane
                                               :home home
                                               :can-publish? can-publish?
@@ -264,6 +272,7 @@
       {:fx/type keycard
        :fx/key pubkey
        :active? false
+       :profile? true
        :identity_ identity
        :this-identity-metadata (get identity-metadata pubkey)}
       {:fx/type :label
@@ -300,8 +309,7 @@
                        })}})
 
 (defn keycards
-  [{:keys [active-key identities identity-metadata show-new-identity?
-           new-identity-error]}]
+  [{:keys [active-key identities identity-metadata show-new-identity? new-identity-error]}]
   {:fx/type :v-box
    :style-class "ndesk-lhs-pane"
    :children (vec
@@ -378,18 +386,53 @@
            :refresh-relays-ts refresh-relays-ts
            :connected-info connected-info}})
 
+(defn identity-selector
+  [{:keys [identities active-key identity-metadata show-new-identity?]}]
+  {:fx/type :h-box
+   ; :alignment :center
+   :padding 10
+   :children (let [label {:fx/type :label
+                          :alignment :center
+                          :padding 10
+                          :text "Identity: "}
+                   combo-box (when active-key
+                               {:fx/type :combo-box
+                                :value active-key
+                                :style-class "identity-selector"
+                                :on-value-changed (fn [k]
+                                                    (swap! domain/*state assoc :active-key k)
+                                                    (timeline/update-active-timelines! domain/*state k))
+                                :button-cell (fn [k] {:text (:name (get identity-metadata k))})
+                                :cell-factory {:fx/cell-type :list-cell
+                                               :describe (fn [k] {:text (:name (get identity-metadata k))})}
+                                :items (sort-by #(:name (get identity-metadata %))
+                                                (keys identity-metadata))})
+                   add-new-button {:fx/type keycard-create-new
+                                   :padding 5
+                                   :show-new-identity? show-new-identity?}]
+               (if active-key
+                 [label combo-box add-new-button]
+                 [label add-new-button]))})
+              
+
 (defn root [{:keys [show-relays? active-key identities identity-metadata relays
                     refresh-relays-ts connected-info homes show-new-identity?
                     new-identity-error active-reply-context contact-lists
                     identity-active-contact metadata-cache]}]
   (log/debugf "Root with active reply context=%s" active-reply-context)
   {:fx/type :border-pane
-   :left {:fx/type keycards
-          :active-key active-key
-          :identities identities
-          :identity-metadata identity-metadata
-          :show-new-identity? show-new-identity?
-          :new-identity-error new-identity-error}
+   :top {:fx/type identity-selector
+         :identities identities
+         :active-key active-key
+         :show-new-identity? show-new-identity?
+         :identity-metadata identity-metadata}
+   #_:left
+   #_ {:fx/type keycards
+       :active-key active-key
+       :identities identities
+       :identity-metadata identity-metadata
+       :show-new-identity? show-new-identity?
+       :new-identity-error new-identity-error}
    :center {:fx/type tab-pane
             :homes homes
             :can-publish? (util-domain/can-publish? active-key identities)

@@ -236,10 +236,8 @@
                :style-class ["button" "ndesk-reply-button"] ;; used for .lookup
                :h-box/margin 3
                :text "reply"
-               #_ :on-mouse-clicked #_ {:event/type :click-reply-button}
                :on-action
                (fn [_]
-                 (log/debugf "Reply button action")
                  (swap! *state assoc :active-reply-context
                         (domain/->UIReplyContext (:id event-obj) item-id)))}]})
   

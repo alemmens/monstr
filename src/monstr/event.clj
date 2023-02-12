@@ -26,6 +26,7 @@
   [{:keys [public-key]}]
   [[:bg
     (fn [*state _db _exec _dispatch!]
+      (log/debugf "Click keycard for public key %s" public-key)
       (timeline-new/update-active-timelines! *state public-key))]])
 
 (defn show-new-identity-effect
@@ -217,6 +218,7 @@
 
 (defn handle
   [{:event/keys [type] :as event}]
+  (log/debugf "Handling event of type %s: %s" type event)
   (case type
     :click-keycard (click-keycard event)
     :show-new-identity (show-new-identity-effect true)

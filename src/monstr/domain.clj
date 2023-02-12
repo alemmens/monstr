@@ -19,6 +19,9 @@
    :identity-timeline-new {} ; a map from identity pubkeys to lists of TimelineNew.
    })
 
+(defonce *state
+  (atom (initial-state)))
+
 (defn relay-urls [state]
   (doall (map :url (:relays state))))
 

@@ -223,3 +223,16 @@
     -fx-background-color: white;
     -fx-cursor: hand;
 }
+
+
+.identity-selector {
+    -fx-font-size: 10pt;
+    -fx-padding: 5px;
+    -fx-font-weight: bold;
+}
+
+.relay-timeline-label {
+    -fx-font-size: 9pt;
+    -fx-padding: 5px;
+    -fx-font-weight: bold;
+}

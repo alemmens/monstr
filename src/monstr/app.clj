@@ -31,51 +31,49 @@
                         (.setDaemon true)))))]
     (Executors/newSingleThreadScheduledExecutor factory)))
 
-(defonce *state
-  (atom
-    (domain/initial-state)))
-
 (defn make-home []
-  (view-home-new/create-list-view *state store/db metadata-cache daemon-scheduled-executor))
+  (view-home-new/create-list-view domain/*state store/db metadata-cache daemon-scheduled-executor))
 
 (defn init-homes!
   "Create home timelines for the first 3 relays."
   []
-  (swap! *state assoc
+  (swap! domain/*state assoc
          :homes (into {}
                       (map #(vector #{%} (make-home))
-                           (take 3 (domain/relay-urls @*state))))))
+                           (take 3 (domain/relay-urls @domain/*state))))))
   
 (defn- load-relays!
   []
   (let [relays (store/load-relays store/db)]
-    (swap! *state assoc :relays relays :refresh-relays-ts (System/currentTimeMillis))
+    (swap! domain/*state assoc
+           :relays relays
+           :refresh-relays-ts (System/currentTimeMillis))
     (log/debugf "Loaded %d relays." (count relays))))
 
 (defn- update-relays! []
-  (relay-conn/update-relays! (:relays @*state)))
+  (relay-conn/update-relays! (:relays @domain/*state)))
 
 (defn- load-identities!
   []
   (let [identities (store/load-identities store/db)]
     (log/debugf "Loaded %d identities." (count identities))
-    (hydrate/hydrate! *state store/db daemon-scheduled-executor identities)))
+    (hydrate/hydrate! domain/*state store/db daemon-scheduled-executor identities)))
 
 (defn- update-connected-info!
   []
   (let [connected-info (relay-conn/connected-info)]
-    (swap! *state assoc :connected-info connected-info)))
+    (swap! domain/*state assoc :connected-info connected-info)))
 
 (defn fg-effect [f dispatch!]
   (fx/on-fx-thread
-    (f *state store/db dispatch!)))
+    (f domain/*state store/db dispatch!)))
 
 (defn bg-effect [f dispatch!]
   (.submit daemon-scheduled-executor
     ^Runnable
     (fn []
       (try
-        (f *state store/db daemon-scheduled-executor #(fx/on-fx-thread (dispatch! %)))
+        (f domain/*state store/db daemon-scheduled-executor #(fx/on-fx-thread (dispatch! %)))
         (catch Throwable t
           (log/error t "on bg"))))))
 
@@ -92,8 +90,8 @@
   [& _]
   (load-relays!)
   (init-homes!)
-  (fx/mount-renderer *state renderer)
-  (consume/start! store/db *state metadata-cache daemon-scheduled-executor)
+  (fx/mount-renderer domain/*state renderer)
+  (consume/start! store/db domain/*state metadata-cache daemon-scheduled-executor)
   (util/schedule! daemon-scheduled-executor load-identities! 1000)
   (util/schedule! daemon-scheduled-executor update-relays! 3000)
   (util/schedule-with-fixed-delay!
