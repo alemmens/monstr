@@ -194,10 +194,12 @@
         ^Label seen-on-label (.lookup v-box ".ndesk-info-popup-seen-on")
         ^Hyperlink copy-event-id-hyperlink (.lookup v-box ".ndesk-info-popup-copy-event-link")
         ^Hyperlink copy-author-pubkey-hyperlink (.lookup v-box ".ndesk-info-popup-copy-author-pubkey-link")]
+    ;; Set the content.
     (.setUserData copy-event-id-hyperlink {:event-id item-id})
     (.setUserData copy-author-pubkey-hyperlink {:author-pubkey author-pubkey})
     (.setText event-id-label (str "Event: " event-id-short))
     (.setText seen-on-label (str/join "\n" (cons "Seen on:" seen-on-relays)))
+    ;; Set position and dimensions.
     (.relocate v-box
                (- (.getX node-pos) (* 0.5 popup-width))
                (.getY node-pos))
@@ -234,9 +236,9 @@
                :style-class ["button" "ndesk-reply-button"] ;; used for .lookup
                :h-box/margin 3
                :text "reply"
-               :on-mouse-clicked {:event/type :click-reply-button}
-               #_:on-action
-               #_(fn [_]
+               #_ :on-mouse-clicked #_ {:event/type :click-reply-button}
+               :on-action
+               (fn [_]
                  (log/debugf "Reply button action")
                  (swap! *state assoc :active-reply-context
                         (domain/->UIReplyContext (:id event-obj) item-id)))}]})

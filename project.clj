@@ -1,5 +1,5 @@
 (defproject monstr "0.1.0-SNAPSHOT"
-  :description "Monstr: a Clojure Desktop app for Nostr"
+  :description "Monstr: a Desktop app for Nostr"
   :url "https://github.com/alemmens/monstr"
   
   :dependencies
