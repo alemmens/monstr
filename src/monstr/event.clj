@@ -216,6 +216,22 @@
       (swap! *state assoc :active-reply-context
              (domain/->UIReplyContext (:id event-obj) (:id event-obj))))]])
 
+(defn remove-relay-timeline!
+  [{:keys [relay-url]}]
+  [[:bg
+    (fn [*state _db _exec _dispatch!]
+      (log/debugf "Removing relay timeline %s, active key = %s" relay-url (:active-key @*state))
+      (swap! *state assoc
+             :relay-timelines (remove #{relay-url} (:relay-timelines @*state))))]])
+
+(defn add-relay-timeline!
+  [{:keys [relay-url]}]
+  [[:bg
+    (fn [*state _db _exec _dispatch!]
+      (log/debugf "Adding relay timeline %s" relay-url)
+      (swap! *state assoc
+             :relay-timelines (conj (:relay-timelines @*state) relay-url)))]])
+
 (defn handle
   [{:event/keys [type] :as event}]
   (log/debugf "Handling event of type %s: %s" type event)
@@ -230,4 +246,6 @@
     :reply-close-request (reply! event)
     :click-contact-card (click-contact-card event)
     :click-reply-button (click-reply-button event)
+    :remove-relay-timeline (remove-relay-timeline! event)
+    :add-relay-timeline (add-relay-timeline! event)
     (log/error "no matching clause" type)))

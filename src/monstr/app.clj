@@ -37,10 +37,12 @@
 (defn init-homes!
   "Create home timelines for the first 3 relays."
   []
-  (swap! domain/*state assoc
-         :homes (into {}
-                      (map #(vector #{%} (make-home))
-                           (take 3 (domain/relay-urls @domain/*state))))))
+  (let [urls (take 3 (domain/relay-urls @domain/*state))]
+    (swap! domain/*state assoc
+           :relay-timelines urls
+           :homes (into {}
+                        (map #(vector #{%} (make-home))
+                             urls)))))
   
 (defn- load-relays!
   []

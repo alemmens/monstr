@@ -11,8 +11,9 @@
 * {
     -nd-basic-border-color: #aaa;
     -nd-hover-background-color: #eee;
-    -nd-timeline-item-pubkey-color: #0097a7;
-    -nd-timeline-item-name-color: #e64a19;
+    -nd-timeline-item-pubkey-color: lightgrey;
+    -nd-timeline-item-timestamp-color: grey;
+    -nd-timeline-item-name-color: black;
     -nd-publish-button-color: #2262ba;
 }
 
@@ -104,6 +105,12 @@
     -fx-font-size: 10pt;
     -fx-font-weight: bold;
     -fx-text-fill: -nd-timeline-item-pubkey-color;
+    -fx-padding: 3px;
+}
+
+.ndesk-timeline-item-timestamp {
+    -fx-font-size: 8pt;
+    -fx-text-fill: -nd-timeline-item-timestamp-color;
     -fx-padding: 3px;
 }
 

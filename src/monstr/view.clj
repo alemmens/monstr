@@ -220,47 +220,53 @@
    :content content})
   
 (defn main-panes
-  [{:keys [homes can-publish? active-reply-context active-contact-pubkey metadata-cache]}]
-  (log/debugf "Main panes with active reply context=%s" active-reply-context)
+  [{:keys [homes relay-timelines can-publish? active-reply-context active-contact-pubkey metadata-cache]}]
+  (log/debugf "Main panes with relay timelines=%s" relay-timelines)
   {:fx/type :v-box
-   :children [;; The "what's on your mind?" box.
-              {:fx/type :h-box
-               :alignment :center
-               :children [{:fx/type publish-box
-                           :can-publish? can-publish?
-                           :h-box/margin 5
-                           :min-width 300
-                           :max-width 600}
-                          {:fx/type :label
-                           :h-box/margin 5
-                           :graphic {:fx/type :button
-                                     ;; note: :on-action and :on-mouse-clicked don't seem to work
-                                     ;;  when the publish text-area has focus but mouse-pressed
-                                     ;;  does:
-                                     :on-mouse-pressed {:event/type :publish!}
-                                     :disable (not can-publish?)
-                                     :style-class ["button" "ndesk-publish-button"]
-                                     :text "Publish"}}]}
-              ;; Timelines per relay.
-              {:fx/type :h-box
-               :fill-height true
-               :children (mapv (fn [[relay-urls home]]
-                                 {:fx/type :v-box
-                                  :h-box/margin 5
-                                  :h-box/hgrow :always
-                                  :children [{:fx/type :h-box
-                                              :alignment :center
-                                              :style-class "relay-timeline-label"
-                                              :children [{:fx/type :label
-                                                          ;; TODO: For now we assume that the relay-url set
-                                                          ;; contains only one element. We probably want to move
-                                                          ;; towards arbitrary-sized relay-url sets instead.
-                                                          :text (first relay-urls)}]}
-                                             {:fx/type main-pane
-                                              :home home
-                                              :can-publish? can-publish?
-                                              :active-reply-context active-reply-context}]})
-                               homes)}]})
+   :children
+   [;; The "what's on your mind?" box.
+    {:fx/type :h-box
+     :alignment :center
+     :children [{:fx/type publish-box
+                 :can-publish? can-publish?
+                 :h-box/margin 5
+                 :min-width 300
+                 :max-width 600}
+                {:fx/type :label
+                 :h-box/margin 5
+                 :graphic {:fx/type :button
+                           ;; note: :on-action and :on-mouse-clicked don't seem to work
+                           ;;  when the publish text-area has focus but mouse-pressed
+                           ;;  does:
+                           :on-mouse-pressed {:event/type :publish!}
+                           :disable (not can-publish?)
+                           :style-class ["button" "ndesk-publish-button"]
+                           :text "Publish"}}]}
+    ;; Timelines per relay.
+    {:fx/type :h-box
+     :fill-height true
+     :children (mapv (fn [relay-url]
+                       ;; TODO: For now we assume that the relay-url set
+                       ;; contains only one element. We probably want to move
+                       ;; towards arbitrary-sized relay-url sets instead.
+                       (let [home (get homes #{relay-url})]
+                         (log/debugf "Making timeline pane for relay %s with home %s" relay-url home)
+                         {:fx/type :v-box
+                          :h-box/margin 5
+                          :h-box/hgrow :always
+                          :children [{:fx/type :h-box
+                                      :alignment :center
+                                      :style-class "relay-timeline-label"
+                                      :children [{:fx/type :label :text relay-url :padding 5}
+                                                 {:fx/type :button
+                                                  :padding 5
+                                                  :on-mouse-pressed {:event/type :remove-relay-timeline :relay-url relay-url}
+                                                  :text "x"}]}
+                                     {:fx/type main-pane
+                                      :home home
+                                      :can-publish? can-publish?
+                                      :active-reply-context active-reply-context}]}))
+                     relay-timelines)}]})
 
 
 (defn profile
@@ -279,10 +285,10 @@
        :text "No pubkey selected for profile"})))
   
 (defn tab-pane
-  [{:keys [homes can-publish? active-reply-context active-contact-list
+  [{:keys [homes relay-timelines can-publish? active-reply-context active-contact-list
            active-key active-contact-pubkey identities
            identity-metadata metadata-cache]}]
-  (log/debugf "Tab pane with active reply context=%s" active-reply-context)
+  (log/debugf "Tab pane with relay timelines=%s" relay-timelines)
   {:fx/type fx/ext-let-refs
    :refs {:dialog {:fx/type view-reply/dialog
                    :active-reply-context active-reply-context}}
@@ -291,6 +297,7 @@
           :tabs (mapv tab*
                       {"Home" {:fx/type main-panes
                                :homes homes
+                               :relay-timelines relay-timelines
                                :can-publish? can-publish?
                                :active-reply-context active-reply-context
                                :active-contact-list active-contact-list
@@ -416,25 +423,19 @@
               
 
 (defn root [{:keys [show-relays? active-key identities identity-metadata relays
-                    refresh-relays-ts connected-info homes show-new-identity?
-                    new-identity-error active-reply-context contact-lists
+                    refresh-relays-ts connected-info homes relay-timelines
+                    show-new-identity? new-identity-error active-reply-context contact-lists
                     identity-active-contact metadata-cache]}]
-  (log/debugf "Root with active reply context=%s" active-reply-context)
+  (log/debugf "Root with relay timelines=%s" relay-timelines)
   {:fx/type :border-pane
    :top {:fx/type identity-selector
          :identities identities
          :active-key active-key
          :show-new-identity? show-new-identity?
          :identity-metadata identity-metadata}
-   #_:left
-   #_ {:fx/type keycards
-       :active-key active-key
-       :identities identities
-       :identity-metadata identity-metadata
-       :show-new-identity? show-new-identity?
-       :new-identity-error new-identity-error}
    :center {:fx/type tab-pane
             :homes homes
+            :relay-timelines relay-timelines
             :can-publish? (util-domain/can-publish? active-key identities)
             :active-key active-key
             :active-reply-context active-reply-context
@@ -450,10 +451,10 @@
             :connected-info connected-info}})
 
 (defn stage [{:keys [show-relays? active-key identities identity-metadata relays
-                     refresh-relays-ts connected-info homes show-new-identity?
-                     new-identity-error active-reply-context contact-lists
-                     identity-active-contact metadata-cache]}]
-  (log/debugf "Stage with active reply context=%s" active-reply-context)
+                     refresh-relays-ts connected-info homes relay-timelines
+                     show-new-identity? new-identity-error active-reply-context
+                     contact-lists identity-active-contact metadata-cache]}]
+  (log/debugf "Stage with relay timelines=%s" relay-timelines )
   {:fx/type :stage
    :showing true
    :title "Monstr"
@@ -476,4 +477,5 @@
            :refresh-relays-ts refresh-relays-ts
            :connected-info connected-info
            :homes homes
+           :relay-timelines relay-timelines
            :metadata-cache metadata-cache}}})

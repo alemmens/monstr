@@ -280,6 +280,7 @@
                                        :style-class "ndesk-timeline-item-pubkey"
                                        :text pubkey-short}]}
                     :right {:fx/type :label
+                            :style-class "ndesk-timeline-item-timestamp"
                             :text (or (some-> timestamp util/format-timestamp) "?")}}
               :bottom {:fx/type :h-box
                        :children [{:fx/type timeline-item-content
