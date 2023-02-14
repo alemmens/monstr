@@ -1,11 +1,13 @@
-[#monstr.domain.Relay{:url "wss://nostr-relay.untethr.me", :read? true, :write? true}
- #monstr.domain.Relay{:url "wss://nostr-pub.wellorder.net", :read? true, :write? true}
- #monstr.domain.Relay{:url "wss://relayer.fiatjaf.com", :read? true, :write? true}
+[#monstr.domain.Relay{:url "wss://relay.plebstr.com", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://spore.ws", :read? true, :write? true} 
+ #monstr.domain.Relay{:url "wss://nostr.einundzwanzig.space", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://nostr.relayer.se", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://nostr.wine", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://nos.lol", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://relay.nostr.nu", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://freespeech.casa", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://relay.n057r.club", :read? true, :write? true}
  #monstr.domain.Relay{:url "wss://nostr.drss.io", :read? true, :write? true}
- #monstr.domain.Relay{:url "wss://nostr-pub.semisol.dev", :read? true, :write? true}
  #monstr.domain.Relay{:url "wss://nostr.bitcoiner.social", :read? true, :write? true}
- #monstr.domain.Relay{:url "wss://nostr.rocks", :read? true, :write? true}
- #monstr.domain.Relay{:url "wss://relay.damus.io", :read? true, :write? true}
- #monstr.domain.Relay{:url "wss://nostr.zebedee.cloud", :read? true, :write? true}
- #monstr.domain.Relay{:url "wss://nostr.semisol.dev", :read? true, :write? true}
+ #monstr.domain.Relay{:url "wss://nostr.localhost.re", :read? true, :write? true}
  ]
