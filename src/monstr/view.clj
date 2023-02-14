@@ -16,7 +16,7 @@
     [monstr.util-fx :as util-fx]
     [monstr.view-common :as view-common]
     [monstr.view-reply :as view-reply]
-    [monstr.timeline-new :as timeline]
+    [monstr.flat-timeline :as timeline]
     [clojure.string :as str]
     [clojure.set :as set]
     [monstr.metadata :as metadata])

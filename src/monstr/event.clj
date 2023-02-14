@@ -7,7 +7,7 @@
     [monstr.modal :as modal]
     [monstr.relay-conn :as relay-conn]
     [monstr.store :as store]
-    [monstr.timeline-new :as timeline-new]
+    [monstr.flat-timeline :as flat-timeline]
     [monstr.x.crypt :as crypt]
     [monstr.hydrate :as hydrate]
     [monstr.publish :as publish]
@@ -27,7 +27,7 @@
   [[:bg
     (fn [*state _db _exec _dispatch!]
       (log/debugf "Click keycard for public key %s" public-key)
-      (timeline-new/update-active-timelines! *state public-key))]])
+      (flat-timeline/update-active-timelines! *state public-key))]])
 
 (defn show-new-identity-effect
   [show-new-identity?]
