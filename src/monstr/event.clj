@@ -224,17 +224,25 @@
       (swap! *state assoc
              :relay-timelines (remove #{relay-url} (:relay-timelines @*state))))]])
 
-(defn add-relay-timeline!
-  [{:keys [relay-url]}]
+(defn show-add-timeline-effect
+  [show?]
   [[:bg
     (fn [*state _db _exec _dispatch!]
-      (log/debugf "Adding relay timeline %s" relay-url)
-      (swap! *state assoc
-             :relay-timelines (conj (:relay-timelines @*state) relay-url)))]])
+      (swap! *state assoc :show-add-timeline-dialog? show?))]])
+  
+(defn add-timeline-close-request
+  [{^DialogEvent dialog-event :fx/event}]
+  [[:bg
+    (fn [*state _db _exec _dispatch!]
+      ;; Add a new timeline if the user has selected a relay url.
+      (when-let [new-timeline (.getResult (.getSource dialog-event))]
+        (swap! *state assoc
+               :relay-timelines (conj (:relay-timelines @*state) new-timeline)))
+      (swap! *state assoc :show-add-timeline-dialog? false))]])
+      
 
 (defn handle
   [{:event/keys [type] :as event}]
-  (log/debugf "Handling event of type %s: %s" type event)
   (case type
     :click-keycard (click-keycard event)
     :show-new-identity (show-new-identity-effect true)
@@ -246,6 +254,8 @@
     :reply-close-request (reply! event)
     :click-contact-card (click-contact-card event)
     :click-reply-button (click-reply-button event)
+    ;; Add/remove relay timelines.
     :remove-relay-timeline (remove-relay-timeline! event)
-    :add-relay-timeline (add-relay-timeline! event)
+    :show-add-timeline-dialog (show-add-timeline-effect true)
+    :add-timeline-close-request (add-timeline-close-request event)
     (log/error "no matching clause" type)))

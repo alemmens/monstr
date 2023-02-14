@@ -35,11 +35,11 @@
   (view-home-new/create-list-view domain/*state store/db metadata-cache daemon-scheduled-executor))
 
 (defn init-homes!
-  "Create home timelines for the first 3 relays."
+  "Create home timelines for all relays."
   []
-  (let [urls (take 3 (domain/relay-urls @domain/*state))]
+  (let [urls (domain/relay-urls @domain/*state)]
     (swap! domain/*state assoc
-           :relay-timelines urls
+           :relay-timelines (doall (take 3 urls))
            :homes (into {}
                         (map #(vector #{%} (make-home))
                              urls)))))

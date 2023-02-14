@@ -18,6 +18,7 @@
     [monstr.view-reply :as view-reply]
     [monstr.timeline-new :as timeline]
     [clojure.string :as str]
+    [clojure.set :as set]
     [monstr.metadata :as metadata])
   (:import (javafx.scene.canvas Canvas)
            (javafx.scene.paint Color)
@@ -207,10 +208,11 @@
 (defn main-pane
   [{:keys [home can-publish?]}]
   {:fx/type :v-box
-   :children
-   [{:fx/type fx/ext-instance-factory
-     :create #(doto home
-                (VBox/setVgrow Priority/ALWAYS))}]})
+   :children (if (nil? home)
+               []
+               [{:fx/type fx/ext-instance-factory
+                 :create #(doto home
+                            (VBox/setVgrow Priority/ALWAYS))}])})
 
 (defn tab*
   [[label content]]
@@ -218,9 +220,22 @@
    :closable false
    :text label
    :content content})
-  
+
+(defn add-timeline-button
+  [text]
+  {:fx/type :h-box
+   :cursor :hand
+   :style-class ["ndesk-keycard"]
+   :on-mouse-clicked {:event/type :show-add-timeline-dialog}
+   :children [{:fx/type :label :text text}]})
+
+(defn hidden-timelines
+  "Returns a list with the relay urls of timelines that are not being shown."
+  [all-relay-urls relay-timelines]
+  (sort (seq (set/difference (set all-relay-urls) (set relay-timelines)))))
+
 (defn main-panes
-  [{:keys [homes relay-timelines can-publish? active-reply-context active-contact-pubkey metadata-cache]}]
+  [{:keys [homes relay-timelines relays show-add-timeline-dialog? can-publish? active-reply-context active-contact-pubkey metadata-cache]}]
   (log/debugf "Main panes with relay timelines=%s" relay-timelines)
   {:fx/type :v-box
    :children
@@ -244,29 +259,42 @@
                            :text "Publish"}}]}
     ;; Timelines per relay.
     {:fx/type :h-box
-     :fill-height true
-     :children (mapv (fn [relay-url]
-                       ;; TODO: For now we assume that the relay-url set
-                       ;; contains only one element. We probably want to move
-                       ;; towards arbitrary-sized relay-url sets instead.
-                       (let [home (get homes #{relay-url})]
-                         (log/debugf "Making timeline pane for relay %s with home %s" relay-url home)
-                         {:fx/type :v-box
-                          :h-box/margin 5
-                          :h-box/hgrow :always
-                          :children [{:fx/type :h-box
-                                      :alignment :center
-                                      :style-class "relay-timeline-label"
-                                      :children [{:fx/type :label :text relay-url :padding 5}
+     :children
+     (if (seq relay-timelines)
+       (mapv (fn [relay-url]
+               ;; TODO: For now we assume that the relay-url set contains only
+               ;; one element. We probably want to move towards arbitrary-sized
+               ;; relay-url sets instead.
+               (let [home (get homes #{relay-url})]
+                 {:fx/type :v-box
+                  :h-box/margin 5
+                  :h-box/hgrow :always
+                  :children [{:fx/type :h-box
+                              :alignment :center
+                              :style-class "relay-timeline-label"
+                              :children (remove nil?
+                                                [{:fx/type :h-box :h-box/hgrow :always}
+                                                 {:fx/type :label :text relay-url :padding 5}
                                                  {:fx/type :button
                                                   :padding 5
-                                                  :on-mouse-pressed {:event/type :remove-relay-timeline :relay-url relay-url}
-                                                  :text "x"}]}
-                                     {:fx/type main-pane
-                                      :home home
-                                      :can-publish? can-publish?
-                                      :active-reply-context active-reply-context}]}))
-                     relay-timelines)}]})
+                                                  :on-mouse-pressed {:event/type :remove-relay-timeline
+                                                                     :relay-url relay-url}
+                                                  :text "x"}
+                                                 {:fx/type :h-box :h-box/hgrow :always}
+                                                 (when (and (= relay-url (last relay-timelines))
+                                                            (not (nil?
+                                                                  (hidden-timelines (map :url relays)
+                                                                                    relay-timelines))))
+                                                   (add-timeline-button "+"))])}
+                             {:fx/type main-pane
+                              :home home
+                              :can-publish? can-publish?
+                              :active-reply-context active-reply-context}]}))
+             relay-timelines)
+       ;; If there are no relay timelines, just show an "Add timeline" button (centered).
+       [{:fx/type :h-box :h-box/hgrow :always}
+        (add-timeline-button "Add timeline")
+        {:fx/type :h-box :h-box/hgrow :always}])}]})
 
 
 (defn profile
@@ -283,15 +311,35 @@
        :this-identity-metadata (get identity-metadata pubkey)}
       {:fx/type :label
        :text "No pubkey selected for profile"})))
-  
+
+
+
+(defn new-timeline-dialog
+  [{:keys [all-relay-urls relay-timelines new-timeline show-add-timeline-dialog?]}]
+  (let [items (hidden-timelines all-relay-urls relay-timelines)]
+    {:fx/type :choice-dialog
+     :selected-item (first items)
+     :title "New timeline"
+     :showing show-add-timeline-dialog?
+     :header-text "Add a relay timeline"
+     :on-close-request {:event/type :add-timeline-close-request}
+     :items items}))
+
 (defn tab-pane
-  [{:keys [homes relay-timelines can-publish? active-reply-context active-contact-list
+  [{:keys [homes
+           relay-timelines relays show-add-timeline-dialog? new-timeline
+           can-publish? active-reply-context active-contact-list
            active-key active-contact-pubkey identities
            identity-metadata metadata-cache]}]
-  (log/debugf "Tab pane with relay timelines=%s" relay-timelines)
+  (log/debugf "Tab pane with relay timelines=%s and show=%s" relay-timelines show-add-timeline-dialog?)
   {:fx/type fx/ext-let-refs
    :refs {:dialog {:fx/type view-reply/dialog
-                   :active-reply-context active-reply-context}}
+                   :active-reply-context active-reply-context}
+          :timeline-dialog {:fx/type new-timeline-dialog
+                            :all-relay-urls (map :url relays)
+                            :relay-timelines relay-timelines
+                            :new-timeline new-timeline
+                            :show-add-timeline-dialog? show-add-timeline-dialog?}}
    :desc {:fx/type :tab-pane
           :side :top
           :tabs (mapv tab*
@@ -299,6 +347,7 @@
                                :homes homes
                                :relay-timelines relay-timelines
                                :can-publish? can-publish?
+                               :show-add-timeline-dialog? show-add-timeline-dialog?
                                :active-reply-context active-reply-context
                                :active-contact-list active-contact-list
                                :active-contact-pubkey active-contact-pubkey
@@ -423,7 +472,8 @@
               
 
 (defn root [{:keys [show-relays? active-key identities identity-metadata relays
-                    refresh-relays-ts connected-info homes relay-timelines
+                    refresh-relays-ts connected-info homes
+                    relay-timelines show-add-timeline-dialog? new-timeline
                     show-new-identity? new-identity-error active-reply-context contact-lists
                     identity-active-contact metadata-cache]}]
   (log/debugf "Root with relay timelines=%s" relay-timelines)
@@ -436,6 +486,9 @@
    :center {:fx/type tab-pane
             :homes homes
             :relay-timelines relay-timelines
+            :relays relays
+            :show-add-timeline-dialog? show-add-timeline-dialog?
+            :new-timeline new-timeline
             :can-publish? (util-domain/can-publish? active-key identities)
             :active-key active-key
             :active-reply-context active-reply-context
@@ -451,7 +504,8 @@
             :connected-info connected-info}})
 
 (defn stage [{:keys [show-relays? active-key identities identity-metadata relays
-                     refresh-relays-ts connected-info homes relay-timelines
+                     refresh-relays-ts connected-info homes
+                     relay-timelines show-add-timeline-dialog? new-timeline
                      show-new-identity? new-identity-error active-reply-context
                      contact-lists identity-active-contact metadata-cache]}]
   (log/debugf "Stage with relay timelines=%s" relay-timelines )
@@ -478,4 +532,6 @@
            :connected-info connected-info
            :homes homes
            :relay-timelines relay-timelines
+           :show-add-timeline-dialog? show-add-timeline-dialog?
+           :new-timeline new-timeline
            :metadata-cache metadata-cache}}})

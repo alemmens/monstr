@@ -15,6 +15,8 @@
    ;; note: changes to active-key and mutations to home-ux, timelines
    ;;   must be done w/in mutex--ie on fx thread!
    :active-key nil ; the public key of the active identity
+   :show-add-timeline-dialog? false
+   :new-timeline nil   ; relay url to be added to the visible timelines
    :relay-timelines [] ; sequence with the relay urls of the visible timelines   
    :homes nil ; a map from sets of relay urls to Listviews
    :identity-timeline-new {} ; a map from identity pubkeys to lists of TimelineNew.
