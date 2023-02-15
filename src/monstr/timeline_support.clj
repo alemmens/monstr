@@ -32,7 +32,8 @@
   (let [seen? (conj seen? n)
         kids (mapv #(->note pruned-graph % seen?)
                (filter (complement seen?) (loom/predecessors pruned-graph n)))]
-    (if-let [{:keys [id pubkey created_at content tags etag-ids ptag-ids]} (loom-attr/attr pruned-graph n ::data)]
+    (if-let [{:keys [id pubkey created_at content tags etag-ids ptag-ids]}
+             (loom-attr/attr pruned-graph n ::data)]
       (domain/->UITextNote id pubkey content created_at tags etag-ids ptag-ids kids false)
       (domain/->UITextNote n nil (format "<missing:%s>" n) nil [] [] [] kids true))))
 

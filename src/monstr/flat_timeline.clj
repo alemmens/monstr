@@ -97,9 +97,6 @@
   (fx/run-later
    #_(log/debugf "Dispatching text note %s" event-obj)
    (doseq [[identity-pubkey timelines] (:identity-timeline-new @*state)]
-     #_(log/debugf "Dispatching for pubkey %s (%d timelines)"
-                 identity-pubkey
-                 (count timelines))
      (doseq [timeline timelines]
        (when (event-is-relevant-for-timeline? event-obj timeline)
          (let [{:keys [^ObservableList observable-list

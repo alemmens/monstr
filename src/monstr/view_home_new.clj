@@ -208,7 +208,7 @@
     (.setPrefWidth v-box popup-width)
     singleton-popup))
 
-(defn- show-info!
+(defn show-info!
   [db item-id author-pubkey ^ActionEvent e]
   (let [node (.getSource e)
         popup-width 250
@@ -219,7 +219,8 @@
         (.show popup stage))))
 
 (defn- action-button-row
-  [*state db event-obj item-id pubkey]
+  "RELAYS is the set of relays that's displayed in the current column."
+  [*state db event-obj item-id pubkey relays]
   {:fx/type :h-box
    :style-class ["ndesk-content-controls"] ;; used for .lookup
    :style (BORDER| :lightgrey)
@@ -239,10 +240,30 @@
                :on-action
                (fn [_]
                  (swap! *state assoc :active-reply-context
-                        (domain/->UIReplyContext (:id event-obj) item-id)))}]})
-  
+                        (domain/->UIReplyContext (:id event-obj) item-id)))}
+              {:fx/type :button
+               :style-class ["button" "ndesk-thread-button"] ;; used for .lookup
+               :h-box/margin 3
+               :text "thread"
+               :on-action (fn [_])}
+              ]})
+
+(defn avatar-or-empty-space
+  [picture-url avatar-color pubkey-for-avatar]
+  (if (str/blank? picture-url)
+    {:fx/type :label
+     :min-width avatar-dim
+     :min-height avatar-dim
+     :max-width avatar-dim
+     :max-height avatar-dim
+     :style {:-fx-background-color avatar-color}
+     :style-class "ndesk-timeline-item-photo"
+     :text pubkey-for-avatar}
+    {:fx/type avatar
+     :picture-url picture-url}))
+
 (defn timeline-item
-  [{:keys [^UITextNoteNew text-note-new *state db metadata-cache executor]}]
+  [{:keys [^UITextNoteNew text-note-new relays *state db metadata-cache executor]}]
   (let [event-obj (:event-obj text-note-new)
         item-id (:id event-obj)
         pubkey (:pubkey event-obj)
@@ -256,17 +277,7 @@
     {:fx/type :border-pane
      :on-mouse-entered (partial show-action-row! *state true)
      :on-mouse-exited (partial show-action-row! *state false)
-     :left (if (str/blank? picture-url)
-             {:fx/type :label
-              :min-width avatar-dim
-              :min-height avatar-dim
-              :max-width avatar-dim
-              :max-height avatar-dim
-              :style {:-fx-background-color avatar-color}
-              :style-class "ndesk-timeline-item-photo"
-              :text pubkey-for-avatar}
-             {:fx/type avatar
-              :picture-url picture-url})
+     :left (avatar-or-empty-space picture-url avatar-color pubkey-for-avatar)
      :center {:fx/type :border-pane
               :style (BORDER| :white)
               :top {:fx/type :border-pane
@@ -290,11 +301,11 @@
                                    :metadata-cache metadata-cache}
                                   ]}}
      ;; The action buttons (Reply, Thread, ...) are at the bottom of the timeline item.
-     :bottom (action-button-row *state db event-obj item-id pubkey)}))
+     :bottom (action-button-row *state db event-obj item-id pubkey relays)}))
 
 
 (defn timeline-item*
-  [{:keys [^UITextNoteNew text-note-new *state db metadata-cache executor]}]
+  [{:keys [^UITextNoteNew text-note-new relays *state db metadata-cache executor]}]
   ;; note: we get nil note-wrapper sometimes when the list-cell is advancing
   ;; in some ways -- for now just render label w/ err which we'll see if
   ;; this matters --
@@ -302,6 +313,7 @@
     {:fx/type :label :text "err"}
     {:fx/type timeline-item
      :text-note-new text-note-new
+     :relays relays
      :*state *state
      :db db
      :metadata-cache metadata-cache
@@ -318,6 +330,7 @@
                                      {:graphic
                                       {:fx/type timeline-item*
                                        :text-note-new text-note-new
+                                       :relays relays
                                        :*state *state
                                        :db db
                                        :metadata-cache metadata-cache

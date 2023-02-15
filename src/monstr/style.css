@@ -159,7 +159,6 @@
     -fx-background-color: -nd-publish-button-color;
     -fx-text-fill: white;
     -fx-cursor: hand;
-    /*-fx-font-weight: bold; ...negates the boldness somehow*/
 }
 
 .ndesk-reply-button:hover,
@@ -167,6 +166,20 @@
     -fx-text-fill: #aaa;
 }
 
+.ndesk-thread-button {
+    -fx-font-family: "Roboto Bold";
+    -fx-font-size: 9pt;
+    -fx-pref-width: 5em;
+    -fx-padding: 2px;
+    -fx-background-color: -nd-publish-button-color;
+    -fx-text-fill: white;
+    -fx-cursor: hand;
+}
+
+.ndesk-thread-button:hover,
+.ndesk-thread-button:hover:visited {
+    -fx-text-fill: #aaa;
+}
 
 .ndesk-timeline-item-info-link {
     -fx-font-family: "Roboto Bold";

@@ -115,21 +115,6 @@
                         (.put item-id->index x init-idx))
                       (.add observable-list init-wrapper))))))))))))
 
-(defn toggle!
-  [*state id]
-  (let [{:keys [active-key identity-timeline]} @*state
-        ^Timeline active-timeline (get identity-timeline active-key)
-        {:keys [^ObservableList observable-list
-                ^HashMap item-id->index]} active-timeline]
-    (fx/run-later
-      (try
-        (when-let [item-index (.get item-id->index id)]
-          (when-let [^UITextNoteWrapper wrapper (.get observable-list item-index)]
-            (let [new-wrapper (update wrapper :expanded? #(not %))]
-              (.set observable-list item-index new-wrapper))))
-        (catch Exception e
-          (log/error 'toggle! e))))))
-
 (defn update-active-timeline!
   [*state public-key] ;; note public-key may be nil!
   (fx/run-later
