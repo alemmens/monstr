@@ -1,4 +1,5 @@
-(ns monstr.x.curve)
+(ns monstr.x.curve
+  (:refer-clojure :exclude [infinite?]))
 
 (defrecord Point [^BigInteger x ^BigInteger y])
 
