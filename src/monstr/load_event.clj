@@ -14,10 +14,14 @@
 (defonce active-load-event-info (atom {}))
 
 (defn async-load-event!
+  "Load the event with the given id from either the database or from the relays."
   [*state db ^ScheduledExecutorService executor event-id]
   (log/info "loading event" {:event-id event-id})
   (if-let [event-from-store (store/load-event db event-id)]
     (timeline/dispatch-text-note! *state event-from-store)
+    ;; Create a unique subscription id to load the event, subscribe to
+    ;; all relays in the hope that we find the event and then unsubscribe
+    ;; 10 seconds later.
     (let [uuid (.toString (UUID/randomUUID))
           subscription-id (format "load-event:%s" uuid)]
       (swap! active-load-event-info

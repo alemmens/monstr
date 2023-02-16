@@ -220,7 +220,7 @@
 
 (defn- action-button-row
   "RELAYS is the set of relays that's displayed in the current column."
-  [*state db event-obj item-id pubkey relays]
+  [*state db event-obj root-data item-id pubkey relays]
   {:fx/type :h-box
    :style-class ["ndesk-content-controls"] ;; used for .lookup
    :style (BORDER| :lightgrey)
@@ -240,7 +240,11 @@
                :on-action
                (fn [_]
                  (swap! *state assoc :active-reply-context
-                        (domain/->UIReplyContext (:id event-obj) item-id)))}
+                        (domain/->UIReplyContext (if (nil? root-data)
+                                                   (:id event-obj)
+                                                   ;; DO: CHECK THIS.
+                                                   (:id root-data))
+                                                 item-id)))}
               {:fx/type :button
                :style-class ["button" "ndesk-thread-button"] ;; used for .lookup
                :h-box/margin 3
@@ -263,7 +267,8 @@
      :picture-url picture-url}))
 
 (defn timeline-item
-  [{:keys [^UITextNoteNew text-note-new relays *state db metadata-cache executor]}]
+  [{:keys [root-data ^UITextNoteNew text-note-new relays *state db metadata-cache executor]}]
+  ;; ROOT-DATA is nil for flat view, some kind of event data for threaded view.
   (let [event-obj (:event-obj text-note-new)
         item-id (:id event-obj)
         pubkey (:pubkey event-obj)
@@ -280,6 +285,7 @@
      :left (avatar-or-empty-space picture-url avatar-color pubkey-for-avatar)
      :center {:fx/type :border-pane
               :style (BORDER| :white)
+              ;; Show name, pubkey and timestamp.              
               :top {:fx/type :border-pane
                     :style (BORDER| :white)
                     :border-pane/margin (Insets. 0.0 5.0 0.0 5.0)
@@ -293,6 +299,7 @@
                     :right {:fx/type :label
                             :style-class "ndesk-timeline-item-timestamp"
                             :text (or (some-> timestamp util/format-timestamp) "?")}}
+              ;; Show the actual content.
               :bottom {:fx/type :h-box
                        :children [{:fx/type timeline-item-content
                                    :h-box/hgrow :always
@@ -301,11 +308,11 @@
                                    :metadata-cache metadata-cache}
                                   ]}}
      ;; The action buttons (Reply, Thread, ...) are at the bottom of the timeline item.
-     :bottom (action-button-row *state db event-obj item-id pubkey relays)}))
+     :bottom (action-button-row *state db event-obj root-data item-id pubkey relays)}))
 
 
 (defn timeline-item*
-  [{:keys [^UITextNoteNew text-note-new relays *state db metadata-cache executor]}]
+  [{:keys [root-data ^UITextNoteNew text-note-new relays *state db metadata-cache executor]}]
   ;; note: we get nil note-wrapper sometimes when the list-cell is advancing
   ;; in some ways -- for now just render label w/ err which we'll see if
   ;; this matters --
@@ -313,6 +320,7 @@
     {:fx/type :label :text "err"}
     {:fx/type timeline-item
      :text-note-new text-note-new
+     :root-data root-data ; can be nil
      :relays relays
      :*state *state
      :db db

@@ -19,11 +19,13 @@
    ^HashMap item-id->index
    ^HashSet item-ids
    timeline-epoch-vol
-   relays ;; Sequence of relay urls for this timeline.
+   relays        ; Sequence of relay urls for this timeline.
+   show-thread?  ; If true, show the current thread instead of a flat timeline.
+   note-id       ; The note that is the focus of the thread. Only relevant when showing a thread.
    ])
 
 (defn new-timeline
-  [relays]
+  [relays show-thread?]
   ;; NOTE: we're querying and subscribing to all of time but for now, for ux
   ;; experience, we filter underlying data by n days
   ;; todo we'll really wish to query/subscribe at an epoch and only update it on scroll etc.
@@ -43,11 +45,14 @@
       (HashMap.)
       (HashSet.)
       timeline-epoch-vol
-      relays)))
+      relays
+      show-thread?
+      nil
+      )))
 
 (defn new-timelines
   [relays]
-  (map #(new-timeline (list %)) relays))
+  (map #(new-timeline (list %) false) relays))
 
 (defn accept-text-note?
   [*state identity-pubkey parsed-ptags {:keys [pubkey] :as _event-obj}]
@@ -69,7 +74,7 @@
 (defn dispatch-metadata-update!
   [*state {:keys [pubkey] :as _event-obj}]
   (fx/run-later
-   (doseq [[identity-pubkey timelines] (:identity-timeline-new @*state)]
+   (doseq [[identity-pubkey timelines] (:identity->timelines @*state)]
      (doseq [timeline timelines]
        (let [{:keys [^ObservableList observable-list
                      ^HashMap author-pubkey->item-id-set
@@ -96,7 +101,7 @@
   ;; CONSIDER if is this too much usage of on-fx-thread - do we need to batch/debounce?
   (fx/run-later
    #_(log/debugf "Dispatching text note %s" event-obj)
-   (doseq [[identity-pubkey timelines] (:identity-timeline-new @*state)]
+   (doseq [[identity-pubkey timelines] (:identity->timelines @*state)]
      (doseq [timeline timelines]
        (when (event-is-relevant-for-timeline? event-obj timeline)
          (let [{:keys [^ObservableList observable-list
@@ -124,7 +129,7 @@
   [*state public-key] ;; note public-key may be nil!
   (fx/run-later
    (log/debugf "Updating active flat timelines for %s" public-key)
-   (doseq [timeline (get (:identity-timeline-new @*state) public-key)]
+   (doseq [timeline (get (:identity->timelines @*state) public-key)]
      ;; Find the relevant home (listview) and update it.
      #_(log/debugf "Relay url list %s" (domain/relay-urls timeline))
      (let [relay-urls (set (:relays timeline))

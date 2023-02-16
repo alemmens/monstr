@@ -19,7 +19,7 @@
    :new-timeline nil   ; relay url to be added to the visible timelines
    :relay-timelines [] ; sequence with the relay urls of the visible timelines   
    :homes nil ; a map from sets of relay urls to Listviews
-   :identity-timeline-new {} ; a map from identity pubkeys to lists of TimelineNew.
+   :identity->timelines {} ; a map from identity pubkeys to lists of TimelineNew.
    })
 
 (defonce *state
@@ -30,6 +30,18 @@
 
 ;; --
 
+(defrecord View
+    ;; TODO: Add more ways to define a view: hash tags, followed pubkeys, etc.
+    [name         ; a string
+     relay-urls   ; a list of relay urls
+     ])
+
+(defrecord Column
+    [view         ; the View that defines what is shown in this column
+     flat-timeline
+     thread-timeline
+     show-thread?])
+  
 (defrecord Identity
   [public-key secret-key])
 

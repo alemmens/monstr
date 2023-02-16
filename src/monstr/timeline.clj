@@ -6,6 +6,7 @@
     [monstr.domain :as domain]
     [monstr.parse :as parse]
     [monstr.timeline-support :as timeline-support]
+    [monstr.flat-timeline :as flat-timeline]
     [monstr.util :as util]
     [monstr.util-java :as util-java])
   (:import (javafx.collections FXCollections ObservableList)
@@ -45,23 +46,6 @@
       (HashSet.)
       timeline-epoch-vol)))
 
-(defn accept-text-note?
-  [*state identity-pubkey parsed-ptags {:keys [pubkey] :as _event-obj}]
-  (let [{:keys [contact-lists]} @*state
-        {:keys [parsed-contacts] :as _contact-list} (get contact-lists identity-pubkey)
-        ;; consider: optimization--not having to create contact set each note
-        contact-keys-set (into #{} (map :public-key) parsed-contacts)
-        ptag-keys-set (set parsed-ptags)]
-    (or
-      ;; identity's own note
-      (= pubkey identity-pubkey)
-      ;; the text-note's pubkey matches an identity's contact
-      (contact-keys-set pubkey)
-      ;; the text-note's ptags reference identity itself
-      (ptag-keys-set identity-pubkey)
-      ;; the text-note's ptags references one of identities contacts
-      (not-empty (set/intersection contact-keys-set ptag-keys-set)))))
-
 (defn dispatch-metadata-update!
   [*state {:keys [pubkey] :as _event-obj}]
   (fx/run-later
@@ -95,7 +79,7 @@
                       ;; has been referenced by any other accepted text note.
                       ;; so we also want to accept those "missing" notes:
                       (.containsKey item-id->index id)
-                      (accept-text-note? *state identity-pubkey ptag-ids event-obj))
+                      (flat-timeline/accept-text-note? *state identity-pubkey ptag-ids event-obj))
                 (.add item-ids id)
                 (.merge author-pubkey->item-id-set pubkey (HashSet. [id])
                   (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))

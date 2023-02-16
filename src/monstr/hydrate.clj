@@ -30,15 +30,15 @@
   (let [new-public-keys (mapv :public-key new-identities)
         identity-metadata (store/load-metadata db new-public-keys)
         relay-urls (domain/relay-urls @*state)
-        identity-timeline-new (into {}
-                                    (map #(vector % (timeline/new-timelines relay-urls)))
-                                    new-public-keys)]
+        identity->timelines (into {}
+                                  (map #(vector % (timeline/new-timelines relay-urls)))
+                                  new-public-keys)]
     (swap! *state
       (fn [curr-state]
         (-> curr-state
           (update :identities into new-identities)
           (update :identity-metadata merge identity-metadata)
-          (update :identity-timeline-new merge identity-timeline-new))))
+          (update :identity->timelines merge identity->timelines))))
     (let [contact-lists (hydrate-contact-lists! *state db new-identities)
           closure-public-keys (subscribe/whale-of-pubkeys* new-public-keys contact-lists)
           ;; todo also limit timeline events to something, some cardinality?
@@ -79,7 +79,7 @@
                   true
                   (update :identity-metadata #(apply dissoc % dead-public-keys-set))
                   true
-                  (update :identity-timeline-new #(apply dissoc % dead-public-keys-set))
+                  (update :identity->timelines #(apply dissoc % dead-public-keys-set))
                   true
                   (update :contact-lists #(apply dissoc % dead-public-keys-set))))))]
       (timeline/update-active-timelines! *state new-active-key)
