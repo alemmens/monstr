@@ -11,7 +11,7 @@
     [monstr.domain :as domain]
     [monstr.parse :as parse]
     [monstr.subscribe :as subscribe]
-    [monstr.flat-timeline :as flat-timeline])
+    [monstr.timeline :as timeline])
   (:import (java.util.concurrent ScheduledExecutorService ScheduledFuture TimeUnit)))
 
 ;; todo where do we have stream buffers?
@@ -33,14 +33,14 @@
             (update curr-state :identity-metadata assoc pubkey parsed)
             curr-state)))
       ;; kick timelines...
-      (flat-timeline/dispatch-metadata-update! *state event-obj))
+      (timeline/dispatch-metadata-update! *state event-obj))
     (catch Exception e
       (log/warn e "while handling metadata event"))))
 
 (defn consume-text-note [_db *state relay-url event-obj]
   (log/trace "text note: " relay-url (:id event-obj))
-  (flat-timeline/dispatch-text-note! *state
-                                    (assoc event-obj :relays (list relay-url))))
+  (timeline/dispatch-text-note! *state
+                                (assoc event-obj :relays (list relay-url))))
 
 (defn consume-recommend-server [db relay-url event-obj]
   (log/info "recommend server (TODO): " relay-url (:id event-obj))

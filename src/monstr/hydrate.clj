@@ -1,6 +1,6 @@
 (ns monstr.hydrate
   (:require
-   [monstr.flat-timeline :as timeline]
+   [monstr.timeline :as timeline]
    [monstr.domain :as domain]
    [monstr.util :as util]
    [monstr.store :as store]
