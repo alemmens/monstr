@@ -2,24 +2,24 @@
 
 (defn initial-state
   []
-  {:show-relays? false  ; indicates if the relays dialog must be shown
+  {:show-relays? false        ; indicates if the relays dialog must be shown
    :show-new-identity? false
    :new-identity-error ""
    :active-reply-context nil  ; for the reply dialog
-   :identities [] ; sequence of domain/Identity
-   :identity-metadata {} ; map from pubkey to domain/ParsedMetadata
-   :contact-lists {} ; pubkey -> domain/ContactList
+   :identities []             ; sequence of Identity
+   :identity-metadata {}      ; map from pubkey to ParsedMetadata
+   :contact-lists {}          ; pubkey -> ContactList
    :identity-active-contact {}
-   :relays [] ;; [domain/Relay]
+   :relays []                 ; list of Relay
    :connected-info {}
    ;; note: changes to active-key and mutations to home-ux, timelines
    ;;   must be done w/in mutex--ie on fx thread!
    :active-key nil ; the public key of the active identity
    :show-add-timeline-dialog? false
-   :new-timeline nil   ; relay url to be added to the visible timelines
-   :relay-timelines [] ; sequence with the relay urls of the visible timelines   
-   :homes nil ; a map from sets of relay urls to Listviews
-   :identity->timelines {} ; a map from identity pubkeys to lists of TimelineNew.
+   :new-timeline nil       ; relay url to be added to the visible timelines
+   :relay-timelines []     ; sequence with the relay urls of the visible timelines   
+   :homes nil              ; map from sets of relay urls to Listviews
+   :identity->columns {}   ; map from identity pubkeys to lists of Column
    })
 
 (defonce *state
@@ -31,13 +31,14 @@
 ;; --
 
 (defrecord View
+    ;; A view defines what is shown in a column.
     ;; TODO: Add more ways to define a view: hash tags, followed pubkeys, etc.
     [name         ; a string
      relay-urls   ; a list of relay urls
      ])
 
 (defrecord Column
-    [view         ; the View that defines what is shown in this column
+    [view
      flat-timeline
      thread-timeline
      show-thread?])

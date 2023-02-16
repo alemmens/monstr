@@ -30,32 +30,32 @@
   (let [new-public-keys (mapv :public-key new-identities)
         identity-metadata (store/load-metadata db new-public-keys)
         relay-urls (domain/relay-urls @*state)
-        identity->timelines (into {}
-                                  (map #(vector % (timeline/new-timelines relay-urls)))
-                                  new-public-keys)]
+        identity->columns (into {}
+                                (map #(vector % (timeline/new-columns relay-urls)))
+                                new-public-keys)]
     (swap! *state
       (fn [curr-state]
         (-> curr-state
           (update :identities into new-identities)
           (update :identity-metadata merge identity-metadata)
-          (update :identity->timelines merge identity->timelines))))
+          (update :identity->columns merge identity->columns))))
     (let [contact-lists (hydrate-contact-lists! *state db new-identities)
           closure-public-keys (subscribe/whale-of-pubkeys* new-public-keys contact-lists)
-          ;; todo also limit timeline events to something, some cardinality?
-          ;; todo also load watermarks and include in new subscriptions
+          ;; TODO also limit timeline events to something, some cardinality?
+          ;; TODO also load watermarks and include in new subscriptions
           timelines-data (map #(store/load-relay-timeline-events db % closure-public-keys)
                               relay-urls)]
       (log/debugf "Loaded %s timeline events" (doall (map count timelines-data)))
       (when-let [first-identity-key (first new-public-keys)]
         (log/debugf "Hydrating with first identity key %s" first-identity-key)
         (timeline/update-active-timelines! *state first-identity-key))
-      ;; todo consider transduce iterate over timeline-data and throttling
+      ;; TODO consider transduce iterate over timeline-data and throttling
       ;;      dispatches via yielding of bg thread; this way we'd move
       ;;      on to subscriptions, allowing new stuff to come in sooner
       ;;      as we backfill
       (doseq [[relay-url timeline-data] (map list relay-urls timelines-data)]
         (dispatch-text-notes *state relay-url timeline-data)))
-    ;; note: use *all* identities to update subscriptions
+    ;; NOTE: use *all* identities to update subscriptions
     (let [{:keys [identities contact-lists]} @*state]
       (subscribe/overwrite-subscriptions! identities contact-lists))))
 
@@ -74,16 +74,16 @@
                     (some #(= (:public-key %) curr-active-key) remaining-identities)]
                 (cond-> curr-state'
                   (not curr-active-key-is-still-alive?)
-                  ;; note: could result in nil new active-key:
+                  ;; NOTE: could result in nil new active-key:
                   (assoc :active-key (:public-key (first remaining-identities)))
                   true
                   (update :identity-metadata #(apply dissoc % dead-public-keys-set))
                   true
-                  (update :identity->timelines #(apply dissoc % dead-public-keys-set))
+                  (update :identity->columns #(apply dissoc % dead-public-keys-set))
                   true
                   (update :contact-lists #(apply dissoc % dead-public-keys-set))))))]
       (timeline/update-active-timelines! *state new-active-key)
-      ;; todo note: this means we are resubscribing -- def should optimize w/ some kind of watermark strat.
+      ;; TODO note: this means we are resubscribing -- def should optimize w/ some kind of watermark strat.
       (subscribe/overwrite-subscriptions! new-identities new-contact-lists))))
 
 (defn hydrate!
