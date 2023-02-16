@@ -4,6 +4,7 @@
    [monstr.domain :as domain]
    [monstr.util :as util]
    [monstr.store :as store]
+   [monstr.metadata :as metadata]
    [monstr.subscribe :as subscribe]
    [clojure.tools.logging :as log])
   (:import (java.util.concurrent ScheduledExecutorService)))
@@ -22,7 +23,7 @@
   ;;      as we backfill
   (doseq [event-obj timeline-data]
     (timeline/dispatch-text-note! *state (assoc event-obj :relays (list relay-url)))))
-  
+
 (defn hydrate!*
   ;; note: first of new-identities will become the active identity
   [*state db ^ScheduledExecutorService executor new-identities]
@@ -31,7 +32,9 @@
         identity-metadata (store/load-metadata db new-public-keys)
         relay-urls (domain/relay-urls @*state)
         identity->columns (into {}
-                                (map #(vector % (timeline/new-columns relay-urls)))
+                                (map #(vector % (timeline/new-columns *state db executor
+                                                                      metadata/cache
+                                                                      relay-urls)))
                                 new-public-keys)]
     (swap! *state
       (fn [curr-state]

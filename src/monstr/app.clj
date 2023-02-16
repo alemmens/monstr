@@ -21,8 +21,6 @@
     (java.util.concurrent ThreadFactory Executors ScheduledExecutorService TimeUnit))
   (:gen-class))
 
-(defonce metadata-cache (metadata/create-cache store/db))
-
 (defonce ^ScheduledExecutorService daemon-scheduled-executor
   (let [factory (reify ThreadFactory
                   (newThread [_ runnable]
@@ -32,7 +30,7 @@
     (Executors/newSingleThreadScheduledExecutor factory)))
 
 (defn make-home []
-  (view-home-new/create-list-view domain/*state store/db metadata-cache daemon-scheduled-executor))
+  (view-home-new/create-list-view domain/*state store/db metadata/cache daemon-scheduled-executor))
 
 (defn init-homes!
   "Create home timelines for all relays."
@@ -85,7 +83,7 @@
 
 (defonce renderer
   (fx/create-renderer
-    :middleware (fx/wrap-map-desc assoc :fx/type view/stage :metadata-cache metadata-cache)
+    :middleware (fx/wrap-map-desc assoc :fx/type view/stage :metadata-cache metadata/cache)
     :opts {:fx.opt/map-event-handler map-event-handler}))
 
 (defn -main
@@ -93,7 +91,7 @@
   (load-relays!)
   (init-homes!)
   (fx/mount-renderer domain/*state renderer)
-  (consume/start! store/db domain/*state metadata-cache daemon-scheduled-executor)
+  (consume/start! store/db domain/*state metadata/cache daemon-scheduled-executor)
   (util/schedule! daemon-scheduled-executor load-identities! 1000)
   (util/schedule! daemon-scheduled-executor update-relays! 3000)
   (util/schedule-with-fixed-delay!

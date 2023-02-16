@@ -4,7 +4,9 @@
             [clojure.tools.logging :as log]
             [monstr.domain :as domain]
             [monstr.parse :as parse]
+            [monstr.timeline-support :as timeline-support]
             [monstr.util :as util]
+            [monstr.view-home-new :as view-home-new]
             [monstr.util-java :as util-java])
   (:import (java.util HashMap HashSet)
            (javafx.collections FXCollections ObservableList)
@@ -19,7 +21,7 @@
    ^HashMap item-id->index
    ^HashSet item-ids
    timeline-epoch-vol
-   relays        ; Sequence of relay urls for this timeline.
+   relays        ; Set of relay urls for this timeline.
    show-thread?  ; If true, show the current thread instead of a flat timeline.
    note-id       ; The note that is the focus of the thread. Only relevant when showing a thread.
    ])
@@ -55,15 +57,19 @@
   (map #(new-timeline (list %) false) relays))
 
 (defn- new-column
-  [relay-urls]
+  [*state db executor metadata-cache relay-urls]
   (domain/->Column (domain/->View (first relay-urls) relay-urls)
                    (new-timeline relay-urls false)
                    (new-timeline relay-urls true)
+                   (view-home-new/create-list-view *state db metadata-cache executor)
+                   (view-home-new/create-list-view *state db metadata-cache executor)
                    false))
+
 (defn new-columns
   "Create a new Column for each relay-url."
-  [relay-urls]
-  (map #(new-column (list %)) relay-urls))
+  [*state db executor metadata-cache relay-urls]
+  (map #(new-column *state db executor metadata-cache #{%})
+       relay-urls))
   
 (defn accept-text-note?
   [*state identity-pubkey parsed-ptags {:keys [pubkey] :as _event-obj}]
@@ -87,7 +93,7 @@
   (fx/run-later
    (doseq [[identity-pubkey columns] (:identity->columns @*state)]
      (doseq [column columns]
-       (let [timeline (:flat-timeline column)]
+       (doseq [timeline (list (:flat-timeline column) #_(:thread-timeline column))]
          (let [{:keys [^ObservableList observable-list
                        ^HashMap author-pubkey->item-id-set
                        ^HashMap item-id->index]}
@@ -106,37 +112,77 @@
   (not-empty (set/intersection (set (:relays timeline))
                                (set (:relays event)))))
 
+(defn flat-dispatch!
+  [*state timeline identity-pubkey
+   {:keys [id pubkey created_at content relays] :as event-obj}]
+  (let [{:keys [^ObservableList observable-list
+                ^HashMap author-pubkey->item-id-set
+                ^HashMap item-id->index
+                ^HashSet item-ids]}
+        timeline]
+    (when-not (.contains item-ids id)
+      (let [ptag-ids (parse/parse-tags event-obj "p")]
+        (when (accept-text-note? *state identity-pubkey ptag-ids event-obj)
+          (.add item-ids id)
+          (.merge author-pubkey->item-id-set pubkey (HashSet. [id])
+                  (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
+          (let [init-idx (.size observable-list)
+                init-note (domain/->UITextNoteNew event-obj created_at)]
+            (.put item-id->index id init-idx)
+            (.add observable-list init-note)))))))
+
+(defn thread-dispatch!
+  [*state timeline identity-pubkey
+   {:keys [id pubkey created_at content relays] :as event-obj}]
+  {:pre [(some? pubkey)]}
+  ;; CONSIDER if is this too much usage of on-fx-thread - do we need to batch/debounce
+  (let [{:keys [^ObservableList observable-list
+                ^HashMap author-pubkey->item-id-set
+                ^HashMap item-id->index
+                ^HashSet item-ids]}
+        timeline]
+    (when-not (.contains item-ids id)
+      (let [ptag-ids (parse/parse-tags event-obj "p")]
+        (when (or
+               ;; Our item-id->index map will have a key for any id that
+               ;; has been referenced by any other accepted text note.
+               ;; So we also want to accept those "missing" notes:
+               (.containsKey item-id->index id)
+               (accept-text-note? *state identity-pubkey ptag-ids event-obj))
+          (.add item-ids id)
+          (.merge author-pubkey->item-id-set pubkey (HashSet. [id])
+                  (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
+          (let [etag-ids (parse/parse-tags event-obj "e") ;; order matters
+                id-closure (cons id etag-ids)
+                existing-idx (first (keep #(.get item-id->index %) id-closure))]
+            (if (some? existing-idx)
+              (let [curr-wrapper (.get observable-list existing-idx)
+                    new-wrapper (timeline-support/contribute!
+                                 curr-wrapper event-obj etag-ids ptag-ids)]
+                (doseq [x id-closure]
+                  (.put item-id->index x existing-idx))
+                (.set observable-list existing-idx new-wrapper))
+              (let [init-idx (.size observable-list)
+                    init-wrapper (timeline-support/init! event-obj etag-ids ptag-ids)]
+                (doseq [x id-closure]
+                  (.put item-id->index x init-idx))
+                (.add observable-list init-wrapper)))))))))
+
+
 (defn dispatch-text-note!
   "Dispatch a text note to all timelines for which the given event is relevant."
   [*state {:keys [id pubkey created_at content relays] :as event-obj}]
   {:pre [(some? pubkey)]}
   ;; CONSIDER if is this too much usage of on-fx-thread - do we need to batch/debounce?
   (fx/run-later
-   #_(log/debugf "Dispatching text note %s" event-obj)
    (doseq [[identity-pubkey columns] (:identity->columns @*state)]
      (doseq [column columns]
-       (let [timeline (:flat-timeline column)]
-         (when (event-is-relevant-for-timeline? event-obj timeline)
-           (let [{:keys [^ObservableList observable-list
-                         ^HashMap author-pubkey->item-id-set
-                         ^HashMap item-id->index
-                         ^HashSet item-ids]}
-                 timeline]
-             #_(log/debugf "Found timeline for event %s and relays %s"
-                           event-obj
-                           (:relays timeline))
-             (when-not (.contains item-ids id)
-               (let [ptag-ids (parse/parse-tags event-obj "p")]
-                 (when (accept-text-note? *state identity-pubkey ptag-ids event-obj)
-                                        ; (log/debugf "Adding id %s to item-ids %s" id item-ids)
-                   (.add item-ids id)
-                   (.merge author-pubkey->item-id-set pubkey (HashSet. [id])
-                           (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
-                   (let [init-idx (.size observable-list)
-                         init-note (domain/->UITextNoteNew event-obj created_at)]
-                     (.put item-id->index id init-idx)
-                     (.add observable-list init-note))))))))))))
-
+       (let [flat-timeline (:flat-timeline column)
+             thread-timeline (:thread-timeline column)]
+         (when (event-is-relevant-for-timeline? event-obj flat-timeline)  
+           (flat-dispatch! *state flat-timeline identity-pubkey event-obj))
+         (when (event-is-relevant-for-timeline? event-obj thread-timeline)  
+           (thread-dispatch! *state thread-timeline identity-pubkey event-obj)))))))
 
 (defn update-active-timelines!
   "Update the active timelines for the identity with the given public key."
@@ -144,18 +190,15 @@
   (fx/run-later
    (log/debugf "Updating active flat timelines for %s" public-key)
    (doseq [column (get (:identity->columns @*state) public-key)]
-     (let [timeline (:flat-timeline column)]
-       ;; Find the relevant home (listview) and update it.
-       #_(log/debugf "Relay url list %s" (domain/relay-urls timeline))
-       (let [relay-urls (set (:relays timeline))
-             home (get (:homes @*state) relay-urls)]
-         #_(log/debugf "Found home %s for relays %s" home relay-urls)
-         (when home
-           (.setItems home
-                      ^ObservableList (or (:adapted-list timeline)
-                                          (FXCollections/emptyObservableList))))))
-     ;; Update the state's active public key.
-     (swap! *state
-            (fn [state]
-              (assoc state :active-key public-key))))))
+     (doseq [[timeline listview]
+             (list [(:flat-timeline column) (:flat-listview column)]
+                   [(:thread-timeline column) (:thread-listview column)])]
+       (.setItems listview
+                  ^ObservableList (or (:adapted-list timeline)
+                                      (FXCollections/emptyObservableList)))))
+   ;; Update the state's active public key.
+   (swap! *state
+          (fn [state]
+            (assoc state :active-key public-key)))))
+
 

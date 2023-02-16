@@ -34,15 +34,23 @@
     ;; A view defines what is shown in a column.
     ;; TODO: Add more ways to define a view: hash tags, followed pubkeys, etc.
     [name         ; a string
-     relay-urls   ; a list of relay urls
+     relay-urls   ; a set of relay urls
      ])
 
 (defrecord Column
     [view
      flat-timeline
      thread-timeline
+     flat-listview
+     thread-listview
      show-thread?])
-  
+
+(defn column-matches-relay-urls?
+  "RELAY-URLS is a set of relay urls."
+  [column relay-urls]
+  (= (:relay-urls (:view column))
+     relay-urls))
+
 (defrecord Identity
   [public-key secret-key])
 
