@@ -31,10 +31,11 @@
   ^UITextNote [pruned-graph n seen?]
   (let [seen? (conj seen? n)
         kids (mapv #(->note pruned-graph % seen?)
-               (filter (complement seen?) (loom/predecessors pruned-graph n)))]
+                   (filter (complement seen?) (loom/predecessors pruned-graph n)))]
     (if-let [{:keys [id pubkey created_at content tags etag-ids ptag-ids]}
              (loom-attr/attr pruned-graph n ::data)]
       (domain/->UITextNote id pubkey content created_at tags etag-ids ptag-ids kids false)
+      ;; If we don't have this note yet, create a special :missing UITextNote.
       (domain/->UITextNote n nil (format "<missing:%s>" n) nil [] [] [] kids true))))
 
 (defn- build*

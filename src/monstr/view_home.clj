@@ -53,6 +53,9 @@
                   ;; get off of fx thread
                   (util/submit! executor
                                 (fn []
+                                  ;; Wait a bit so we don't overload the relays.
+                                  ;; TODO: we should use a queue instead!
+                                  (Thread/sleep 50)
                                   (load-event/async-load-event! *state db executor (:id item-data))))
                   {:fx/type :hyperlink
                    :h-box/hgrow :always
@@ -112,7 +115,7 @@
                                                        (:id root-data) item-id)))}]}]}}})))
 
 (defn- tree-rows*
-  [indent ^UITextNote root-data ^UITextNote item-data expand? *state db metadata-cache executor]
+  [indent ^UITextNote root-data ^UITextNote item-data *state db metadata-cache executor]
   (let [spacer-width (* indent 10)]
     (cons
       {:fx/type :h-box
@@ -129,37 +132,25 @@
                    :db db
                    :metadata-cache metadata-cache
                    :executor executor}]}
-      (when expand?
-        (mapcat #(tree-rows* (inc indent) root-data % expand? *state db metadata-cache executor)
-                (:children item-data))))))
+      (mapcat #(tree-rows* (inc indent) root-data % *state db metadata-cache executor)
+              (:children item-data)))))
 
 (defn- find-note
   [^UITextNote note pred]
   (if (pred note) note (first (map #(find-note % pred) (:children note)))))
 
 (defn- tree* [{:keys [^UITextNoteWrapper note-wrapper *state db metadata-cache executor]}]
-  ;; note: we get nil note-wrapper sometimes when the list-cell is advancing
-  ;; in some ways -- for now just render label w/ err which we'll see if
-  ;; this matters --
+  ;; NOTE: we get nil note-wrapper sometimes when the list-cell is advancing
+  ;; in some ways. For now just render label w/ err which we'll see if
+  ;; this matters.
   (if (nil? note-wrapper)
     {:fx/type :label :text "err"}
     (let [{:keys [root expanded? max-timestamp note-count]} note-wrapper]
       {:fx/type :v-box
-       :children
-       (vec
-         (concat
-           (tree-rows* 0
-                       root
-                       (if expanded?
-                         root
-                         (or (find-note root #(= (:timestamp %) max-timestamp))
-                             ;; should never get:
-                             root))
-                       expanded?
-                       *state
-                       db
-                       metadata-cache
-                       executor)))})))
+       :children (vec
+                  ; (concat
+                   (tree-rows* 0 root root
+                               *state db metadata-cache executor))})))
 
 (defn home [{:keys [*state db metadata-cache executor]}]
   {:fx/type fx/ext-on-instance-lifecycle

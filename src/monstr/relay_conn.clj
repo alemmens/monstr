@@ -142,6 +142,9 @@
     (vswap! conn-vol update :subscriptions dissoc id)
     (let [{:keys [deferred-conn]} @conn-vol]
       (when (d/realized? deferred-conn)
+        (log/debugf "Closing subscription with id %s (%d left)"
+                    id
+                    (count (:subscriptions @conn-vol)))
         (s/put! @deferred-conn
           (json*/write-str* ["CLOSE" id]))))))
 

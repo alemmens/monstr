@@ -17,7 +17,7 @@ Pre-requisites:
 $ brew install clojure/tools/clojure
 ```
 
-May need to install some java/jdk, say v. 17, if you don't have one
+May need to install some java/jdk, say v. 17, if you don't have one.
 You may also need to install rlwrap.
 
 How to run:

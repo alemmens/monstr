@@ -110,8 +110,14 @@
 
 (defn- consume-eose
   [relay-url subscription-id]
-  (log/info "EOSE (TODO): " relay-url subscription-id) ;; todo
-  )
+  (log/info "EOSE: " relay-url subscription-id)
+  (locking relay-conn/conn-registry
+    ;; TODO: Use this moment to automatically unsubscribe from old connections for relays
+    ;; that don't send EOSE.
+    (let [read-connections @(:read-connections-vol relay-conn/conn-registry)
+          connection (get read-connections relay-url)]
+      (when connection
+        (relay-conn/unsubscribe! connection subscription-id)))))
 
 (defn- consume*
   [db *state metadata-cache executor resubscribe-future-vol cache [relay-url event-str]]
