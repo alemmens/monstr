@@ -266,7 +266,7 @@
                ;; one element. We probably want to move towards arbitrary-sized
                ;; relay-url sets instead.
                (let [column (find-column #{relay-url} columns)
-                     listview (:flat-listview column)]
+                     listview (:thread-listview column)]
                  (if (nil? column)
                    (log/debugf "No column found for %s" relay-url)
                    (log/debugf "Creating pane for column %s" relay-url))

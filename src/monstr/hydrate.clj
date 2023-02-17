@@ -6,8 +6,25 @@
    [monstr.store :as store]
    [monstr.metadata :as metadata]
    [monstr.subscribe :as subscribe]
+   [monstr.view-home-new :as view-home-new]
+   [monstr.view-home :as view-home-threaded]
    [clojure.tools.logging :as log])
   (:import (java.util.concurrent ScheduledExecutorService)))
+
+(defn- new-column
+  [*state db executor metadata-cache relay-urls]
+  (domain/->Column (domain/->View (first relay-urls) relay-urls)
+                   (timeline/new-timeline relay-urls false)
+                   (timeline/new-timeline relay-urls true)
+                   (view-home-new/create-list-view *state db metadata-cache executor)
+                   (view-home-threaded/create-list-view *state db metadata-cache executor)
+                   false))
+
+(defn- new-columns
+  "Create a new Column for each relay-url."
+  [*state db executor metadata-cache relay-urls]
+  (map #(new-column *state db executor metadata-cache #{%})
+       relay-urls))
 
 (defn- hydrate-contact-lists!
   [*state db new-identities]
@@ -22,7 +39,8 @@
   ;;      on to subscriptions, allowing new stuff to come in sooner
   ;;      as we backfill
   (doseq [event-obj timeline-data]
-    (timeline/dispatch-text-note! *state (assoc event-obj :relays (list relay-url)))))
+    (timeline/dispatch-text-note! *state false
+                                  (assoc event-obj :relays (list relay-url)))))
 
 (defn hydrate!*
   ;; note: first of new-identities will become the active identity
@@ -32,9 +50,9 @@
         identity-metadata (store/load-metadata db new-public-keys)
         relay-urls (domain/relay-urls @*state)
         identity->columns (into {}
-                                (map #(vector % (timeline/new-columns *state db executor
-                                                                      metadata/cache
-                                                                      relay-urls)))
+                                (map #(vector % (new-columns *state db executor
+                                                             metadata/cache
+                                                             relay-urls)))
                                 new-public-keys)]
     (swap! *state
       (fn [curr-state]

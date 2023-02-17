@@ -49,20 +49,20 @@
   (if (:missing? item-data)
     {:fx/type :h-box
      :style-class ["ndesk-timeline-item-missing"]
-     :children [{:fx/type :hyperlink
-                 :h-box/hgrow :always
-                 :style-class ["ndesk-timeline-item-missing-hyperlink"]
-                 :text "load parent message..."
-                 :on-action (fn [^ActionEvent _e]
-                              ;; get off of fx thread
-                              (util/submit! executor
+     :children [(do
+                  ;; get off of fx thread
+                  (util/submit! executor
                                 (fn []
-                                  (load-event/async-load-event! *state db executor (:id item-data)))))}]}
+                                  (load-event/async-load-event! *state db executor (:id item-data))))
+                  {:fx/type :hyperlink
+                   :h-box/hgrow :always
+                   :style-class ["ndesk-timeline-item-missing-hyperlink"]
+                   :text "loading parent thread..."})]}
     ;; else -- not missing
     (let [item-id (:id item-data)
           pubkey (:pubkey item-data)
           pubkey-for-avatar (or (some-> pubkey (subs 0 3)) "?")
-          ;pubkey-short (or (some-> pubkey util/format-pubkey-short) "?")
+          pubkey-short (or (some-> pubkey util/format-pubkey-short) "?")
           timestamp (:timestamp item-data)
           content (:content item-data)
           tags (:tags item-data)
@@ -81,7 +81,7 @@
                                          :text name}
                                         {:fx/type :label
                                          :style-class "ndesk-timeline-item-pubkey"
-                                         :text pubkey}]}
+                                         :text pubkey-short}]}
                       :right {:fx/type :h-box
                               :children [{:fx/type :hyperlink
                                           :style-class ["label" "ndesk-timeline-item-info-link"] ;; used for .lookup
@@ -113,7 +113,7 @@
 
 (defn- tree-rows*
   [indent ^UITextNote root-data ^UITextNote item-data expand? *state db metadata-cache executor]
-  (let [spacer-width (* indent 25)]
+  (let [spacer-width (* indent 10)]
     (cons
       {:fx/type :h-box
        :children [{:fx/type :label
@@ -166,6 +166,7 @@
    :on-created #(.setSelectionModel % util-fx-more/no-selection-model)
    :desc {:fx/type :list-view
           :focus-traversable false
+          :pref-height 100000  ; trick to make it stretch vertically
           :cell-factory {:fx/cell-type :list-cell
                          :describe (fn [note-wrapper]
                                      {:graphic

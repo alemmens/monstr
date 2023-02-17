@@ -13,12 +13,17 @@
 
 (defonce active-load-event-info (atom {}))
 
+(defn- load-from-store [db event-id]
+  (when-let [event (store/load-event db event-id)]
+    (assoc event :relays (store/load-relays-for-event db event-id))))
+
 (defn async-load-event!
   "Load the event with the given id from either the database or from the relays."
   [*state db ^ScheduledExecutorService executor event-id]
   (log/info "loading event" {:event-id event-id})
-  (if-let [event-from-store (store/load-event db event-id)]
-    (timeline/dispatch-text-note! *state event-from-store)
+  (if-let [event-from-store (load-from-store db event-id)]
+    (do (log/debugf "Found event in store: %s" event-from-store)
+        (timeline/dispatch-text-note! *state true event-from-store))
     ;; Create a unique subscription id to load the event, subscribe to
     ;; all relays in the hope that we find the event and then unsubscribe
     ;; 10 seconds later.

@@ -64,14 +64,12 @@
         ;; -- else (event not yet seen from relay - cache nor db)
         (let [calculated-event-id (calc-event-id event-obj)]
           (if (not= id calculated-event-id)
-            ;; -- then
             (do
               (log/debug "bad id" id relay-url)) ;; consider: something else?
             ;; -- else (we have a good id)
             (if-let [sig-from-cache (cache/get-if-present cache id-key)]
               ;; -- then sig in cache
               (if (not= sig sig-from-cache)
-                ;; -- then
                 (do
                   (log/debug "bad sig" id relay-url)) ;; consider: something else?
                 ;; -- else (we have good sig for a message we've seen, just not yet from this relay)
@@ -84,7 +82,6 @@
               (if-let [sig-from-db (store/event-signature-by-id db id)]
                 ;; -- then sig in db
                 (if (not= sig sig-from-db)
-                  ;; -- then
                   (do
                     (log/debug "bad sig" id relay-url)) ;; consider: something else?
                   ;; -- good sig (per db)

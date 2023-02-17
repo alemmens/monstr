@@ -37,9 +37,10 @@
     (catch Exception e
       (log/warn e "while handling metadata event"))))
 
-(defn consume-text-note [_db *state relay-url event-obj]
-  (log/trace "text note: " relay-url (:id event-obj))
+(defn consume-text-note [_db *state relay-url event-obj force-acceptance]
+  #_(log/debug "text note: " relay-url (:id event-obj))
   (timeline/dispatch-text-note! *state
+                                force-acceptance
                                 (assoc event-obj :relays (list relay-url))))
 
 (defn consume-recommend-server [db relay-url event-obj]
@@ -78,14 +79,18 @@
   )
 
 (defn- consume-verified-event
-  [db *state metadata-cache executor resubscribe-future-vol relay-url _subscription-id {:keys [kind] :as verified-event}]
-  (case kind
-    0 (consume-set-metadata-event db *state metadata-cache relay-url verified-event)
-    1 (consume-text-note db *state relay-url verified-event)
-    2 (consume-recommend-server db relay-url verified-event)
-    3 (consume-contact-list db *state executor resubscribe-future-vol relay-url verified-event)
-    4 (consume-direct-message db relay-url verified-event)
-    (log/warn "skipping kind" kind relay-url)))
+  [db *state metadata-cache executor resubscribe-future-vol relay-url subscription-id {:keys [kind] :as verified-event}]
+  (let [force-acceptance? (str/starts-with? subscription-id "load-event:")]
+    ;; If the subscription id starts with "load-event:", the event is caused by async-load-event!,
+    ;; which means it's for a thread view. That means we consider the event to be relevant for
+    ;; any thread-timeline.
+    (case kind
+      0 (consume-set-metadata-event db *state metadata-cache relay-url verified-event)
+      1 (consume-text-note db *state relay-url verified-event force-acceptance?)
+      2 (consume-recommend-server db relay-url verified-event)
+      3 (consume-contact-list db *state executor resubscribe-future-vol relay-url verified-event)
+      4 (consume-direct-message db relay-url verified-event)
+      (log/warn "skipping kind" kind relay-url))))
 
 (defn- consume-event
   [db *state metadata-cache executor resubscribe-future-vol cache relay-url subscription-id {:keys [id kind] :as event-obj} raw-event-tuple]

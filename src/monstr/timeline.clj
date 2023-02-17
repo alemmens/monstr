@@ -6,8 +6,6 @@
             [monstr.parse :as parse]
             [monstr.timeline-support :as timeline-support]
             [monstr.util :as util]
-            [monstr.view-home-new :as view-home-new]
-            ; [monstr.view-home :as view-home-threaded]
             [monstr.util-java :as util-java])
   (:import (java.util HashMap HashSet)
            (javafx.collections FXCollections ObservableList)
@@ -27,7 +25,7 @@
    note-id       ; The note that is the focus of the thread. Only relevant when showing a thread.
    ])
 
-(defn- new-timeline
+(defn new-timeline
   [relays show-thread?]
   ;; NOTE: we're querying and subscribing to all of time but for now, for ux
   ;; experience, we filter underlying data by n days
@@ -50,28 +48,8 @@
       timeline-epoch-vol
       relays
       show-thread?
-      nil
-      )))
+      nil)))
 
-(defn- new-timelines
-  [relays]
-  (map #(new-timeline (list %) false) relays))
-
-(defn- new-column
-  [*state db executor metadata-cache relay-urls]
-  (domain/->Column (domain/->View (first relay-urls) relay-urls)
-                   (new-timeline relay-urls false)
-                   (new-timeline relay-urls true)
-                   (view-home-new/create-list-view *state db metadata-cache executor)
-                   (view-home-new/create-list-view *state db metadata-cache executor)
-                   false))
-
-(defn new-columns
-  "Create a new Column for each relay-url."
-  [*state db executor metadata-cache relay-urls]
-  (map #(new-column *state db executor metadata-cache #{%})
-       relay-urls))
-  
 (defn accept-text-note?
   [*state identity-pubkey parsed-ptags {:keys [pubkey] :as _event-obj}]
   (let [{:keys [contact-lists]} @*state
@@ -133,7 +111,7 @@
             (.add observable-list init-note)))))))
 
 (defn thread-dispatch!
-  [*state timeline identity-pubkey
+  [*state force-acceptance timeline identity-pubkey
    {:keys [id pubkey created_at content relays] :as event-obj}]
   {:pre [(some? pubkey)]}
   ;; CONSIDER if is this too much usage of on-fx-thread - do we need to batch/debounce
@@ -144,12 +122,12 @@
         timeline]
     (when-not (.contains item-ids id)
       (let [ptag-ids (parse/parse-tags event-obj "p")]
-        (when (or
-               ;; Our item-id->index map will have a key for any id that
-               ;; has been referenced by any other accepted text note.
-               ;; So we also want to accept those "missing" notes:
-               (.containsKey item-id->index id)
-               (accept-text-note? *state identity-pubkey ptag-ids event-obj))
+        (when (or force-acceptance
+                  ;; Our item-id->index map will have a key for any id that
+                  ;; has been referenced by any other accepted text note.
+                  ;; So we also want to accept those "missing" notes:
+                  (.containsKey item-id->index id)
+                  (accept-text-note? *state identity-pubkey ptag-ids event-obj))
           (.add item-ids id)
           (.merge author-pubkey->item-id-set pubkey (HashSet. [id])
                   (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
@@ -171,8 +149,10 @@
 
 
 (defn dispatch-text-note!
-  "Dispatch a text note to all timelines for which the given event is relevant."
-  [*state {:keys [id pubkey created_at content relays] :as event-obj}]
+  "Dispatch a text note to all timelines for which the given event is relevant.
+  If FORCE-ACCEPTANCE is true, we don't check (with 'accept-text-note?) if the
+  note is acceptable. This is necessary for the threaded view."
+  [*state force-acceptance {:keys [id pubkey created_at content relays] :as event-obj}]
   {:pre [(some? pubkey)]}
   ;; CONSIDER if is this too much usage of on-fx-thread - do we need to batch/debounce?
   (fx/run-later
@@ -182,8 +162,9 @@
              thread-timeline (:thread-timeline column)]
          (when (event-is-relevant-for-timeline? event-obj flat-timeline)  
            (flat-dispatch! *state flat-timeline identity-pubkey event-obj))
-         (when (event-is-relevant-for-timeline? event-obj thread-timeline)  
-           (thread-dispatch! *state thread-timeline identity-pubkey event-obj)))))))
+         (when (or force-acceptance
+                   (event-is-relevant-for-timeline? event-obj thread-timeline))
+           (thread-dispatch! *state force-acceptance thread-timeline identity-pubkey event-obj)))))))
 
 (defn update-active-timelines!
   "Update the active timelines for the identity with the given public key."

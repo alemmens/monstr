@@ -87,6 +87,14 @@
     :raw_event_tuple
     raw-event-tuple->event-obj))
 
+(defn load-relays-for-event
+  "Returns a list of relay urls."
+  [db event-id]
+  (map :relay_url
+       (jdbc/execute! db
+                      [(str "select relay_url from relay_event_id where event_id='" event-id "'")]
+                      {:builder-fn rs/as-unqualified-lower-maps})))
+
 (defn timeline-query
   [pubkeys]
   [(format (str "select raw_event_tuple from n_events"
@@ -119,10 +127,11 @@
   [db relay-url pubkeys]
   (log/debugf "Loading timeline events for %s with %d pubkeys" relay-url (count pubkeys))
   (when-not (empty? pubkeys)
-    (mapv (comp raw-event-tuple->event-obj :raw_event_tuple)
-          (jdbc/execute! db
-                         (relay-timeline-query relay-url pubkeys)
-                         {:builder-fn rs/as-unqualified-lower-maps}))))
+    (map #(assoc % :relays (list relay-url))
+         (mapv (comp raw-event-tuple->event-obj :raw_event_tuple)
+               (jdbc/execute! db
+                              (relay-timeline-query relay-url pubkeys)
+                              {:builder-fn rs/as-unqualified-lower-maps})))))
   
 ;; --
 
