@@ -250,9 +250,9 @@
                 {:fx/type :label
                  :h-box/margin 5
                  :graphic {:fx/type :button
-                           ;; note: :on-action and :on-mouse-clicked don't seem to work
-                           ;;  when the publish text-area has focus but mouse-pressed
-                           ;;  does:
+                           ;; NOTE: :on-action and :on-mouse-clicked don't seem to work
+                           ;; when the publish text-area has focus but :on-mouse-pressed
+                           ;; does.
                            :on-mouse-pressed {:event/type :publish!}
                            :disable (not can-publish?)
                            :style-class ["button" "ndesk-publish-button"]
@@ -262,11 +262,11 @@
      :children
      (if (seq relay-timelines)
        (mapv (fn [relay-url]
-               ;; TODO: For now we assume that the relay-url set contains only
-               ;; one element. We probably want to move towards arbitrary-sized
-               ;; relay-url sets instead.
+               ;; TODO: For now we assume that the relay-url set contains only one
+               ;; element. We probably want to move towards arbitrary-sized relay-url sets
+               ;; instead.
                (let [column (find-column #{relay-url} columns)
-                     listview (:thread-listview column)]
+                     listview (:flat-listview column)]
                  (if (nil? column)
                    (log/debugf "No column found for %s" relay-url)
                    (log/debugf "Creating pane for column %s" relay-url))

@@ -238,19 +238,20 @@
                :h-box/margin 3
                :text "reply"
                :on-action
-               (fn [_]
-                 (swap! *state assoc :active-reply-context
-                        (domain/->UIReplyContext (if (nil? root-data)
-                                                   (:id event-obj)
-                                                   ;; DO: CHECK THIS.
-                                                   (:id root-data))
-                                                 item-id)))}
+               (fn [_] (swap! *state assoc :active-reply-context
+                              (domain/->UIReplyContext (if (nil? root-data)
+                                                         (:id event-obj)
+                                                         ;; DO: CHECK THIS.
+                                                         (:id root-data))
+                                                       item-id)))}
               {:fx/type :button
                :style-class ["button" "ndesk-thread-button"] ;; used for .lookup
                :h-box/margin 3
                :text "thread"
-               :on-action (fn [_])}
-              ]})
+               :on-action (fn [_]
+                            (swap! *state assoc
+                                   :show-threadpane? true
+                                   :thread-focus event-obj))}]})
 
 (defn avatar-or-empty-space
   [picture-url avatar-color pubkey-for-avatar]

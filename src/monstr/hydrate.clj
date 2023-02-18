@@ -23,6 +23,7 @@
 (defn- new-columns
   "Create a new Column for each relay-url."
   [*state db executor metadata-cache relay-urls]
+  (log/debugf "Creating new columns for %s" relay-urls)
   (map #(new-column *state db executor metadata-cache #{%})
        relay-urls))
 
@@ -38,6 +39,7 @@
   ;;      dispatches via yielding of bg thread; this way we'd move
   ;;      on to subscriptions, allowing new stuff to come in sooner
   ;;      as we backfill
+  (log/debugf "Dispatching %d text notes for %s" (count timeline-data) relay-url)
   (doseq [event-obj timeline-data]
     (timeline/dispatch-text-note! *state false
                                   (assoc event-obj :relays (list relay-url)))))
@@ -45,15 +47,15 @@
 (defn hydrate!*
   ;; note: first of new-identities will become the active identity
   [*state db ^ScheduledExecutorService executor new-identities]
-  (log/debugf "Hydrating with new identities")
+  (log/debugf "Hydrating with %d new identities" (count new-identities))
   (let [new-public-keys (mapv :public-key new-identities)
         identity-metadata (store/load-metadata db new-public-keys)
         relay-urls (domain/relay-urls @*state)
         identity->columns (into {}
                                 (map #(vector % (new-columns *state db executor
                                                              metadata/cache
-                                                             relay-urls)))
-                                new-public-keys)]
+                                                             relay-urls))
+                                     new-public-keys))]
     (swap! *state
       (fn [curr-state]
         (-> curr-state

@@ -50,11 +50,11 @@
     {:fx/type :h-box
      :style-class ["ndesk-timeline-item-missing"]
      :children [(do
-                  ;; get off of fx thread
-                  (util/submit! executor
+                  ;; Load the parent (Nostr) thread. 
+                  (util/submit! executor ; get off of fx thread
                                 (fn []
                                   ;; Wait a bit so we don't overload the relays.
-                                  ;; TODO: we should use a queue instead!
+                                  ;; TODO: we should use a queue instead of this black magic!
                                   (Thread/sleep 50)
                                   (load-event/async-load-event! *state db executor (:id item-data))))
                   {:fx/type :hyperlink
@@ -145,18 +145,17 @@
   ;; this matters.
   (if (nil? note-wrapper)
     {:fx/type :label :text "err"}
-    (let [{:keys [root expanded? max-timestamp note-count]} note-wrapper]
+    (let [root (:root note-wrapper)]
       {:fx/type :v-box
-       :children (vec
-                  ; (concat
-                   (tree-rows* 0 root root
-                               *state db metadata-cache executor))})))
+       :children (vec (tree-rows* 0 root root
+                                  *state db metadata-cache executor))})))
 
 (defn home [{:keys [*state db metadata-cache executor]}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created #(.setSelectionModel % util-fx-more/no-selection-model)
    :desc {:fx/type :list-view
           :focus-traversable false
+          :style-class ["monstr-thread-pane-listview"]
           :pref-height 100000  ; trick to make it stretch vertically
           :cell-factory {:fx/cell-type :list-cell
                          :describe (fn [note-wrapper]
@@ -168,6 +167,7 @@
                                        :metadata-cache metadata-cache
                                        :executor executor}})}}})
 
+
 (defn create-list-view
   ^ListView [*state db metadata-cache executor]
   (fx/instance
@@ -176,3 +176,49 @@
                           :db db
                           :metadata-cache metadata-cache
                           :executor executor})))
+
+#_
+(defonce ^Popup singleton-thread-pane
+  [{:keys [*state db metadata-cache executor]}]
+  (fx/instance
+   (fx/create-component
+    {:fx/type :popup
+     :anchor-location :window-top-left
+     :auto-hide true
+     :auto-fix false
+     :content [{:fx/type :v-box
+                :style-class "ndesk-thread-pane-vbox"
+                :padding 20
+                :style {:-fx-background-color :white}
+                :effect {:fx/type :drop-shadow}
+                :on-mouse-exited (fn [^MouseEvent x]
+                                   (let [popup (.getWindow (.getScene ^Node (.getSource x)))]
+                                     (.hide popup)))
+                :children [{:fx/type :label
+                            :text "thread"
+                            :style {:-fx-font-weight :bold}
+                            :style-class ["label"]}
+                           {:fx/type home
+                            :*state *state
+                            :db db
+                            :metadata-cache metadata-cache
+                            :executor executor}]}]})))
+
+#_
+(defn prepare-thread-pane!
+  [db node-pos width event-id]
+  (let [^VBox v-box (first (seq (.getContent singleton-thread-pane)))
+        listview (.lookup v-box "monstr-thread-pane-listview")]
+    ))
+
+#_
+(defn show-thread-pane!
+  [db event-id ^ActionEvent e]
+  (let [node (.getSource e)
+        bounds (.getBoundsInLocal node)
+        width 700
+        node-pos (.localToScreen node (* 0.5 (.getWidth bounds)) 0.0)
+        pane (prepare-thread-pane! db node-pos width event-id)]
+    (let [stage (-> node .getScene .getWindow)]
+      (.show popup stage))))
+

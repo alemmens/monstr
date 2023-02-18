@@ -216,7 +216,6 @@
   {:pre [(vector? filters) (every? map? filters)]}
   (let [filters' (mapv util/compact filters)]
     (locking conn-registry
-      (log/debugf "Subscribing all to %s" filters')
       (vswap! (:subscriptions conn-registry) assoc id filters')
       (doseq [[_ read-conn-vol] @(:read-connections-vol conn-registry)]
         (subscribe! read-conn-vol id filters')))))

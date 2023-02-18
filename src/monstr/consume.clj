@@ -112,8 +112,6 @@
   [relay-url subscription-id]
   (log/info "EOSE: " relay-url subscription-id)
   (locking relay-conn/conn-registry
-    ;; TODO: Use this moment to automatically unsubscribe from old connections for relays
-    ;; that don't send EOSE.
     (let [read-connections @(:read-connections-vol relay-conn/conn-registry)
           connection (get read-connections relay-url)]
       (when connection
