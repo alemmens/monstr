@@ -263,6 +263,21 @@
               (.setVisible (and show?
                                 (util-domain/can-publish? active-key identities)))))))
 
+(defn- info-button [db item-id pubkey]
+  {:fx/type :button
+   :style-class ["button" "ndesk-timeline-item-info-link"] ;; used for .lookup
+   :text "info"
+   :on-action (partial show-info! db item-id pubkey)})
+
+(defn reply-button [*state root-id item-id]
+  {:fx/type :button
+   :style-class ["button" "ndesk-reply-button"] ;; used for .lookup
+   :h-box/margin 3
+   :text "reply"
+   :on-action (fn [_] (swap! *state assoc :active-reply-context
+                             (domain/->UIReplyContext (or root-id item-id)
+                                                      item-id)))})
+  
 (defn- action-button-row
   [*state db event-obj root-data item-id pubkey column-id]
   {:fx/type :h-box
@@ -271,23 +286,10 @@
    :visible false
    :alignment :center
    :max-width Integer/MAX_VALUE
-   :children [;; Info button
-              {:fx/type :button
-               :style-class ["button" "ndesk-timeline-item-info-link"] ;; used for .lookup
-               :text "info"
-               :on-action (partial show-info! db item-id pubkey)}
-              ;; Reply button
-              {:fx/type :button
-               :style-class ["button" "ndesk-reply-button"] ;; used for .lookup
-               :h-box/margin 3
-               :text "reply"
-               :on-action
-               (fn [_] (swap! *state assoc :active-reply-context
-                              (domain/->UIReplyContext (if (nil? root-data)
-                                                         (:id event-obj)
-                                                         ;; DO: CHECK THIS.
-                                                         (:id root-data))
-                                                       item-id)))}
+   :children [(info-button db item-id pubkey)
+              (reply-button *state
+                            (:id (if (nil? root-data) event-obj root-data))
+                            item-id)
               {:fx/type :button
                :style-class ["button" "ndesk-thread-button"] ;; used for .lookup
                :h-box/margin 3
@@ -297,6 +299,19 @@
                               (log/debugf "Thread button clicked for column %s" (:name (:view column)))
                               (timeline/show-column-thread! *state column event-obj)))}]})
 
+(defn- thread-action-button-row
+  [*state db root-data item-id pubkey column-id]
+  {:fx/type :h-box
+   :style-class ["ndesk-content-controls"] ;; used for .lookup
+   :style (BORDER| :lightgrey)
+   :visible false
+   :alignment :center
+   :max-width Integer/MAX_VALUE
+   :children [(info-button db item-id pubkey)
+              (reply-button *state
+                            (if (nil? root-data) item-id (:id root-data))
+                            item-id)]})
+  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Thread pane
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -312,13 +327,12 @@
                                 (fn []
                                   ;; Wait a bit so we don't overload the relays.
                                   ;; TODO: we should use a queue instead of this black magic!
-                                  (Thread/sleep 50)
+                                  (Thread/sleep 50) ; 50ms
                                   (load-event/async-load-event! *state db column-id (:id item-data))))
                   {:fx/type :hyperlink
                    :h-box/hgrow :always
                    :style-class ["ndesk-timeline-item-missing-hyperlink"]
                    :text "loading parent thread..."})]}
-    ;; else -- not missing
     (let [item-id (:id item-data)
           pubkey (:pubkey item-data)
           pubkey-for-avatar (or (some-> pubkey (subs 0 3)) "?")
@@ -329,8 +343,8 @@
           {:keys [name about picture-url nip05-id created-at]} (some->> pubkey (metadata/get* metadata-cache))
           avatar-color (or (some-> pubkey avatar/color) :lightgray)]
       {:fx/type :border-pane
-;       :on-mouse-entered (partial show-action-row! *state true)
-;       :on-mouse-exited (partial show-action-row! *state false)
+       :on-mouse-entered (partial show-action-row! *state true)
+       :on-mouse-exited (partial show-action-row! *state false)
        :left (avatar-or-empty-space picture-url avatar-color pubkey-for-avatar)
        :center {:fx/type :border-pane
                 :top {:fx/type :border-pane
@@ -343,33 +357,17 @@
                                          :style-class "ndesk-timeline-item-pubkey"
                                          :text pubkey-short}]}
                       :right {:fx/type :h-box
-                              :children [{:fx/type :hyperlink
-                                          :style-class ["label" "ndesk-timeline-item-info-link"] ;; used for .lookup
-                                          :visible false
-                                          :text "info"
-                                        :on-action (partial show-info! db item-id pubkey)}
-                                         {:fx/type :label
+                              :children [{:fx/type :label
+                                          :style-class "ndesk-timeline-item-timestamp"                                          
                                           :text (or (some-> timestamp util/format-timestamp) "?")}]}}
                 :bottom {:fx/type :h-box
                          :children [{:fx/type timeline-item-content
                                      :h-box/hgrow :always
                                      :content content
                                      :tags tags
-                                     :metadata-cache metadata-cache}
-                                    {:fx/type :h-box
-                                     :style-class ["ndesk-content-controls"] ;; used for .lookup
-                                     :visible false
-                                     :alignment :center-right
-                                     :max-width Integer/MAX_VALUE
-                                     :children [{:fx/type :button
-                                                 :style-class ["button" "ndesk-reply-button"] ;; used for .lookup
-                                                 :h-box/margin 3
-                                                 :text "reply"
-                                                 :on-action
-                                                 (fn [_]
-                                                   (swap! *state assoc :active-reply-context
-                                                     (domain/->UIReplyContext
-                                                       (:id root-data) item-id)))}]}]}}})))
+                                     :metadata-cache metadata-cache}]}}
+     ;; The action buttons (Reply, Info, ...) are at the bottom of the timeline item.
+     :bottom (thread-action-button-row *state db root-data item-id pubkey column-id)})))
 
 (defn- tree-rows*
   [indent ^UITextNote root-data ^UITextNote item-data column-id *state db metadata-cache executor]
@@ -386,7 +384,7 @@
                    :item-data item-data
                    :root-data root-data
                    :column-id column-id
-                   :*state @domain/*state
+                   :*state *state
                    :db store/db
                    :metadata-cache metadata/cache
                    :executor executor}]}
