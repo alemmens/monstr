@@ -6,19 +6,22 @@
    [monstr.store :as store]
    [monstr.metadata :as metadata]
    [monstr.subscribe :as subscribe]
-   [monstr.view-home-new :as view-home-new]
-   [monstr.view-home :as view-home-threaded]
+   [monstr.view-home-new :as view-home]
    [clojure.tools.logging :as log])
-  (:import (java.util.concurrent ScheduledExecutorService)))
+  (:import (java.util.concurrent ScheduledExecutorService)
+           (java.util UUID)))
 
 (defn- new-column
   [*state db executor metadata-cache relay-urls]
-  (domain/->Column (domain/->View (first relay-urls) relay-urls)
-                   (timeline/new-timeline relay-urls false)
-                   (timeline/new-timeline relay-urls true)
-                   (view-home-new/create-list-view *state db metadata-cache executor)
-                   (view-home-threaded/create-list-view *state db metadata-cache executor)
-                   false))
+  (let [id (.toString (UUID/randomUUID))
+        column (domain/->Column id
+                                (domain/->View (first relay-urls) relay-urls)
+                                (timeline/new-timeline relay-urls false)
+                                (timeline/new-timeline relay-urls true)
+                                nil nil false nil)]
+    (assoc column
+           :flat-listview (view-home/create-list-view id *state db metadata-cache executor)
+           :thread-listview (view-home/create-thread-view id *state db metadata-cache executor))))
 
 (defn- new-columns
   "Create a new Column for each relay-url."
@@ -59,26 +62,26 @@
     (swap! *state
       (fn [curr-state]
         (-> curr-state
-          (update :identities into new-identities)
-          (update :identity-metadata merge identity-metadata)
-          (update :identity->columns merge identity->columns))))
+            (update :identities into new-identities)
+            (update :identity-metadata merge identity-metadata)
+            (update :identity->columns merge identity->columns))))
     (let [contact-lists (hydrate-contact-lists! *state db new-identities)
           closure-public-keys (subscribe/whale-of-pubkeys* new-public-keys contact-lists)
-          ;; TODO also limit timeline events to something, some cardinality?
-          ;; TODO also load watermarks and include in new subscriptions
+          ;; TODO: also limit timeline events to something, some cardinality?
+          ;; TODO: also load watermarks and include in new subscriptions.
           timelines-data (map #(store/load-relay-timeline-events db % closure-public-keys)
                               relay-urls)]
       (log/debugf "Loaded %s timeline events" (doall (map count timelines-data)))
       (when-let [first-identity-key (first new-public-keys)]
         (log/debugf "Hydrating with first identity key %s" first-identity-key)
         (timeline/update-active-timelines! *state first-identity-key))
-      ;; TODO consider transduce iterate over timeline-data and throttling
+      ;; TODO: consider transduce iterate over timeline-data and throttling
       ;;      dispatches via yielding of bg thread; this way we'd move
       ;;      on to subscriptions, allowing new stuff to come in sooner
       ;;      as we backfill
       (doseq [[relay-url timeline-data] (map list relay-urls timelines-data)]
         (dispatch-text-notes *state relay-url timeline-data)))
-    ;; NOTE: use *all* identities to update subscriptions
+    ;; NOTE: use *all* identities to update subscriptions.
     (let [{:keys [identities contact-lists]} @*state]
       (subscribe/overwrite-subscriptions! identities contact-lists))))
 

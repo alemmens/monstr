@@ -22,10 +22,6 @@
    :new-timeline nil        ; relay url to be added to the visible timelines
    :relay-timelines []      ; sequence with the relay urls of the visible timelines   
    :identity->columns {}    ; map from identity pubkeys to lists of Column
-   ;; Thread
-   :thread-timeline nil     ; the timeline for the thread pane
-   :show-threadpane? false  ; indicates if the thread pane must be shown
-   :thread-focus nil        ; the event object that is the focus of the thread pane
    })
 
 (defonce *state
@@ -54,18 +50,26 @@
      ])
 
 (defrecord Column
-    [view
+    [id           ; a random UUID
+     view
      flat-timeline
      thread-timeline
      flat-listview
      thread-listview
-     show-thread?])
+     show-thread?
+     thread-focus  ; The note (event-obj) that is the focus of the thread. Only relevant when showing a thread.
+     ])
 
 (defn column-matches-relay-urls?
   "RELAY-URLS is a set of relay urls."
   [column relay-urls]
   (= (:relay-urls (:view column))
      relay-urls))
+
+(defn find-column-by-id
+  [id]
+  (first (filter #(= (:id %) id)
+                 (apply concat (vals (:identity->columns @*state))))))
 
 (defrecord Identity
   [public-key secret-key])

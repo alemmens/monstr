@@ -44,7 +44,7 @@
           (.lookup ".ndesk-content-controls")
           (.setVisible show?))))))
 
-(defn timeline-item
+(defn thread-timeline-item
   [{:keys [^UITextNote root-data ^UITextNote item-data *state db metadata-cache executor]}]
   (if (:missing? item-data)
     {:fx/type :h-box
@@ -123,14 +123,14 @@
                    :min-width spacer-width
                    :max-width spacer-width
                    :text ""}
-                  {:fx/type timeline-item
+                  {:fx/type thread-timeline-item
                    :h-box/hgrow :always
                    :spacer-width spacer-width
                    :item-data item-data
                    :root-data root-data
-                   :*state *state
-                   :db db
-                   :metadata-cache metadata-cache
+                   :*state @domain/*state
+                   :db store/db
+                   :metadata-cache metadata/cache
                    :executor executor}]}
       (mapcat #(tree-rows* (inc indent) root-data % *state db metadata-cache executor)
               (:children item-data)))))
@@ -150,7 +150,7 @@
        :children (vec (tree-rows* 0 root root
                                   *state db metadata-cache executor))})))
 
-(defn home [{:keys [*state db metadata-cache executor]}]
+(defn thread-home [{:keys [*state db metadata-cache executor]}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created #(.setSelectionModel % util-fx-more/no-selection-model)
    :desc {:fx/type :list-view
@@ -168,6 +168,7 @@
                                        :executor executor}})}}})
 
 
+#_
 (defn create-list-view
   ^ListView [*state db metadata-cache executor]
   (fx/instance
@@ -177,9 +178,7 @@
                           :metadata-cache metadata-cache
                           :executor executor})))
 
-#_
 (defonce ^Popup singleton-thread-pane
-  [{:keys [*state db metadata-cache executor]}]
   (fx/instance
    (fx/create-component
     {:fx/type :popup
@@ -198,27 +197,24 @@
                             :text "thread"
                             :style {:-fx-font-weight :bold}
                             :style-class ["label"]}
-                           {:fx/type home
-                            :*state *state
-                            :db db
-                            :metadata-cache metadata-cache
-                            :executor executor}]}]})))
+                           {:fx/type thread-home}]}]})))
 
-#_
+(defn find-thread-listview []
+  (let [v-box (first (seq (.getContent singleton-thread-pane)))]
+    (.lookup v-box "monstr-thread-pane-listview")))
+ 
 (defn prepare-thread-pane!
-  [db node-pos width event-id]
-  (let [^VBox v-box (first (seq (.getContent singleton-thread-pane)))
-        listview (.lookup v-box "monstr-thread-pane-listview")]
-    ))
+  [node-pos width event-id]
+  ;; Nothing for now.
+  singleton-thread-pane)
 
-#_
 (defn show-thread-pane!
-  [db event-id ^ActionEvent e]
+  [event-id ^ActionEvent e]
   (let [node (.getSource e)
         bounds (.getBoundsInLocal node)
         width 700
         node-pos (.localToScreen node (* 0.5 (.getWidth bounds)) 0.0)
-        pane (prepare-thread-pane! db node-pos width event-id)]
+        pane (prepare-thread-pane! node-pos width event-id)]
     (let [stage (-> node .getScene .getWindow)]
-      (.show popup stage))))
+      (.show pane stage))))
 

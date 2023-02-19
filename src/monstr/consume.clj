@@ -37,10 +37,10 @@
     (catch Exception e
       (log/warn e "while handling metadata event"))))
 
-(defn consume-text-note [_db *state relay-url event-obj force-acceptance]
+(defn consume-text-note [_db *state relay-url event-obj column-id]
   #_(log/debug "text note: " relay-url (:id event-obj))
   (timeline/dispatch-text-note! *state
-                                force-acceptance
+                                column-id ; can be nil
                                 (assoc event-obj :relays (list relay-url))))
 
 (defn consume-recommend-server [db relay-url event-obj]
@@ -86,7 +86,10 @@
     ;; any thread-timeline.
     (case kind
       0 (consume-set-metadata-event db *state metadata-cache relay-url verified-event)
-      1 (consume-text-note db *state relay-url verified-event force-acceptance?)
+      1 (let [parts (str/split subscription-id #":")
+              column-id (when (= (first parts) "monstr:")
+                          (second parts))]
+          (consume-text-note db *state relay-url verified-event column-id))
       2 (consume-recommend-server db relay-url verified-event)
       3 (consume-contact-list db *state executor resubscribe-future-vol relay-url verified-event)
       4 (consume-direct-message db relay-url verified-event)

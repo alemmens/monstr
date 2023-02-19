@@ -9,7 +9,6 @@
     [monstr.style :as style :refer [BORDER|]]
     [monstr.util :as util]
     [monstr.util-domain :as util-domain]
-    [monstr.view-home :as view-home]
     [monstr.view-new-identity :as view-new-identity]
     [monstr.view-relays :as view-relays]
     [monstr.util-java :as util-java]
@@ -216,6 +215,7 @@
    :text label
    :content content})
 
+#_
 (defn add-timeline-button
   [text]
   {:fx/type :h-box
@@ -223,6 +223,20 @@
    :style-class ["ndesk-keycard"]
    :on-mouse-clicked {:event/type :show-add-timeline-dialog}
    :children [{:fx/type :label :text text}]})
+
+(defn add-timeline-button
+  [text]
+  {:fx/type :button
+   :padding 5
+   :on-mouse-pressed {:event/type :show-add-timeline-dialog}
+   :text text})
+
+(defn back-from-thread-button
+  [column]
+  {:fx/type :button
+   :padding 5
+   :on-mouse-pressed (fn [e] (timeline/unshow-column-thread! domain/*state column))
+   :text " back "})
 
 (defn hidden-timelines
   "Returns a list with the relay urls of timelines that are not being shown."
@@ -233,7 +247,15 @@
   (log/debugf "Looking for %s in %d columns" relay-urls (count columns))
   (first (filter #(domain/column-matches-relay-urls? % relay-urls)
                  columns)))
-                   
+
+(defn thread-list [listview]
+  {:fx/type :v-box
+   :children (if (nil? listview)
+               []
+               [{:fx/type fx/ext-instance-factory
+                 :create #(doto listview
+                            (VBox/setVgrow Priority/ALWAYS))}])})
+
 (defn main-panes
   [{:keys [columns relay-timelines relays show-add-timeline-dialog? can-publish? active-reply-context active-contact-pubkey metadata-cache]}]
   (log/debugf "Main panes with %d relay timelines=%s" (count relay-timelines) relay-timelines)
@@ -266,10 +288,14 @@
                ;; element. We probably want to move towards arbitrary-sized relay-url sets
                ;; instead.
                (let [column (find-column #{relay-url} columns)
-                     listview (:flat-listview column)]
+                     show-thread? (:show-thread? column)
+                     listview (if show-thread?
+                                (:thread-listview column)
+                                (:flat-listview column))]
                  (if (nil? column)
                    (log/debugf "No column found for %s" relay-url)
-                   (log/debugf "Creating pane for column %s" relay-url))
+                   (log/debugf "Creating pane for column %s (show-thread=%s listview=%s)"
+                               relay-url show-thread? listview))
                  {:fx/type :v-box
                   :h-box/margin 5
                   :h-box/hgrow :always
@@ -278,7 +304,13 @@
                               :style-class "relay-timeline-label"
                               :children (remove nil?
                                                 [{:fx/type :h-box :h-box/hgrow :always}
-                                                 {:fx/type :label :text relay-url :padding 5}
+                                                 (when show-thread?
+                                                   (back-from-thread-button column))
+                                                 {:fx/type :label
+                                                  :text (if show-thread?
+                                                          (format "%s (thread)" relay-url)
+                                                          relay-url)
+                                                  :padding 5}
                                                  {:fx/type :button
                                                   :padding 5
                                                   :on-mouse-pressed {:event/type :remove-relay-timeline
@@ -296,7 +328,8 @@
        ;; If there are no relay timelines, just show an "Add timeline" button (centered).
        [{:fx/type :h-box :h-box/hgrow :always}
         (add-timeline-button "Add timeline")
-        {:fx/type :h-box :h-box/hgrow :always}])}]})
+        {:fx/type :h-box :h-box/hgrow :always}])}
+    ]})
 
 
 (defn profile
@@ -331,7 +364,8 @@
            relay-timelines relays show-add-timeline-dialog? new-timeline
            can-publish? active-reply-context active-contact-list
            active-key active-contact-pubkey identities
-           identity-metadata metadata-cache]}]
+           identity-metadata metadata-cache
+           ]}]
   (log/debugf "Tab pane with relay timelines=%s and show=%s" relay-timelines show-add-timeline-dialog?)
   {:fx/type fx/ext-let-refs
    :refs {:dialog {:fx/type view-reply/dialog
@@ -352,7 +386,8 @@
                                :active-reply-context active-reply-context
                                :active-contact-list active-contact-list
                                :active-contact-pubkey active-contact-pubkey
-                               :metadata-cache metadata-cache}
+                               :metadata-cache metadata-cache
+                               }
                        "Contacts" {:fx/type contacts
                                    :active-contact-list active-contact-list
                                    :active-contact-pubkey active-contact-pubkey
@@ -476,7 +511,8 @@
                     refresh-relays-ts connected-info
                     relay-timelines show-add-timeline-dialog? new-timeline
                     show-new-identity? new-identity-error active-reply-context contact-lists
-                    identity-active-contact metadata-cache]}]
+                    identity-active-contact metadata-cache
+                    ]}]
   (log/debugf "Root with relay timelines=%s" relay-timelines)
   {:fx/type :border-pane
    :top {:fx/type identity-selector
@@ -497,7 +533,8 @@
             :active-contact-pubkey (get identity-active-contact active-key)
             :identities identities
             :identity-metadata identity-metadata
-            :metadata-cache metadata-cache}
+            :metadata-cache metadata-cache
+            }
    :bottom {:fx/type status-bar
             :show-relays? show-relays?
             :relays relays
@@ -508,8 +545,9 @@
                      refresh-relays-ts connected-info
                      relay-timelines show-add-timeline-dialog? new-timeline
                      show-new-identity? new-identity-error active-reply-context
-                     contact-lists identity-active-contact metadata-cache]}]
-  (log/debugf "Stage with %d columns and active key %s" (count identity->columns) active-key)
+                     contact-lists identity-active-contact metadata-cache
+                     ]}]
+  (log/debugf "Stage with %d identities and active key %s" (count identity->columns) active-key)
   {:fx/type :stage
    :showing true
    :title "Monstr"
@@ -535,4 +573,5 @@
            :relay-timelines relay-timelines
            :show-add-timeline-dialog? show-add-timeline-dialog?
            :new-timeline new-timeline
-           :metadata-cache metadata-cache}}})
+           :metadata-cache metadata-cache
+           }}})

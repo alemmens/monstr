@@ -22,7 +22,6 @@
    timeline-epoch-vol
    relays        ; Set of relay urls for this timeline.
    show-thread?  ; If true, show the current thread instead of a flat timeline.
-   note-id       ; The note that is the focus of the thread. Only relevant when showing a thread.
    ])
 
 (defn new-timeline
@@ -47,8 +46,7 @@
       (HashSet.)
       timeline-epoch-vol
       relays
-      show-thread?
-      nil)))
+      show-thread?)))
 
 (defn accept-text-note?
   [*state identity-pubkey parsed-ptags {:keys [pubkey] :as _event-obj}]
@@ -170,8 +168,9 @@
                   (.put item-id->index x init-idx))
                 (.add observable-list init-wrapper)))))))))
 
-(defn add-item-to-thread-timeline!
-  [timeline ptag-ids {:keys [id pubkey] :as event-obj}]
+(defn- add-item-to-thread-timeline!
+  [timeline ptag-ids {:keys [id pubkey] :as event-obj}] 
+  #_(log/debugf "Adding event with id %s to thread timeline" id)
   (let [{:keys [^ObservableList observable-list
                 ^HashMap author-pubkey->item-id-set
                 ^HashMap item-id->index
@@ -199,53 +198,82 @@
             (.put item-id->index x init-index))
           (.add observable-list init-wrapper))))))
 
-(defn clear-timeline!
+(defn- clear-timeline!
   [timeline]
+  {:pre [(some? timeline)]}
+  (log/debugf "Clearing timeline %s" timeline)  
   (doseq [property [:adapted-list
                     :observable-list
                     :author-pubkey->item-id-set
                     :item-id->index
                     :item-ids]]
+    (log/debugf "Clearing timeline property %s: %s" property (property timeline))
     (.clear (property timeline))))
 
-(defn reset-thread-timeline!
-  "Clears the timeline and then adds the given event-obj."
-  [timeline event-obj]
-  (clear-timeline! timeline)
-  (let [ptag-ids (parse/parse-tags event-obj "p")]
-    (add-item-to-thread-timeline! timeline ptag-ids event-obj)))
-
-(defn thread-dispatch!
-  [*state timeline event-obj]
-  {:pre [(some? (:pubkey event-obj))]}
-  ;; CONSIDER if is this too much usage of on-fx-thread - do we need to batch/debounce
-  (when-not (.contains (:item-ids timeline) (:id event-obj))
+(defn- update-column-properties!
+  [*state column show-thread? thread-focus]
+  (let [new-column (assoc column
+                          :show-thread? show-thread?
+                          :thread-focus thread-focus)
+        active-key (:active-key @*state)
+        identity->columns (:identity->columns @*state)
+        columns (get identity->columns active-key)]
+    (log/debugf "Updating column. %d columns (%d after removal)"
+                (count columns)
+                (count (remove #(= (:id %) (:id column)) columns)))
+    (log/debugf "New column with list views %s and %s and thread focus %s"
+                new-column
+                (:flat-listview new-column)
+                (:thread-listview new-column)
+                (:thread-focus new-column))
+    (swap! *state assoc
+           :identity->columns (assoc identity->columns active-key
+                                     (conj (remove #(= (:id %) (:id column)) columns)
+                                           new-column)))))
+  
+(defn show-column-thread!
+  [*state column event-obj]
+  (log/debugf "Showing thread timeline for column %s" (:name (:view column)))
+  ;; Update the :show-thread? and :thread-focus properties of the column.
+  (update-column-properties! *state column true event-obj)
+  ;; Clear the column's thread timeline and then add the given event-obj."  
+  (let [timeline (:thread-timeline column)]
+    (clear-timeline! timeline)
     (let [ptag-ids (parse/parse-tags event-obj "p")]
       (add-item-to-thread-timeline! timeline ptag-ids event-obj))))
 
+(defn unshow-column-thread!
+  [*state column]
+  (log/debugf "Unshowing thread timeline for column %s" (:name (:view column)))
+  (update-column-properties! *state column false nil))
+
+  
+(defn- thread-dispatch!
+  [*state column event-obj]
+  {:pre [(some? (:pubkey event-obj))]}
+  ;; CONSIDER if is this too much usage of on-fx-thread - do we need to batch/debounce
+  (let [timeline (:thread-timeline column)]
+    (log/debugf "Thread dispatch to column %s with timeline %s" column timeline)
+    (when-not (.contains (:item-ids timeline) (:id event-obj))
+      (let [ptag-ids (parse/parse-tags event-obj "p")]
+        (add-item-to-thread-timeline! timeline ptag-ids event-obj)))))
+
 (defn dispatch-text-note!
   "Dispatch a text note to all timelines for which the given event is relevant.
-  If FORCE-ACCEPTANCE is true, we don't check if the note is acceptable. This is necessary
-  for the threaded view."
-  [*state force-acceptance {:keys [id pubkey created_at content relays] :as event-obj}]
-  {:pre [(some? pubkey)]}
+  If COLUMN-ID is a string, the note is supposed to be for a thread view and
+  it's only dispatched to the specified column."
+  [*state column-id event-obj]
+  {:pre [(some? (:pubkey event-obj))]}
   ;; CONSIDER if is this too much usage of on-fx-thread - do we need to batch/debounce?
   (fx/run-later
-   ;; Dispatch to flat timelines.
-   #_(log/debugf "Dispatching text note for %d identities." (count (:identity->columns @*state)))
-   (doseq [[identity-pubkey columns] (:identity->columns @*state)]
-     #_(log/debugf "Dispatching text note for pubkey %s with %d columns"
-                 identity-pubkey
-                 (count columns))
-     (doseq [column columns]
-       #_(log/debugf "Considering dispatch for column %s" (:name (:view column)))
-       (let [flat-timeline (:flat-timeline column)]
-         (when (event-is-relevant-for-timeline? event-obj flat-timeline)
-           (flat-dispatch! *state flat-timeline identity-pubkey event-obj)))))
-   ;; Dispatch to thread timeline.
-   (when-let [thread-timeline (:thread-timeline @*state)]
-     (when force-acceptance
-       (thread-dispatch! *state thread-timeline event-obj)))))
+   (if (string? column-id)   
+     (do (log/debugf "Dispatching to column %s" column-id)
+         (thread-dispatch! *state (domain/find-column-by-id column-id) event-obj))
+     (doseq [[identity-pubkey columns] (:identity->columns @*state)]
+       (doseq [column columns]
+         (let [flat-timeline (:flat-timeline column)]
+           (when (event-is-relevant-for-timeline? event-obj flat-timeline)
+             (flat-dispatch! *state flat-timeline identity-pubkey event-obj))))))))
 
 (defn update-active-timelines!
   "Update the active timelines for the identity with the given public key."
@@ -257,10 +285,10 @@
      (log/debugf "Setting items for listview for %s" (:name (:view column)))
      (.setItems (:flat-listview column)
                 ^ObservableList (or (:adapted-list (:flat-timeline column))
+                                    (FXCollections/emptyObservableList)))
+     (.setItems (:thread-listview column)
+                ^ObservableList (or (:adapted-list (:thread-timeline column))
                                     (FXCollections/emptyObservableList))))
-   ;; Clear the thread timeline.
-   (when-let [thread-timeline (:thread-timeline @*state)]
-     (clear-timeline! thread-timeline))
    ;; Update the state's active public key.
    (swap! *state
           (fn [state]

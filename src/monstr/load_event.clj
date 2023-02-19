@@ -15,14 +15,15 @@
 
 (defn async-load-event!
   "Load the event with the given id from either the database or from the relays."
-  [*state db ^ScheduledExecutorService executor event-id]
+  [*state db column-id event-id]
+  (log/debugf "Async loading event with id %s" event-id)
   (if-let [event-from-store (load-from-store db event-id)]
-    (timeline/dispatch-text-note! *state true event-from-store)
+    (do (log/debugf "Found event in store.")
+        (timeline/dispatch-text-note! *state column-id event-from-store))
     ;; Create a unique subscription id to load the event and subscribe to all relays in
     ;; the hope that we find the event.  We'll unsubscribe automatically when we get an
     ;; EOSE event.
-    (let [uuid (.toString (UUID/randomUUID))
-          subscription-id (format "load-event:%s" uuid)]
+    (let [subscription-id (format "monstr:%s:%s" column-id (rand-int 1000000000))]
       (relay-conn/subscribe-all! subscription-id
                                  [(domain/->subscription-filter
                                    [event-id] [1] nil nil nil nil nil)]))))
