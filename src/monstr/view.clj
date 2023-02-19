@@ -235,8 +235,10 @@
   [column]
   {:fx/type :button
    :padding 5
+   :style {:-fx-font-weight :bold}
    :on-mouse-pressed (fn [e] (timeline/unshow-column-thread! domain/*state column))
-   :text " back "})
+   :text (str (char 0x2190)) ; left arrow
+   })
 
 (defn hidden-timelines
   "Returns a list with the relay urls of timelines that are not being shown."

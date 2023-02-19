@@ -30,15 +30,17 @@
 (defn relay-urls [state]
   (doall (map :url (:relays state))))
 
+(defn columns [state]
+  (apply concat (vals (:identity->columns state))))
+
 (defn flat-timelines [state]
-  (map :flat-timeline
-       (vals (:identity->columns state))))
+  (map :flat-timeline (columns state)))
+
+(defn thread-timelines [state]
+  (map :thread-timeline (columns state)))
 
 (defn all-timelines [state]
-  (let [thread-timeline (:thread-timeline state)
-        flat-timelines (flat-timelines state)]
-    (conj flat-timelines thread-timeline)
-    flat-timelines))
+  (concat (flat-timelines state) (thread-timelines state)))
 
 ;; --
 

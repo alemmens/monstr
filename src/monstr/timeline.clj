@@ -34,10 +34,9 @@
         observable-list (FXCollections/observableArrayList)
         filtered-list (FilteredList. observable-list
                         (util-java/->Predicate #(> (:max-timestamp %) init-timeline-epoch)))
-        adapted-list (.sorted
-                       filtered-list
-                       ;; latest wrapper entries first:
-                       (comparator #(< (:max-timestamp %2) (:max-timestamp %1))))]
+        adapted-list (.sorted filtered-list
+                              ;; latest wrapper entries first:
+                              (comparator #(< (:max-timestamp %2) (:max-timestamp %1))))]
     (->TimelineNew
       adapted-list
       observable-list
@@ -65,29 +64,12 @@
      ;; the text-note's ptags references one of identities contacts
      (not-empty (set/intersection contact-keys-set ptag-keys-set)))))
 
-#_
-(defn dispatch-metadata-update!
-  [*state {:keys [pubkey] :as _event-obj}]
-  (fx/run-later
-   (doseq [[identity-pubkey columns] (:identity->columns @*state)]
-     (doseq [column columns]
-       (doseq [timeline (list (:flat-timeline column) (:thread-timeline column))]
-         (let [{:keys [^ObservableList observable-list
-                       ^HashMap author-pubkey->item-id-set
-                       ^HashMap item-id->index]}
-               timeline]
-           (doseq [item-id (seq (.get author-pubkey->item-id-set pubkey))]
-             (when-let [item-idx (.get item-id->index item-id)]
-               (let [curr-wrapper (.get observable-list item-idx)]
-                 ;; todo why doesn't this refresh timeline immediately?
-                 (.set observable-list item-idx
-                       (assoc curr-wrapper :touch-ts (System/currentTimeMillis))))))))))))
 
 (defn dispatch-metadata-update!
-  [*state {:keys [pubkey] :as _event-obj}]
+  [*state {:keys [pubkey]}]
   (fx/run-later
-   ;; TODO: Add thread pane.
-   (doseq [timeline (domain/flat-timelines @*state)]
+   #_(log/debugf "Updating metadata for %d timelines" (count (domain/all-timelines @*state)))
+   (doseq [timeline (domain/all-timelines @*state)]
      (let [{:keys [^ObservableList observable-list
                    ^HashMap author-pubkey->item-id-set
                    ^HashMap item-id->index]}
@@ -103,16 +85,12 @@
   "An event is relevant for a timeline if the timeline's relays have some overlap with the
    event's relays."
   [event timeline]
-  #_(log/debugf "Checking relevance for timeline %s and event %s"
-                (set (:relays timeline))
-                (set (:relays event)))
   (not-empty (set/intersection (set (:relays timeline))
                                (set (:relays event)))))
 
 (defn flat-dispatch!
   [*state timeline identity-pubkey
    {:keys [id pubkey created_at content] :as event-obj}]
-  #_(log/debugf "Flat dispatch for %s" event-obj)
   (let [{:keys [^ObservableList observable-list
                 ^HashMap author-pubkey->item-id-set
                 ^HashMap item-id->index
@@ -121,52 +99,15 @@
     (when-not (.contains item-ids id)
       (let [ptag-ids (parse/parse-tags event-obj "p")]
         (when (accept-text-note? *state identity-pubkey ptag-ids event-obj)
-          #_(log/debugf "Adding %s to observable list" id)
           (.add item-ids id)
-          (.merge author-pubkey->item-id-set pubkey (HashSet. [id])
+          (.merge author-pubkey->item-id-set
+                  pubkey
+                  (HashSet. [id])
                   (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
           (let [init-idx (.size observable-list)
                 init-note (domain/->UITextNoteNew event-obj created_at)]
             (.put item-id->index id init-idx)
             (.add observable-list init-note)))))))
-
-#_
-(defn thread-dispatch!
-  [*state force-acceptance timeline identity-pubkey
-   {:keys [id pubkey created_at content relays] :as event-obj}]
-  {:pre [(some? pubkey)]}
-  ;; CONSIDER if is this too much usage of on-fx-thread - do we need to batch/debounce
-  (let [{:keys [^ObservableList observable-list
-                ^HashMap author-pubkey->item-id-set
-                ^HashMap item-id->index
-                ^HashSet item-ids]}
-        timeline]
-    (when-not (.contains item-ids id)
-      (let [ptag-ids (parse/parse-tags event-obj "p")]
-        (when (or force-acceptance
-                  ;; Our item-id->index map will have a key for any id that
-                  ;; has been referenced by any other accepted text note.
-                  ;; So we also want to accept those "missing" notes:
-                  (.containsKey item-id->index id)
-                  (accept-text-note? *state identity-pubkey ptag-ids event-obj))
-          (.add item-ids id)
-          (.merge author-pubkey->item-id-set pubkey (HashSet. [id])
-                  (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
-          (let [etag-ids (parse/parse-tags event-obj "e") ;; order matters
-                id-closure (cons id etag-ids)
-                existing-idx (first (keep #(.get item-id->index %) id-closure))]
-            (if (some? existing-idx)
-              (let [curr-wrapper (.get observable-list existing-idx)
-                    new-wrapper (timeline-support/contribute!
-                                 curr-wrapper event-obj etag-ids ptag-ids)]
-                (doseq [x id-closure]
-                  (.put item-id->index x existing-idx))
-                (.set observable-list existing-idx new-wrapper))
-              (let [init-idx (.size observable-list)
-                    init-wrapper (timeline-support/init! event-obj etag-ids ptag-ids)]
-                (doseq [x id-closure]
-                  (.put item-id->index x init-idx))
-                (.add observable-list init-wrapper)))))))))
 
 (defn- add-item-to-thread-timeline!
   [timeline ptag-ids {:keys [id pubkey] :as event-obj}] 
@@ -194,58 +135,51 @@
         ;; list.
         (let [init-index (.size observable-list)
               init-wrapper (timeline-support/init! event-obj etag-ids ptag-ids)]
+          #_(log/debugf "Adding new wrapper for %s to index %s" id init-index)
           (doseq [x id-closure]
             (.put item-id->index x init-index))
           (.add observable-list init-wrapper))))))
 
-(defn- clear-timeline!
-  [timeline]
-  {:pre [(some? timeline)]}
-  (log/debugf "Clearing timeline %s" timeline)  
-  (doseq [property [:adapted-list
-                    :observable-list
-                    :author-pubkey->item-id-set
-                    :item-id->index
-                    :item-ids]]
-    (log/debugf "Clearing timeline property %s: %s" property (property timeline))
-    (.clear (property timeline))))
-
-(defn- update-column-properties!
-  [*state column show-thread? thread-focus]
-  (let [new-column (assoc column
-                          :show-thread? show-thread?
-                          :thread-focus thread-focus)
-        active-key (:active-key @*state)
+(defn- update-column!
+  [*state new-column]
+  (let [active-key (:active-key @*state)
         identity->columns (:identity->columns @*state)
         columns (get identity->columns active-key)]
-    (log/debugf "Updating column. %d columns (%d after removal)"
-                (count columns)
-                (count (remove #(= (:id %) (:id column)) columns)))
-    (log/debugf "New column with list views %s and %s and thread focus %s"
-                new-column
-                (:flat-listview new-column)
-                (:thread-listview new-column)
-                (:thread-focus new-column))
     (swap! *state assoc
            :identity->columns (assoc identity->columns active-key
-                                     (conj (remove #(= (:id %) (:id column)) columns)
+                                     (conj (remove #(= (:id %) (:id new-column)) columns)
                                            new-column)))))
+
+(defn- clear-column-thread!
+  [*state column]
+  (let [listview (:thread-listview column)
+        timeline (:thread-timeline column)]
+    (log/debugf "Clearing listview %s and timeline %s" listview timeline)
+    ;; Clear the column's thread timeline/listview
+    (doseq [property [:observable-list :adapted-list :author-pubkey->item-id-set :item-id->index :item-ids]]
+      (.clear (property timeline)))
+    (.setItems listview (:adapted-list timeline))))
   
 (defn show-column-thread!
   [*state column event-obj]
-  (log/debugf "Showing thread timeline for column %s" (:name (:view column)))
-  ;; Update the :show-thread? and :thread-focus properties of the column.
-  (update-column-properties! *state column true event-obj)
-  ;; Clear the column's thread timeline and then add the given event-obj."  
-  (let [timeline (:thread-timeline column)]
-    (clear-timeline! timeline)
-    (let [ptag-ids (parse/parse-tags event-obj "p")]
-      (add-item-to-thread-timeline! timeline ptag-ids event-obj))))
+  (fx/run-later  
+   (let [column-id (:id column)]
+     ;; Clear the column's thread.
+     (clear-column-thread! *state column)
+     ;; Update the :show-thread? and :thread-focus properties of the column.    
+     (update-column! *state (assoc column
+                                   :show-thread? true
+                                   :thread-focus event-obj))
+     ;; Add the given event-obj.
+     (let [ptag-ids (parse/parse-tags event-obj "p")]
+       (add-item-to-thread-timeline! (:thread-timeline (domain/find-column-by-id column-id))
+                                     ptag-ids event-obj)))))
 
 (defn unshow-column-thread!
   [*state column]
-  (log/debugf "Unshowing thread timeline for column %s" (:name (:view column)))
-  (update-column-properties! *state column false nil))
+  (update-column! *state (assoc column
+                                :show-thread? false
+                                :thread-focus nil)))
 
   
 (defn- thread-dispatch!
