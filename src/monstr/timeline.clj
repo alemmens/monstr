@@ -131,7 +131,6 @@
         (let [curr-wrapper (.get observable-list existing-index)
               new-wrapper (timeline-support/contribute!
                            curr-wrapper event-obj etag-ids ptag-ids)]
-          (log/debugf "Updating wrapper for %s at index %s" event-obj existing-index)          
           (doseq [x id-closure]
             (.put item-id->index x existing-index))
           (.set observable-list existing-index new-wrapper))
@@ -139,7 +138,6 @@
         ;; list.
         (let [init-index (.size observable-list)
               init-wrapper (timeline-support/init! event-obj etag-ids ptag-ids)]
-          (log/debugf "Adding new wrapper for %s to index %s" id init-index)
           (doseq [x id-closure]
             (.put item-id->index x init-index))
           (.add observable-list init-wrapper))))))
@@ -189,7 +187,6 @@
   (fx/run-later
    (if (string? column-id)
      (let [column (domain/find-column-by-id column-id)]
-       (log/debugf "Dispatching %s to column %s" (:id event-obj) column-id)
        (thread-dispatch! *state column event-obj check-relevance?))
      (doseq [[identity-pubkey columns] (:identity->columns @*state)]
        (doseq [column columns]
@@ -204,7 +201,6 @@
    (log/debugf "Updating active timelines for %s" public-key)
    ;; Update the listviews.
    (doseq [column (get (:identity->columns @*state) public-key)]
-     (log/debugf "Setting items for listview for %s" (:name (:view column)))
      (.setItems (:flat-listview column)
                 ^ObservableList (or (:adapted-list (:flat-timeline column))
                                     (FXCollections/emptyObservableList)))
@@ -224,8 +220,7 @@
   "Load the event with the given id from either the database or from the relays."
   [*state db column-id event-id]
   (if-let [event-from-store (load-from-store db event-id)]
-    (do (log/debugf "Found event in store.")
-        (dispatch-text-note! *state column-id event-from-store false))
+    (dispatch-text-note! *state column-id event-from-store false)
     ;; Create a unique subscription id to load the event and subscribe to all relays in
     ;; the hope that we find the event.  We'll unsubscribe automatically when we get an
     ;; EOSE event.

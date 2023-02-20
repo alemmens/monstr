@@ -12,7 +12,6 @@
    [monstr.relay-conn :as relay-conn]
    [monstr.store :as store]
    [monstr.view :as view]
-   ; [monstr.view-home-new :as view-home-new]
    [monstr.event :as ev]
    [clojure.tools.logging :as log]
    [monstr.util :as util]

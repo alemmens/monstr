@@ -307,10 +307,10 @@
                               :children (remove nil?
                                                 [{:fx/type :h-box :h-box/hgrow :always}
                                                  (when show-thread?
-                                                   (back-from-thread-button column))
+                                                   (back-from-thread-button column))                                                 
                                                  {:fx/type :label
                                                   :text (if show-thread?
-                                                          (format "%s (thread)" relay-url)
+                                                          (format "thread: %s" relay-url)
                                                           relay-url)
                                                   :padding 5}
                                                  {:fx/type :button

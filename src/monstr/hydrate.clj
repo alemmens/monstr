@@ -6,7 +6,7 @@
    [monstr.store :as store]
    [monstr.metadata :as metadata]
    [monstr.subscribe :as subscribe]
-   [monstr.view-home-new :as view-home]
+   [monstr.view-home :as view-home]
    [clojure.tools.logging :as log])
   (:import (java.util.concurrent ScheduledExecutorService)
            (java.util UUID)))

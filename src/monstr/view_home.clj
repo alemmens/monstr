@@ -1,4 +1,4 @@
-(ns monstr.view-home-new
+(ns monstr.view-home
   (:require [cljfx.api :as fx]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
