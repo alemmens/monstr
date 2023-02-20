@@ -18,10 +18,12 @@
    :connected-info {}
    ;; NOTE: changes to active-key and mutations to home-ux, timelines must be done
    ;; within a mutex, i.e. on the fx thread!
-   :active-key nil          ; the public key of the active identity
-   :new-timeline nil        ; relay url to be added to the visible timelines
-   :relay-timelines []      ; sequence with the relay urls of the visible timelines   
-   :identity->columns {}    ; map from identity pubkeys to lists of Column
+   :active-key nil           ; the public key of the active identity
+   :new-timeline nil         ; relay url to be added to the visible timelines
+   :relay-timelines []       ; sequence with the relay urls of the visible timelines   
+   :identity->columns {}     ; map from identity pubkeys to lists of Column
+   ;; Thread
+   :thread-refresh-timestamp nil ; Unix timestamp of the oldest event in the current thread
    })
 
 (defonce *state

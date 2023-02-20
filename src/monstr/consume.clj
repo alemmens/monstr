@@ -41,7 +41,8 @@
   #_(log/debug "text note: " relay-url (:id event-obj))
   (timeline/dispatch-text-note! *state
                                 column-id ; can be nil
-                                (assoc event-obj :relays (list relay-url))))
+                                (assoc event-obj :relays (list relay-url))
+                                false))
 
 (defn consume-recommend-server [db relay-url event-obj]
   (log/info "recommend server (TODO): " relay-url (:id event-obj))

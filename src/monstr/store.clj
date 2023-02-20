@@ -39,7 +39,9 @@
 
 (defonce db (init! (file-sys/db-path)))
 
-;; --
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Inserting and deleting
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- insert-event!*
   [db id pubkey created-at kind content raw-event-tuple]
@@ -74,6 +76,30 @@
        " (source_event_id, tagged_pubkey)"
        " values (?, ?)")
      source-event-id tagged-pubkey]))
+
+(defn event-signature!
+  [db event-id sig]
+  (jdbc/execute-one! db
+    ["insert or ignore into signature_event_id (event_id, signature_) values (?,?)"
+     event-id sig]))
+
+(defn insert-identity!
+  [db public-key secret-key]
+  ;; secret-key could be nil
+  (jdbc/execute-one! db
+    [(str "insert into identities_ (public_key, secret_key) values (?,?)"
+       " on conflict(public_key) do update set secret_key=?"
+       " where excluded.secret_key is not null")
+     public-key secret-key secret-key]))
+
+(defn delete-identity!
+  [db public-key]
+  (jdbc/execute-one! db
+    ["delete from identities_ where public_key = ?" public-key]))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Loading events
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- raw-event-tuple->event-obj
   [raw-event-tuple]
@@ -132,8 +158,19 @@
                (jdbc/execute! db
                               (relay-timeline-query relay-url pubkeys)
                               {:builder-fn rs/as-unqualified-lower-maps})))))
-  
-;; --
+
+(defn load-events-since
+  "Loads (at most 1000) events since the given timestamp."
+  [db since]
+  (mapv (comp raw-event-tuple->event-obj :raw_event_tuple)
+        (jdbc/execute! db
+                       [(format "select raw_event_tuple from n_events where created_at >= %d limit 1000"
+                                since)]
+                       {:builder-fn rs/as-unqualified-lower-maps})))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Loading everything else
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn load-relays
   [db]
@@ -254,23 +291,3 @@
     (jdbc/execute-one! db
       ["select signature_ from signature_event_id where event_id = ?" event-id]
       {:builder-fn rs/as-unqualified-lower-maps})))
-
-(defn event-signature!
-  [db event-id sig]
-  (jdbc/execute-one! db
-    ["insert or ignore into signature_event_id (event_id, signature_) values (?,?)"
-     event-id sig]))
-
-(defn insert-identity!
-  [db public-key secret-key]
-  ;; secret-key could be nil
-  (jdbc/execute-one! db
-    [(str "insert into identities_ (public_key, secret_key) values (?,?)"
-       " on conflict(public_key) do update set secret_key=?"
-       " where excluded.secret_key is not null")
-     public-key secret-key secret-key]))
-
-(defn delete-identity!
-  [db public-key]
-  (jdbc/execute-one! db
-    ["delete from identities_ where public_key = ?" public-key]))

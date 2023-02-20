@@ -67,7 +67,7 @@
     (assoc wrapper
            :loom-graph graph
            :note-count (count (loom/nodes graph))
-           :max-timestamp (max (:max-timestamp wrapper) created_at)
+           :max-timestamp (max (or (:max-timestamp wrapper) 0) (or created_at 0))
            :root (build* graph))))
 
 (defn init!

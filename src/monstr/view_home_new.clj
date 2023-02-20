@@ -6,7 +6,6 @@
             [monstr.cache :as cache]
             [monstr.domain :as domain]
             [monstr.links :as links]
-            [monstr.load-event :as load-event]            
             [monstr.metadata :as metadata]
             [monstr.rich-text :as rich-text]
             [monstr.store :as store]
@@ -322,17 +321,18 @@
     {:fx/type :h-box
      :style-class ["ndesk-timeline-item-missing"]
      :children [(do
-                  ;; Load the parent (Nostr) thread. 
+                  ;; Load the parent.
                   (util/submit! executor ; get off of fx thread
                                 (fn []
                                   ;; Wait a bit so we don't overload the relays.
                                   ;; TODO: we should use a queue instead of this black magic!
                                   (Thread/sleep 50) ; 50ms
-                                  (load-event/async-load-event! *state db column-id (:id item-data))))
+                                  (timeline/async-load-event! *state db column-id (:id item-data))))
+                  ;; Show that we're working on it.
                   {:fx/type :hyperlink
                    :h-box/hgrow :always
                    :style-class ["ndesk-timeline-item-missing-hyperlink"]
-                   :text "loading parent thread..."})]}
+                   :text (format "trying to load %s..." (:id item-data))})]}
     (let [item-id (:id item-data)
           pubkey (:pubkey item-data)
           pubkey-for-avatar (or (some-> pubkey (subs 0 3)) "?")

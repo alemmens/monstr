@@ -4,6 +4,8 @@
             [clojure.tools.logging :as log]
             [monstr.domain :as domain]
             [monstr.parse :as parse]
+            [monstr.relay-conn :as relay-conn]
+            [monstr.store :as store]
             [monstr.timeline-support :as timeline-support]
             [monstr.util :as util]
             [monstr.util-java :as util-java])
@@ -63,6 +65,7 @@
      (ptag-keys-set identity-pubkey)
      ;; the text-note's ptags references one of identities contacts
      (not-empty (set/intersection contact-keys-set ptag-keys-set)))))
+
 
 
 (defn dispatch-metadata-update!
@@ -128,6 +131,7 @@
         (let [curr-wrapper (.get observable-list existing-index)
               new-wrapper (timeline-support/contribute!
                            curr-wrapper event-obj etag-ids ptag-ids)]
+          (log/debugf "Updating wrapper for %s at index %s" event-obj existing-index)          
           (doseq [x id-closure]
             (.put item-id->index x existing-index))
           (.set observable-list existing-index new-wrapper))
@@ -135,7 +139,7 @@
         ;; list.
         (let [init-index (.size observable-list)
               init-wrapper (timeline-support/init! event-obj etag-ids ptag-ids)]
-          #_(log/debugf "Adding new wrapper for %s to index %s" id init-index)
+          (log/debugf "Adding new wrapper for %s to index %s" id init-index)
           (doseq [x id-closure]
             (.put item-id->index x init-index))
           (.add observable-list init-wrapper))))))
@@ -159,50 +163,34 @@
     (doseq [property [:observable-list :adapted-list :author-pubkey->item-id-set :item-id->index :item-ids]]
       (.clear (property timeline)))
     (.setItems listview (:adapted-list timeline))))
-  
-(defn show-column-thread!
-  [*state column event-obj]
-  (fx/run-later  
-   (let [column-id (:id column)]
-     ;; Clear the column's thread.
-     (clear-column-thread! *state column)
-     ;; Update the :show-thread? and :thread-focus properties of the column.    
-     (update-column! *state (assoc column
-                                   :show-thread? true
-                                   :thread-focus event-obj))
-     ;; Add the given event-obj.
-     (let [ptag-ids (parse/parse-tags event-obj "p")]
-       (add-item-to-thread-timeline! (:thread-timeline (domain/find-column-by-id column-id))
-                                     ptag-ids event-obj)))))
 
-(defn unshow-column-thread!
-  [*state column]
-  (update-column! *state (assoc column
-                                :show-thread? false
-                                :thread-focus nil)))
+(defn events-share-etags?
+  [event-a event-b]
+  (not-empty (set/intersection (set (cons (:id event-a) (parse/parse-tags event-a "e")))
+                               (set (cons (:id event-b) (parse/parse-tags event-b "e"))))))
 
-  
 (defn- thread-dispatch!
-  [*state column event-obj]
-  {:pre [(some? (:pubkey event-obj))]}
+  [*state column event-obj check-relevance?]
   ;; CONSIDER if is this too much usage of on-fx-thread - do we need to batch/debounce
   (let [timeline (:thread-timeline column)]
-    (log/debugf "Thread dispatch to column %s with timeline %s" column timeline)
     (when-not (.contains (:item-ids timeline) (:id event-obj))
-      (let [ptag-ids (parse/parse-tags event-obj "p")]
-        (add-item-to-thread-timeline! timeline ptag-ids event-obj)))))
+      (when (or (not check-relevance?)
+                ;; TODO: Try to find a more precise way to check if an event should be
+                ;; added to a thread.
+                (events-share-etags? event-obj (:thread-focus column)))
+        (add-item-to-thread-timeline! timeline (parse/parse-tags event-obj "p") event-obj)))))
 
 (defn dispatch-text-note!
   "Dispatch a text note to all timelines for which the given event is relevant.
   If COLUMN-ID is a string, the note is supposed to be for a thread view and
   it's only dispatched to the specified column."
-  [*state column-id event-obj]
-  {:pre [(some? (:pubkey event-obj))]}
+  [*state column-id event-obj check-relevance?]
   ;; CONSIDER if is this too much usage of on-fx-thread - do we need to batch/debounce?
   (fx/run-later
-   (if (string? column-id)   
-     (do (log/debugf "Dispatching to column %s" column-id)
-         (thread-dispatch! *state (domain/find-column-by-id column-id) event-obj))
+   (if (string? column-id)
+     (let [column (domain/find-column-by-id column-id)]
+       (log/debugf "Dispatching %s to column %s" (:id event-obj) column-id)
+       (thread-dispatch! *state column event-obj check-relevance?))
      (doseq [[identity-pubkey columns] (:identity->columns @*state)]
        (doseq [column columns]
          (let [flat-timeline (:flat-timeline column)]
@@ -228,4 +216,59 @@
           (fn [state]
             (assoc state :active-key public-key)))))
 
+(defn- load-from-store [db event-id]
+  (when-let [event (store/load-event db event-id)]
+    (assoc event :relays (store/load-relays-for-event db event-id))))
 
+(defn async-load-event!
+  "Load the event with the given id from either the database or from the relays."
+  [*state db column-id event-id]
+  (if-let [event-from-store (load-from-store db event-id)]
+    (do (log/debugf "Found event in store.")
+        (dispatch-text-note! *state column-id event-from-store false))
+    ;; Create a unique subscription id to load the event and subscribe to all relays in
+    ;; the hope that we find the event.  We'll unsubscribe automatically when we get an
+    ;; EOSE event.
+    (let [subscription-id (format "monstr:%s:%s" column-id (rand-int 1000000000))]
+      (relay-conn/subscribe-all! subscription-id
+                                 [(domain/->subscription-filter
+                                   [event-id] [1] nil nil nil nil nil)]))))
+
+(defn refresh-thread-events!
+  [*state column-id]
+  (let [timestamp (:thread-refresh-timestamp @*state)
+        events (store/load-events-since store/db timestamp)]
+    (doseq [e events]
+      (dispatch-text-note! *state column-id e true))
+    ;; TODO: Also load recent events from relays.
+    ))
+
+  
+(defn show-column-thread!
+  [*state column event-obj]
+  (fx/run-later  
+   (let [column-id (:id column)]
+     ;; Clear the column's thread.
+     (clear-column-thread! *state column)
+     ;; Update the :show-thread? and :thread-focus properties of the column.    
+     (update-column! *state (assoc column
+                                   :show-thread? true
+                                   :thread-focus event-obj))
+     ;; Add the given event-obj.
+     (let [ptag-ids (parse/parse-tags event-obj "p")]
+       (add-item-to-thread-timeline! (:thread-timeline (domain/find-column-by-id column-id))
+                                     ptag-ids event-obj))
+     ;; Refresh events to find any children.
+     (when-not (:thread-refresh-timestamp @*state)
+       (swap! *state assoc
+              :thread-refresh-timestamp (:created_at event-obj))
+       (refresh-thread-events! *state column-id)
+       (swap! *state dissoc :thread-refresh-timestamp)))))
+
+(defn unshow-column-thread!
+  [*state column]
+  (update-column! *state (assoc column
+                                :show-thread? false
+                                :thread-focus nil)))
+
+  

@@ -44,8 +44,10 @@
   ;;      as we backfill
   (log/debugf "Dispatching %d text notes for %s" (count timeline-data) relay-url)
   (doseq [event-obj timeline-data]
-    (timeline/dispatch-text-note! *state false
-                                  (assoc event-obj :relays (list relay-url)))))
+    (timeline/dispatch-text-note! *state
+                                  false
+                                  (assoc event-obj :relays (list relay-url))
+                                  false)))
 
 (defn hydrate!*
   ;; note: first of new-identities will become the active identity
