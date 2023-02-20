@@ -7,6 +7,7 @@
     [monstr.domain :as domain]
     [monstr.event :as ev]
     [monstr.style :as style :refer [BORDER|]]
+    [monstr.subscribe :as subscribe]
     [monstr.util :as util]
     [monstr.util-domain :as util-domain]
     [monstr.view-new-identity :as view-new-identity]
@@ -96,9 +97,6 @@
           :on-mouse-clicked {:event/type :show-new-identity}
           :children
           [{:fx/type :label
-            ; :h-box/hgrow :always
-            ; :max-width Integer/MAX_VALUE
-            ; :alignment :center
             :text "add identity"}]}})
 
 (defn contact-card
@@ -215,15 +213,6 @@
    :text label
    :content content})
 
-#_
-(defn add-timeline-button
-  [text]
-  {:fx/type :h-box
-   :cursor :hand
-   :style-class ["ndesk-keycard"]
-   :on-mouse-clicked {:event/type :show-add-timeline-dialog}
-   :children [{:fx/type :label :text text}]})
-
 (defn add-timeline-button
   [text]
   {:fx/type :button
@@ -235,11 +224,28 @@
   [column]
   {:fx/type :button
    :padding 5
-   :style {:-fx-font-weight :bold}
    :on-mouse-pressed (fn [e] (timeline/unshow-column-thread! domain/*state column))
-   :text (str (char 0x2190)) ; left arrow
+   :text (str " " (char 0x2190) " ") ; left arrow
    })
 
+(defn refresh-button
+  [last-refresh]
+  {:fx/type :v-box
+   :padding 5
+   :children [{:fx/type :h-box :v-box/vgrow :always}
+              {:fx/type :button
+               :padding 5
+               :tooltip {:fx/type :tooltip
+                         :style-class "monstr-tooltip"
+                         :text "refresh all subscriptions"}
+               :style-class ["button" "monstr-refresh-button"]
+               :on-mouse-pressed (fn [_] (subscribe/refresh!))
+               :text (str (char 0x21bb)) ; clockwise open-circle arrow
+               }
+              {:fx/type :h-box :v-box/vgrow :always}]})
+              
+  
+  
 (defn hidden-timelines
   "Returns a list with the relay urls of timelines that are not being shown."
   [all-relay-urls relay-timelines]
@@ -514,14 +520,18 @@
                     relay-timelines show-add-timeline-dialog? new-timeline
                     show-new-identity? new-identity-error active-reply-context contact-lists
                     identity-active-contact metadata-cache
+                    last-refresh
                     ]}]
   (log/debugf "Root with relay timelines=%s" relay-timelines)
   {:fx/type :border-pane
-   :top {:fx/type identity-selector
-         :identities identities
-         :active-key active-key
-         :show-new-identity? show-new-identity?
-         :identity-metadata identity-metadata}
+   :top {:fx/type :h-box
+         :children [{:fx/type identity-selector
+                     :identities identities
+                     :active-key active-key
+                     :show-new-identity? show-new-identity?
+                     :identity-metadata identity-metadata}
+                    {:fx/type :h-box :h-box/hgrow :always}
+                    (refresh-button last-refresh)]}
    :center {:fx/type tab-pane
             :columns columns
             :relay-timelines relay-timelines
@@ -548,6 +558,7 @@
                      relay-timelines show-add-timeline-dialog? new-timeline
                      show-new-identity? new-identity-error active-reply-context
                      contact-lists identity-active-contact metadata-cache
+                     last-refresh
                      ]}]
   (log/debugf "Stage with %d identities and active key %s" (count identity->columns) active-key)
   {:fx/type :stage
@@ -569,6 +580,7 @@
            :contact-lists contact-lists
            :identity-active-contact identity-active-contact
            :relays relays
+           :last-refresh last-refresh
            :refresh-relays-ts refresh-relays-ts
            :connected-info connected-info
            :columns (get identity->columns active-key)

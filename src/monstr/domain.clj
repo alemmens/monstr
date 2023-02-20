@@ -22,8 +22,8 @@
    :new-timeline nil         ; relay url to be added to the visible timelines
    :relay-timelines []       ; sequence with the relay urls of the visible timelines   
    :identity->columns {}     ; map from identity pubkeys to lists of Column
-   ;; Thread
-   :thread-refresh-timestamp nil ; Unix timestamp of the oldest event in the current thread
+   ;; Refresh
+   :last-refresh nil         ; Java Instant indicating when the most recent refresh started
    })
 
 (defonce *state

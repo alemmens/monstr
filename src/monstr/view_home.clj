@@ -332,7 +332,7 @@
                   {:fx/type :hyperlink
                    :h-box/hgrow :always
                    :style-class ["ndesk-timeline-item-missing-hyperlink"]
-                   :text (format "trying to load %s..." (:id item-data))})]}
+                   :text (format "missing %s..." (:id item-data))})]}
     (let [item-id (:id item-data)
           pubkey (:pubkey item-data)
           pubkey-for-avatar (or (some-> pubkey (subs 0 3)) "?")
