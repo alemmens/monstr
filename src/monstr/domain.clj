@@ -18,6 +18,9 @@
    :connected-info {}
    ;; NOTE: changes to active-key and mutations to home-ux, timelines must be done
    ;; within a mutex, i.e. on the fx thread!
+   :views {}                 ; map from view names to views
+   :selected-view nil        ; the view name that is currently selected in the Views tab
+   :temp-view nil            ; the view that's being edited in the Views tab
    :active-key nil           ; the public key of the active identity
    :new-timeline nil         ; relay url to be added to the visible timelines
    :relay-timelines []       ; sequence with the relay urls of the visible timelines   
@@ -44,6 +47,12 @@
 (defn all-timelines [state]
   (concat (flat-timelines state) (thread-timelines state)))
 
+(defn update-state! [keys new-value]
+  (swap! *state update-in keys (constantly new-value)))
+
+(defn find-view [name]
+  (get (:views @*state) name))
+
 ;; --
 
 (defrecord View
@@ -51,7 +60,12 @@
     ;; TODO: Add more ways to define a view: hash tags, followed pubkeys, etc.
     [name         ; a string
      relay-urls   ; a set of relay urls
+     authors      ; either :use-identity (i.e. follow the contacts of the active identity)
+                  ; or :all (i.e. global) or a set of pubkeys of authors the user wants to
+                  ; follow for this view
+     words        ; a set of hashtags
      ])
+
 
 (defrecord Column
     [id           ; a random UUID

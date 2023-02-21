@@ -32,6 +32,18 @@
   (into {}
     (filter (fn [[_ v]] (and (some? v) (or (not (coll? v)) (not (empty? v)))))) m))
 
+(defn dissoc-in
+  "dissoc-in is a mixture of assoc-in and dissoc. It lets us remove an entry from a nested
+  associative structure using a path of keys."
+  [m [k & knext :as ks]]
+  (cond
+    (and knext
+      (contains?
+        (get-in m (butlast ks))
+        (last ks))) (update-in m (butlast ks) dissoc (last ks))
+    (not knext) (dissoc m k)
+    :else m))
+
 (defn format-pubkey-short
   [pubkey]
   (str (subs pubkey 0 3) "..." (subs pubkey (- (count pubkey) 4))))

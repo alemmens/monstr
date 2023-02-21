@@ -15,7 +15,7 @@
   [*state db executor metadata-cache relay-urls]
   (let [id (.toString (UUID/randomUUID))
         column (domain/->Column id
-                                (domain/->View (first relay-urls) relay-urls)
+                                (domain/->View (first relay-urls) relay-urls #{} #{})
                                 (timeline/new-timeline relay-urls false)
                                 (timeline/new-timeline relay-urls true)
                                 nil nil false nil)]
@@ -50,7 +50,7 @@
                                   false)))
 
 (defn hydrate!*
-  ;; note: first of new-identities will become the active identity
+  ;; The first of new-identities will become the active identity.
   [*state db ^ScheduledExecutorService executor new-identities]
   (log/debugf "Hydrating with %d new identities" (count new-identities))
   (let [new-public-keys (mapv :public-key new-identities)

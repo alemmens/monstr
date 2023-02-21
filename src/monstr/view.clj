@@ -1,25 +1,26 @@
 (ns monstr.view
   (:require
-    [cljfx.api :as fx]
-    [clojure.tools.logging :as log]
-    [monstr.avatar :as avatar]
-    [monstr.cache :as cache]
-    [monstr.domain :as domain]
-    [monstr.event :as ev]
-    [monstr.style :as style :refer [BORDER|]]
-    [monstr.subscribe :as subscribe]
-    [monstr.util :as util]
-    [monstr.util-domain :as util-domain]
-    [monstr.view-new-identity :as view-new-identity]
-    [monstr.view-relays :as view-relays]
-    [monstr.util-java :as util-java]
-    [monstr.util-fx :as util-fx]
-    [monstr.view-common :as view-common]
-    [monstr.view-reply :as view-reply]
-    [monstr.timeline :as timeline]
-    [clojure.string :as str]
-    [clojure.set :as set]
-    [monstr.metadata :as metadata])
+   [cljfx.api :as fx]
+   [cljfx.ext.list-view :as fx.ext.list-view]
+   [clojure.tools.logging :as log]
+   [monstr.avatar :as avatar]
+   [monstr.cache :as cache]
+   [monstr.domain :as domain]
+   [monstr.event :as ev]
+   [monstr.style :as style :refer [BORDER|]]
+   [monstr.subscribe :as subscribe]
+   [monstr.util :as util]
+   [monstr.util-domain :as util-domain]
+   [monstr.view-new-identity :as view-new-identity]
+   [monstr.view-relays :as view-relays]
+   [monstr.util-java :as util-java]
+   [monstr.util-fx :as util-fx]
+   [monstr.view-common :as view-common]
+   [monstr.view-reply :as view-reply]
+   [monstr.timeline :as timeline]
+   [clojure.string :as str]
+   [clojure.set :as set]
+   [monstr.metadata :as metadata])
   (:import (javafx.scene.canvas Canvas)
            (javafx.scene.paint Color)
            (javafx.geometry Pos)
@@ -367,8 +368,96 @@
      :on-close-request {:event/type :add-timeline-close-request}
      :items items}))
 
+(defn field-row
+  [label content]
+  {:fx/type :h-box
+   :children [{:fx/type :label
+               :alignment :center
+               :min-width 60
+               :max-width 60
+               :text label}
+              content
+              ]})
+
+(defn field-label [{:keys [text]}]
+  {:fx/type :label
+   :alignment :center
+   :min-width 60
+   :max-width 60
+   :text text})
+
+(defn text-input [{:keys [label value value-converter on-text-changed]}]
+  {:fx/type :h-box
+   :children [{:fx/type field-label
+               :text label}
+              {:fx/type :text-field
+               :pref-column-count 20
+               :text value
+               :style-class ["text-input" "monstr-view-name"]
+               :on-text-changed on-text-changed}]})
+
+(defn save-view!
+  [temp-view]
+  (let [old-name (:selected-view @domain/*state)
+        new-name (:name temp-view)]
+    (log/debugf "Saving view with new name %s and old name %s and relays %s"
+                new-name
+                old-name
+                (:relay-urls temp-view))
+    (swap! domain/*state assoc-in
+           [:views new-name]
+           (constantly temp-view))
+    (swap! domain/*state assoc
+           :views (dissoc (:views @domain/*state) old-name))
+    (swap! domain/*state assoc
+           :selected-view new-name)))
+
+(defn views-tab
+  [{:keys [views selected-view temp-view]}]
+  {:fx/type :h-box
+   :padding 10
+   :children (let [items (sort (keys views))
+                   value (or selected-view (first items))]
+               [;; List with the names of all views.
+                {:fx/type fx.ext.list-view/with-selection-props
+                 :props {:selected-item value
+                         :on-selected-item-changed (fn [new-value]
+                                                     (let [view (domain/find-view new-value)]
+                                                       (assert view
+                                                               (format "Can't find view for %s" new-value))
+                                                       (swap! domain/*state assoc
+                                                              :selected-view new-value
+                                                              :temp-view view)))}
+                 :desc {:fx/type :list-view
+                        :focus-traversable true
+                        :padding 10
+                        :pref-height 1000000 ; make it stretch vertically
+                        :items items}}
+                ;; Fields to edit the view.
+                {:fx/type :v-box
+                 :padding 30
+                 :spacing 20
+                 :children [;; Name
+                            {:fx/type text-input
+                             :label "Name"
+                             :value value
+                             :value-converter :default
+                             :on-text-changed (fn [new-name]
+                                                (swap! domain/*state assoc-in
+                                                       [:temp-view :name] new-name))}
+                            ;; Relays
+                            {:fx/type :label
+                             :text (str (:relay-urls temp-view))}
+                            ;; Save button
+                            {:fx/type :button
+                             :text "Save"
+                             :padding 5
+                             :on-mouse-pressed (fn [e] (save-view! temp-view))}
+                            ]}])})
+
+
 (defn tab-pane
-  [{:keys [columns
+  [{:keys [columns views selected-view temp-view
            relay-timelines relays show-add-timeline-dialog? new-timeline
            can-publish? active-reply-context active-contact-list
            active-key active-contact-pubkey identities
@@ -386,16 +475,17 @@
    :desc {:fx/type :tab-pane
           :side :top
           :tabs (mapv tab*
-                      {"Home" {:fx/type main-panes
-                               :columns columns
-                               :relay-timelines relay-timelines
-                               :can-publish? can-publish?
-                               :show-add-timeline-dialog? show-add-timeline-dialog?
-                               :active-reply-context active-reply-context
-                               :active-contact-list active-contact-list
-                               :active-contact-pubkey active-contact-pubkey
-                               :metadata-cache metadata-cache
-                               }
+                      {
+                       #_"Home" #_{:fx/type main-panes
+                                  :columns columns
+                                  :relay-timelines relay-timelines
+                                  :can-publish? can-publish?
+                                  :show-add-timeline-dialog? show-add-timeline-dialog?
+                                  :active-reply-context active-reply-context
+                                  :active-contact-list active-contact-list
+                                  :active-contact-pubkey active-contact-pubkey
+                                  :metadata-cache metadata-cache
+                                  }
                        "Contacts" {:fx/type contacts
                                    :active-contact-list active-contact-list
                                    :active-contact-pubkey active-contact-pubkey
@@ -405,6 +495,11 @@
                                   :pubkey active-key
                                   :identities identities
                                   :identity-metadata identity-metadata}
+                       "Views" {:fx/type views-tab
+                                :views views
+                                :selected-view selected-view
+                                :temp-view temp-view
+                                }
                        ;;"Search" {:fx/type search}
                        })}})
 
@@ -515,7 +610,8 @@
                  [label add-new-button]))})
               
 
-(defn root [{:keys [columns show-relays? active-key identities identity-metadata relays
+(defn root [{:keys [columns views selected-view temp-view
+                    show-relays? active-key identities identity-metadata relays
                     refresh-relays-ts connected-info
                     relay-timelines show-add-timeline-dialog? new-timeline
                     show-new-identity? new-identity-error active-reply-context contact-lists
@@ -534,6 +630,9 @@
                     (refresh-button last-refresh)]}
    :center {:fx/type tab-pane
             :columns columns
+            :views views
+            :selected-view selected-view
+            :temp-view temp-view
             :relay-timelines relay-timelines
             :relays relays
             :show-add-timeline-dialog? show-add-timeline-dialog?
@@ -558,7 +657,7 @@
                      relay-timelines show-add-timeline-dialog? new-timeline
                      show-new-identity? new-identity-error active-reply-context
                      contact-lists identity-active-contact metadata-cache
-                     last-refresh
+                     last-refresh views selected-view temp-view
                      ]}]
   (log/debugf "Stage with %d identities and active key %s" (count identity->columns) active-key)
   {:fx/type :stage
@@ -584,6 +683,9 @@
            :refresh-relays-ts refresh-relays-ts
            :connected-info connected-info
            :columns (get identity->columns active-key)
+           :views views
+           :selected-view selected-view
+           :temp-view temp-view
            :relay-timelines relay-timelines
            :show-add-timeline-dialog? show-add-timeline-dialog?
            :new-timeline new-timeline

@@ -239,7 +239,19 @@
         (swap! *state assoc
                :relay-timelines (conj (:relay-timelines @*state) new-timeline)))
       (swap! *state assoc :show-add-timeline-dialog? false))]])
-      
+
+(defn save-view
+  [{:keys [temp-view]}]
+  [[:bg
+    (fn [*state _db _exec _dispatch!]
+      (log/debugf "Mouse pressed with temp-view %s and selected view %s"
+                  (:name temp-view)
+                  (:selected-view @*state))
+      (swap! *state update-in
+             [:views (:selected-view @*state)]
+             (constantly temp-view))
+      (swap! *state assoc
+             :selected-view (:name temp-view)))]])
 
 (defn handle
   [{:event/keys [type] :as event}]
@@ -258,4 +270,5 @@
     :remove-relay-timeline (remove-relay-timeline! event)
     :show-add-timeline-dialog (show-add-timeline-effect true)
     :add-timeline-close-request (add-timeline-close-request event)
+    :save-view (save-view event)
     (log/error "no matching clause" type)))
