@@ -30,15 +30,14 @@
 
 
 (defn init-homes!
-  "Create home timelines three relays and views for all relays."
+  "Create home timelines for three relays and a few views."
   []
   (let [urls (domain/relay-urls @domain/*state)]
     (swap! domain/*state assoc
            :relay-timelines (doall (take 3 urls))
            :views (into {}
-                        (map (fn [url]
-                               [url (domain/->View url #{url} #{} #{})])
-                             urls)))))
+                        (map (fn [url] [url (domain/make-view url #{url} {})])
+                             (take 2 urls))))))
   
 (defn- load-relays!
   []

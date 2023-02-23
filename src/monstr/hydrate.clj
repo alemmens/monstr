@@ -15,7 +15,7 @@
   [*state db executor metadata-cache relay-urls]
   (let [id (.toString (UUID/randomUUID))
         column (domain/->Column id
-                                (domain/->View (first relay-urls) relay-urls #{} #{})
+                                (domain/make-view (first relay-urls) relay-urls {})
                                 (timeline/new-timeline relay-urls false)
                                 (timeline/new-timeline relay-urls true)
                                 nil nil false nil)]

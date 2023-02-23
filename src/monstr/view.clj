@@ -9,6 +9,7 @@
    [monstr.event :as ev]
    [monstr.style :as style :refer [BORDER|]]
    [monstr.subscribe :as subscribe]
+   [monstr.tab-views :as tab-views]
    [monstr.util :as util]
    [monstr.util-domain :as util-domain]
    [monstr.view-new-identity :as view-new-identity]
@@ -207,12 +208,7 @@
                  :create #(doto listview
                             (VBox/setVgrow Priority/ALWAYS))}])})
 
-(defn tab*
-  [[label content]]
-  {:fx/type :tab
-   :closable false
-   :text label
-   :content content})
+
 
 (defn add-timeline-button
   [text]
@@ -264,6 +260,13 @@
                [{:fx/type fx/ext-instance-factory
                  :create #(doto listview
                             (VBox/setVgrow Priority/ALWAYS))}])})
+
+(defn tab*
+  [{:keys [label content]}]
+  {:fx/type :tab
+   :closable false
+   :text label
+   :content content})
 
 (defn main-panes
   [{:keys [columns relay-timelines relays show-add-timeline-dialog? can-publish? active-reply-context active-contact-pubkey metadata-cache]}]
@@ -368,94 +371,6 @@
      :on-close-request {:event/type :add-timeline-close-request}
      :items items}))
 
-(defn field-row
-  [label content]
-  {:fx/type :h-box
-   :children [{:fx/type :label
-               :alignment :center
-               :min-width 60
-               :max-width 60
-               :text label}
-              content
-              ]})
-
-(defn field-label [{:keys [text]}]
-  {:fx/type :label
-   :alignment :center
-   :min-width 60
-   :max-width 60
-   :text text})
-
-(defn text-input [{:keys [label value value-converter on-text-changed]}]
-  {:fx/type :h-box
-   :children [{:fx/type field-label
-               :text label}
-              {:fx/type :text-field
-               :pref-column-count 20
-               :text value
-               :style-class ["text-input" "monstr-view-name"]
-               :on-text-changed on-text-changed}]})
-
-(defn save-view!
-  [temp-view]
-  (let [old-name (:selected-view @domain/*state)
-        new-name (:name temp-view)]
-    (log/debugf "Saving view with new name %s and old name %s and relays %s"
-                new-name
-                old-name
-                (:relay-urls temp-view))
-    (swap! domain/*state assoc-in
-           [:views new-name]
-           (constantly temp-view))
-    (swap! domain/*state assoc
-           :views (dissoc (:views @domain/*state) old-name))
-    (swap! domain/*state assoc
-           :selected-view new-name)))
-
-(defn views-tab
-  [{:keys [views selected-view temp-view]}]
-  {:fx/type :h-box
-   :padding 10
-   :children (let [items (sort (keys views))
-                   value (or selected-view (first items))]
-               [;; List with the names of all views.
-                {:fx/type fx.ext.list-view/with-selection-props
-                 :props {:selected-item value
-                         :on-selected-item-changed (fn [new-value]
-                                                     (let [view (domain/find-view new-value)]
-                                                       (assert view
-                                                               (format "Can't find view for %s" new-value))
-                                                       (swap! domain/*state assoc
-                                                              :selected-view new-value
-                                                              :temp-view view)))}
-                 :desc {:fx/type :list-view
-                        :focus-traversable true
-                        :padding 10
-                        :pref-height 1000000 ; make it stretch vertically
-                        :items items}}
-                ;; Fields to edit the view.
-                {:fx/type :v-box
-                 :padding 30
-                 :spacing 20
-                 :children [;; Name
-                            {:fx/type text-input
-                             :label "Name"
-                             :value value
-                             :value-converter :default
-                             :on-text-changed (fn [new-name]
-                                                (swap! domain/*state assoc-in
-                                                       [:temp-view :name] new-name))}
-                            ;; Relays
-                            {:fx/type :label
-                             :text (str (:relay-urls temp-view))}
-                            ;; Save button
-                            {:fx/type :button
-                             :text "Save"
-                             :padding 5
-                             :on-mouse-pressed (fn [e] (save-view! temp-view))}
-                            ]}])})
-
-
 (defn tab-pane
   [{:keys [columns views selected-view temp-view
            relay-timelines relays show-add-timeline-dialog? new-timeline
@@ -474,7 +389,7 @@
                             :show-add-timeline-dialog? show-add-timeline-dialog?}}
    :desc {:fx/type :tab-pane
           :side :top
-          :tabs (mapv tab*
+          :tabs (for [[label content]
                       {
                        #_"Home" #_{:fx/type main-panes
                                   :columns columns
@@ -489,19 +404,22 @@
                        "Contacts" {:fx/type contacts
                                    :active-contact-list active-contact-list
                                    :active-contact-pubkey active-contact-pubkey
-                                   :metadata-cache metadata-cache}
+                                   :metadata-cache metadata-cache},
                        ;;"Messages" {:fx/type messages}
                        "Profile" {:fx/type profile
                                   :pubkey active-key
                                   :identities identities
-                                  :identity-metadata identity-metadata}
-                       "Views" {:fx/type views-tab
+                                  :identity-metadata identity-metadata},
+                       "Views" {:fx/type tab-views/show-tab
                                 :views views
                                 :selected-view selected-view
                                 :temp-view temp-view
-                                }
+                                },
                        ;;"Search" {:fx/type search}
-                       })}})
+                       }]
+                  {:fx/type tab*
+                   :label label
+                   :content content})}})
 
 (defn keycards
   [{:keys [active-key identities identity-metadata show-new-identity? new-identity-error]}]
@@ -684,8 +602,8 @@
            :connected-info connected-info
            :columns (get identity->columns active-key)
            :views views
-           :selected-view selected-view
-           :temp-view temp-view
+           :selected-view (or selected-view (:name (first (vals views))))
+           :temp-view (or temp-view (first (vals views)))
            :relay-timelines relay-timelines
            :show-add-timeline-dialog? show-add-timeline-dialog?
            :new-timeline new-timeline

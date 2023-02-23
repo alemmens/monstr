@@ -24,6 +24,10 @@
     -fx-background-color: lightyellow;
 }
 
+.monstr-view-name {
+    -fx-font-weight: bold;
+}
+
 .hyperlink {
     -fx-fill: blue;
 }
