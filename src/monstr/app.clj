@@ -7,6 +7,7 @@
   (:require
    [cljfx.api :as fx]
    [monstr.consume :as consume]
+   [monstr.file-sys :as file-sys]
    [monstr.hydrate :as hydrate]
    [monstr.metadata :as metadata]
    [monstr.relay-conn :as relay-conn]
@@ -35,9 +36,10 @@
   (let [urls (domain/relay-urls @domain/*state)]
     (swap! domain/*state assoc
            :relay-timelines (doall (take 3 urls))
-           :views (into {}
-                        (map (fn [url] [url (domain/make-view url #{url} {})])
-                             (take 2 urls))))))
+           :views (or (file-sys/load-views)
+                      (into {}
+                            (map (fn [url] [url (domain/make-view url #{url} {})])
+                                 (take 2 urls)))))))
   
 (defn- load-relays!
   []

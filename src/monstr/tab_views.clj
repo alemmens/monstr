@@ -2,9 +2,11 @@
   (:require
    [cljfx.api :as fx]
    [cljfx.ext.list-view :as fx.ext.list-view]
+   [clojure.java.io :as io]
    [clojure.tools.logging :as log]
    [clojure.set :as set]
-   [monstr.domain :as domain]))
+   [monstr.domain :as domain]
+   [monstr.file-sys :as file-sys]))
 
 (defn- field-row
   [label content]
@@ -49,7 +51,8 @@
     (when-not (= old-name new-name)
       (swap! domain/*state assoc
              :views (dissoc (:views @domain/*state) old-name)
-             :selected-view new-name))))
+             :selected-view new-name))
+    (file-sys/save-views (:views @domain/*state))))
 
 (defn update-temp-view!
   [property value]
