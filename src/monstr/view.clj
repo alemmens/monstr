@@ -208,8 +208,6 @@
                  :create #(doto listview
                             (VBox/setVgrow Priority/ALWAYS))}])})
 
-
-
 (defn add-timeline-button
   [text]
   {:fx/type :button
@@ -241,12 +239,11 @@
                }
               {:fx/type :h-box :v-box/vgrow :always}]})
               
-  
-  
-(defn hidden-timelines
-  "Returns a list with the relay urls of timelines that are not being shown."
-  [all-relay-urls relay-timelines]
-  (sort (seq (set/difference (set all-relay-urls) (set relay-timelines)))))
+
+(defn hidden-columns [all-columns visible-column-ids]
+  "Returns a list of the ids of those columns that are not visible."
+  (sort (seq (set/difference (set (map :id all-columns))
+                             visible-column-ids))))
 
 (defn find-column [relay-urls columns]
   (log/debugf "Looking for %s in %d columns" relay-urls (count columns))
@@ -269,8 +266,12 @@
    :content content})
 
 (defn main-panes
-  [{:keys [columns relay-timelines relays show-add-timeline-dialog? can-publish? active-reply-context active-contact-pubkey metadata-cache]}]
-  (log/debugf "Main panes with %d relay timelines=%s" (count relay-timelines) relay-timelines)
+  [{:keys [all-columns visible-column-ids
+           relays show-add-timeline-dialog? can-publish? active-reply-context active-contact-pubkey metadata-cache]}]
+  (log/debugf "Main panes with %d columns=%s and views %s"
+              (count visible-column-ids)
+              (pr-str visible-column-ids)
+              (pr-str (map (comp :view domain/find-column-by-id) visible-column-ids)))
   {:fx/type :v-box
    :children
    [;; The "what's on your mind?" box.
@@ -291,57 +292,58 @@
                            :disable (not can-publish?)
                            :style-class ["button" "ndesk-publish-button"]
                            :text "Publish"}}]}
-    ;; Timelines per relay.
+    ;; Columns
     {:fx/type :h-box
      :children
-     (if (seq relay-timelines)
-       (mapv (fn [relay-url]
-               ;; TODO: For now we assume that the relay-url set contains only one
-               ;; element. We probably want to move towards arbitrary-sized relay-url sets
-               ;; instead.
-               (let [column (find-column #{relay-url} columns)
-                     show-thread? (:show-thread? column)
-                     listview (if show-thread?
-                                (:thread-listview column)
-                                (:flat-listview column))]
-                 (if (nil? column)
-                   (log/debugf "No column found for %s" relay-url)
-                   (log/debugf "Creating pane for column %s (show-thread=%s listview=%s)"
-                               relay-url show-thread? listview))
-                 {:fx/type :v-box
-                  :h-box/margin 5
-                  :h-box/hgrow :always
-                  :children [{:fx/type :h-box
-                              :alignment :center
-                              :style-class "relay-timeline-label"
-                              :children (remove nil?
-                                                [{:fx/type :h-box :h-box/hgrow :always}
-                                                 (when show-thread?
-                                                   (back-from-thread-button column))                                                 
-                                                 {:fx/type :label
-                                                  :text (if show-thread?
-                                                          (format "thread: %s" relay-url)
-                                                          relay-url)
-                                                  :padding 5}
-                                                 {:fx/type :button
-                                                  :padding 5
-                                                  :on-mouse-pressed {:event/type :remove-relay-timeline
-                                                                     :relay-url relay-url}
-                                                  :text "x"}
-                                                 {:fx/type :h-box :h-box/hgrow :always}
-                                                 (when (and (= relay-url (last relay-timelines))
-                                                            (not (nil?
-                                                                  (hidden-timelines (map :url relays)
-                                                                                    relay-timelines))))
-                                                   (add-timeline-button "+"))])}
-                             {:fx/type main-pane
-                              :listview listview}]}))
-             relay-timelines)
+     (if (seq visible-column-ids)
+       (map (fn [column-id]
+              ;; TODO: For now we assume that the relay-url set contains only one
+              ;; element. We probably want to move towards arbitrary-sized relay-url sets
+              ;; instead.
+              (let [column (domain/find-column-by-id column-id)
+                    name (:name (:view column))
+                    show-thread? (:show-thread? column)
+                    listview (if show-thread?
+                               (:thread-listview column)
+                               (:flat-listview column))]
+                (if (nil? column)
+                  (log/debugf "No column found for %s" column-id)
+                  (log/debugf "Creating pane for column %s with view %s (show-thread=%s listview=%s)"
+                              column-id (pr-str (:view column))
+                              show-thread? listview))
+                {:fx/type :v-box
+                 :h-box/margin 5
+                 :h-box/hgrow :always
+                 :children [{:fx/type :h-box
+                             :alignment :center
+                             :style-class "relay-timeline-label"
+                             :children (remove nil?
+                                               [{:fx/type :h-box :h-box/hgrow :always}
+                                                (when show-thread?
+                                                  (back-from-thread-button column))
+                                                {:fx/type :label
+                                                 :text (if show-thread?
+                                                         (format "thread: %s" name)
+                                                         name)
+                                                 :padding 5}
+                                                {:fx/type :button
+                                                 :padding 5
+                                                 :on-mouse-pressed {:event/type :remove-visible-column
+                                                                    :column-id column-id}
+                                                 :text "x"}
+                                                {:fx/type :h-box :h-box/hgrow :always}
+                                                (when (and (= column-id (last visible-column-ids))
+                                                           (not (nil?
+                                                                 (hidden-columns all-columns
+                                                                                 visible-column-ids))))
+                                                  (add-timeline-button "+"))])}
+                            {:fx/type main-pane
+                             :listview listview}]}))
+            visible-column-ids)
        ;; If there are no relay timelines, just show an "Add timeline" button (centered).
        [{:fx/type :h-box :h-box/hgrow :always}
         (add-timeline-button "Add timeline")
-        {:fx/type :h-box :h-box/hgrow :always}])}
-    ]})
+        {:fx/type :h-box :h-box/hgrow :always}])}]})
 
 
 (defn profile
@@ -360,47 +362,48 @@
        :text "No pubkey selected for profile"})))
 
 
-(defn new-timeline-dialog
-  [{:keys [all-relay-urls relay-timelines new-timeline show-add-timeline-dialog?]}]
-  (let [items (hidden-timelines all-relay-urls relay-timelines)]
+(defn new-column-dialog
+  [{:keys [all-columns visible-column-ids new-timeline show-add-timeline-dialog?]}]
+  (let [items (hidden-columns all-columns visible-column-ids)]
     {:fx/type :choice-dialog
      :selected-item (first items)
-     :title "New timeline"
+     :title "New column"
      :showing show-add-timeline-dialog?
-     :header-text "Add a relay timeline"
+     :header-text "Add a column"
      :on-close-request {:event/type :add-timeline-close-request}
      :items items}))
 
 (defn tab-pane
-  [{:keys [columns views selected-view temp-view
-           relay-timelines relays show-add-timeline-dialog? new-timeline
+  [{:keys [all-columns visible-column-ids views selected-view temp-view
+           relays show-add-timeline-dialog? new-timeline
            can-publish? active-reply-context active-contact-list
            active-key active-contact-pubkey identities
            identity-metadata metadata-cache
            ]}]
-  (log/debugf "Tab pane with relay timelines=%s and show=%s" relay-timelines show-add-timeline-dialog?)
+  (log/debugf "Tab pane with columns=%s and show=%s"
+              (pr-str visible-column-ids)
+              show-add-timeline-dialog?)
   {:fx/type fx/ext-let-refs
    :refs {:dialog {:fx/type view-reply/dialog
                    :active-reply-context active-reply-context}
-          :timeline-dialog {:fx/type new-timeline-dialog
-                            :all-relay-urls (map :url relays)
-                            :relay-timelines relay-timelines
+          :timeline-dialog {:fx/type new-column-dialog
+                            :all-columns all-columns
+                            :visible-column-ids visible-column-ids
                             :new-timeline new-timeline
                             :show-add-timeline-dialog? show-add-timeline-dialog?}}
    :desc {:fx/type :tab-pane
           :side :top
           :tabs (for [[label content]
-                      {
-                       #_"Home" #_{:fx/type main-panes
-                                  :columns columns
-                                  :relay-timelines relay-timelines
-                                  :can-publish? can-publish?
-                                  :show-add-timeline-dialog? show-add-timeline-dialog?
-                                  :active-reply-context active-reply-context
-                                  :active-contact-list active-contact-list
-                                  :active-contact-pubkey active-contact-pubkey
-                                  :metadata-cache metadata-cache
-                                  }
+                      {"Home" {:fx/type main-panes
+                               :all-columns all-columns
+                               :visible-column-ids visible-column-ids
+                               :can-publish? can-publish?
+                               :show-add-timeline-dialog? show-add-timeline-dialog?
+                               :active-reply-context active-reply-context
+                               :active-contact-list active-contact-list
+                               :active-contact-pubkey active-contact-pubkey
+                               :metadata-cache metadata-cache
+                               }
                        "Contacts" {:fx/type contacts
                                    :active-contact-list active-contact-list
                                    :active-contact-pubkey active-contact-pubkey
@@ -528,15 +531,15 @@
                  [label add-new-button]))})
               
 
-(defn root [{:keys [columns views selected-view temp-view
-                    show-relays? active-key identities identity-metadata relays
-                    refresh-relays-ts connected-info
-                    relay-timelines show-add-timeline-dialog? new-timeline
+(defn root [{:keys [all-columns visible-column-ids views selected-view temp-view
+                    show-relays? active-key identities identity-metadata
+                    relays refresh-relays-ts connected-info
+                    show-add-timeline-dialog? new-timeline
                     show-new-identity? new-identity-error active-reply-context contact-lists
                     identity-active-contact metadata-cache
                     last-refresh
                     ]}]
-  (log/debugf "Root with relay timelines=%s" relay-timelines)
+  (log/debugf "Root with columns=%s" (pr-str visible-column-ids))
   {:fx/type :border-pane
    :top {:fx/type :h-box
          :children [{:fx/type identity-selector
@@ -547,11 +550,11 @@
                     {:fx/type :h-box :h-box/hgrow :always}
                     (refresh-button last-refresh)]}
    :center {:fx/type tab-pane
-            :columns columns
+            :all-columns all-columns
+            :visible-column-ids visible-column-ids
             :views views
             :selected-view selected-view
             :temp-view temp-view
-            :relay-timelines relay-timelines
             :relays relays
             :show-add-timeline-dialog? show-add-timeline-dialog?
             :new-timeline new-timeline
@@ -570,14 +573,15 @@
             :refresh-relays-ts refresh-relays-ts
             :connected-info connected-info}})
 
-(defn stage [{:keys [identity->columns show-relays? active-key identities identity-metadata relays
-                     refresh-relays-ts connected-info
-                     relay-timelines show-add-timeline-dialog? new-timeline
+(defn stage [{:keys [all-columns visible-column-ids
+                     show-relays? active-key identities identity-metadata
+                     relays refresh-relays-ts connected-info
+                     show-add-timeline-dialog? new-timeline
                      show-new-identity? new-identity-error active-reply-context
                      contact-lists identity-active-contact metadata-cache
                      last-refresh views selected-view temp-view
                      ]}]
-  (log/debugf "Stage with %d identities and active key %s" (count identity->columns) active-key)
+  (log/debugf "Stage with %d identities and active key %s" (count identities) active-key)
   {:fx/type :stage
    :showing true
    :title "Monstr"
@@ -600,11 +604,11 @@
            :last-refresh last-refresh
            :refresh-relays-ts refresh-relays-ts
            :connected-info connected-info
-           :columns (get identity->columns active-key)
+           :all-columns all-columns
+           :visible-column-ids visible-column-ids
            :views views
            :selected-view (or selected-view (:name (first (vals views))))
            :temp-view (or temp-view (first (vals views)))
-           :relay-timelines relay-timelines
            :show-add-timeline-dialog? show-add-timeline-dialog?
            :new-timeline new-timeline
            :metadata-cache metadata-cache

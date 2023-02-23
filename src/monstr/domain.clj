@@ -1,4 +1,6 @@
-(ns monstr.domain)
+(ns monstr.domain
+  (:require
+   [clojure.set :as set]))
 
 (defn initial-state
   []
@@ -23,8 +25,8 @@
    :temp-view nil            ; the view that's being edited in the Views tab
    :active-key nil           ; the public key of the active identity
    :new-timeline nil         ; relay url to be added to the visible timelines
-   :relay-timelines []       ; sequence with the relay urls of the visible timelines   
-   :identity->columns {}     ; map from identity pubkeys to lists of Column
+   :all-columns nil          ; a list with all columns
+   :visible-column-ids nil   ; a list with the ids of the visible columns
    ;; Refresh
    :last-refresh nil         ; Java Instant indicating when the most recent refresh started
    })
@@ -36,7 +38,7 @@
   (doall (map :url (:relays state))))
 
 (defn columns [state]
-  (apply concat (vals (:identity->columns state))))
+  (:all-columns state))
 
 (defn flat-timelines [state]
   (map :flat-timeline (columns state)))
@@ -102,7 +104,7 @@
 (defn find-column-by-id
   [id]
   (first (filter #(= (:id %) id)
-                 (apply concat (vals (:identity->columns @*state))))))
+                 (:all-columns @*state))))
 
 (defrecord Identity
   [public-key secret-key])

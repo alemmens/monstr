@@ -31,16 +31,21 @@
 
 
 (defn init-homes!
-  "Create home timelines for three relays and a few views."
+  "Create columns for all views (if there are no views yet, create a
+  few)."
   []
-  (let [urls (domain/relay-urls @domain/*state)]
+  (let [urls (domain/relay-urls @domain/*state)
+        views (or (file-sys/load-views)
+                  (into {}
+                        (map (fn [url] [url (domain/make-view url #{url} {})])
+                             (take 3 urls))))
+        all-columns (map #(hydrate/new-column % daemon-scheduled-executor)
+                         (vals views))]
     (swap! domain/*state assoc
-           :relay-timelines (doall (take 3 urls))
-           :views (or (file-sys/load-views)
-                      (into {}
-                            (map (fn [url] [url (domain/make-view url #{url} {})])
-                                 (take 2 urls)))))))
-  
+           :views views
+           :all-columns all-columns
+           :visible-column-ids (map :id (take 3 all-columns)))))
+
 (defn- load-relays!
   []
   (let [relays (store/load-relays store/db)]

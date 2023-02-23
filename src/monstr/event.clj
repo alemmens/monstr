@@ -4,16 +4,16 @@
     [clojure.java.io :as io]
     [clojure.tools.logging :as log]
     [clojure.string :as str]
+    [monstr.domain :as domain]
+    [monstr.hydrate :as hydrate]    
     [monstr.modal :as modal]
+    [monstr.publish :as publish]
     [monstr.relay-conn :as relay-conn]
     [monstr.store :as store]
     [monstr.timeline :as timeline]
-    [monstr.x.crypt :as crypt]
-    [monstr.hydrate :as hydrate]
-    [monstr.publish :as publish]
-    [monstr.domain :as domain]
     [monstr.util :as util]
     [monstr.util-domain :as util-domain]
+    [monstr.x.crypt :as crypt]
     [manifold.deferred :as d])
   (:import (javafx.scene.control DialogEvent Dialog Button TextArea)
            (javafx.event Event ActionEvent)))
@@ -216,28 +216,28 @@
       (swap! *state assoc :active-reply-context
              (domain/->UIReplyContext (:id event-obj) (:id event-obj))))]])
 
-(defn remove-relay-timeline!
-  [{:keys [relay-url]}]
+(defn remove-visible-column!
+  [{:keys [column-id]}]
   [[:bg
     (fn [*state _db _exec _dispatch!]
-      (log/debugf "Removing relay timeline %s, active key = %s" relay-url (:active-key @*state))
+      (log/debugf "Removing column %s, active key = %s" column-id (:active-key @*state))
       (swap! *state assoc
-             :relay-timelines (remove #{relay-url} (:relay-timelines @*state))))]])
+             :visible-column-ids (remove #{column-id} (:visible-column-ids @*state))))]])
 
-(defn show-add-timeline-effect
+(defn- show-add-column-effect
   [show?]
   [[:bg
     (fn [*state _db _exec _dispatch!]
       (swap! *state assoc :show-add-timeline-dialog? show?))]])
   
-(defn add-timeline-close-request
+(defn- add-column-close-request
   [{^DialogEvent dialog-event :fx/event}]
   [[:bg
     (fn [*state _db _exec _dispatch!]
-      ;; Add a new timeline if the user has selected a relay url.
-      (when-let [new-timeline (.getResult (.getSource dialog-event))]
-        (swap! *state assoc
-               :relay-timelines (conj (:relay-timelines @*state) new-timeline)))
+      ;; Add a new column if the user has selected a column id.
+      (when-let [new-column-id (.getResult (.getSource dialog-event))]
+        (swap! *state update
+               :visible-column-ids #(conj % new-column-id)))
       (swap! *state assoc :show-add-timeline-dialog? false))]])
 
 (defn save-view
@@ -266,9 +266,9 @@
     :reply-close-request (reply! event)
     :click-contact-card (click-contact-card event)
     :click-reply-button (click-reply-button event)
-    ;; Add/remove relay timelines.
-    :remove-relay-timeline (remove-relay-timeline! event)
-    :show-add-timeline-dialog (show-add-timeline-effect true)
-    :add-timeline-close-request (add-timeline-close-request event)
+    ;; Add/remove visible columns.
+    :remove-visible-column (remove-visible-column! event)
+    :show-add-timeline-dialog (show-add-column-effect true)
+    :add-timeline-close-request (add-column-close-request event)
     :save-view (save-view event)
     (log/error "no matching clause" type)))

@@ -50,8 +50,9 @@
       show-thread?)))
 
 (defn accept-text-note?
-  [*state identity-pubkey parsed-ptags {:keys [pubkey] :as _event-obj}]
-  (let [{:keys [contact-lists]} @*state
+  [*state parsed-ptags {:keys [pubkey] :as _event-obj}]
+  (let [identity-pubkey (:active-key @*state)
+        {:keys [contact-lists]} @*state
         {:keys [parsed-contacts] :as _contact-list} (get contact-lists identity-pubkey)
         ;; consider: optimization--not having to create contact set each note
         contact-keys-set (into #{} (map :public-key) parsed-contacts)
@@ -65,8 +66,6 @@
      (ptag-keys-set identity-pubkey)
      ;; the text-note's ptags references one of identities contacts
      (not-empty (set/intersection contact-keys-set ptag-keys-set)))))
-
-
 
 (defn dispatch-metadata-update!
   [*state {:keys [pubkey]}]
@@ -85,15 +84,15 @@
                    (assoc curr-wrapper :touch-ts (System/currentTimeMillis))))))))))
 
 (defn- event-is-relevant-for-timeline?
-  "An event is relevant for a timeline if the timeline's relays have some overlap with the
-   event's relays."
-  [event timeline]
+  "An event is relevant for a timeline in a column if the timeline's relays have some
+  overlap with the event's relays and if the column's filters also allow the event."
+  [event timeline column]
+  ;; TODO: Check pubkeys etc.
   (not-empty (set/intersection (set (:relays timeline))
                                (set (:relays event)))))
 
 (defn flat-dispatch!
-  [*state timeline identity-pubkey
-   {:keys [id pubkey created_at content] :as event-obj}]
+  [*state timeline {:keys [id pubkey created_at content] :as event-obj}]
   (let [{:keys [^ObservableList observable-list
                 ^HashMap author-pubkey->item-id-set
                 ^HashMap item-id->index
@@ -101,7 +100,7 @@
         timeline]
     (when-not (.contains item-ids id)
       (let [ptag-ids (parse/parse-tags event-obj "p")]
-        (when (accept-text-note? *state identity-pubkey ptag-ids event-obj)
+        (when (accept-text-note? *state ptag-ids event-obj)
           (.add item-ids id)
           (.merge author-pubkey->item-id-set
                   pubkey
@@ -145,12 +144,10 @@
 (defn- update-column!
   [*state new-column]
   (let [active-key (:active-key @*state)
-        identity->columns (:identity->columns @*state)
-        columns (get identity->columns active-key)]
+        columns (:all-columns @*state)]
     (swap! *state assoc
-           :identity->columns (assoc identity->columns active-key
-                                     (conj (remove #(= (:id %) (:id new-column)) columns)
-                                           new-column)))))
+           :columns (conj (remove #(= (:id %) (:id new-column)) columns)
+                          new-column))))
 
 (defn- clear-column-thread!
   [*state column]
@@ -188,11 +185,10 @@
    (if (string? column-id)
      (let [column (domain/find-column-by-id column-id)]
        (thread-dispatch! *state column event-obj check-relevance?))
-     (doseq [[identity-pubkey columns] (:identity->columns @*state)]
-       (doseq [column columns]
-         (let [flat-timeline (:flat-timeline column)]
-           (when (event-is-relevant-for-timeline? event-obj flat-timeline)
-             (flat-dispatch! *state flat-timeline identity-pubkey event-obj))))))))
+     (doseq [column (:all-columns @*state)]
+       (let [flat-timeline (:flat-timeline column)]
+         (when (event-is-relevant-for-timeline? event-obj flat-timeline column)
+           (flat-dispatch! *state flat-timeline event-obj)))))))
 
 (defn update-active-timelines!
   "Update the active timelines for the identity with the given public key."
@@ -200,7 +196,7 @@
   (fx/run-later
    (log/debugf "Updating active timelines for %s" public-key)
    ;; Update the listviews.
-   (doseq [column (get (:identity->columns @*state) public-key)]
+   (doseq [column (:all-columns @*state)]
      (.setItems (:flat-listview column)
                 ^ObservableList (or (:adapted-list (:flat-timeline column))
                                     (FXCollections/emptyObservableList)))
