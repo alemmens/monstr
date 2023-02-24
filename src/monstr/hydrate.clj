@@ -32,6 +32,7 @@
 (defn- hydrate-contact-lists!
   [*state db new-identities]
   (let [contact-lists (store/load-contact-lists db new-identities)]
+    (status-bar/message! "Loading contact lists")
     (swap! *state update :contact-lists merge contact-lists)
     contact-lists))
 
@@ -72,7 +73,9 @@
       ;; TODO: also load watermarks and include in new subscriptions.
       (doseq [r relay-urls]
         (let [events (store/load-relay-events db r closure-public-keys)]
-          (status-bar/message! (format "Loaded %s relay events" (count events)))
+          (status-bar/message! (format "Loaded %d events for %s from database"
+                                       (count events)
+                                       r))
           (dispatch-text-notes *state r events))))
     ;; NOTE: use *all* identities to update subscriptions.
     (let [{:keys [identities contact-lists]} @*state]
@@ -98,6 +101,7 @@
                   true
                   (update :identity-metadata #(apply dissoc % dead-public-keys-set))
                   true
+                  ;; TO DO: FIX THIS!
                   (update :identity->columns #(apply dissoc % dead-public-keys-set))
                   true
                   (update :contact-lists #(apply dissoc % dead-public-keys-set))))))]

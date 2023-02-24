@@ -125,6 +125,7 @@
 (defn subscribe!
   [conn-vol id filters]
   {:pre [(vector? filters) (every? map? filters)]}
+  (status-bar/message! (format "Subscribing to events from %s" (:relay-url @conn-vol)))
   (locking conn-vol
     (vswap! conn-vol update :subscriptions assoc id filters)
     (let [{:keys [relay-url deferred-conn]} @conn-vol]
@@ -219,7 +220,8 @@
     (locking conn-registry
       (vswap! (:subscriptions conn-registry) assoc id filters')
       (doseq [[_ read-conn-vol] @(:read-connections-vol conn-registry)]
-        (subscribe! read-conn-vol id filters')))))
+        (subscribe! read-conn-vol id filters')))
+    (status-bar/message! "")))
 
 (defn unsubscribe-all!
   [id]
