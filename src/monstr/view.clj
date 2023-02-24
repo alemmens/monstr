@@ -372,7 +372,8 @@
      :items items}))
 
 (defn tab-pane
-  [{:keys [all-columns visible-column-ids views selected-view temp-view
+  [{:keys [all-columns visible-column-ids
+           views selected-view temp-view temp-view-changed?
            relays show-add-timeline-dialog? new-timeline
            can-publish? active-reply-context active-contact-list
            active-key active-contact-pubkey identities
@@ -415,6 +416,7 @@
                                 :views views
                                 :selected-view selected-view
                                 :temp-view temp-view
+                                :temp-view-changed? temp-view-changed?
                                 },
                        ;;"Search" {:fx/type search}
                        }]
@@ -469,7 +471,8 @@
                  [label add-new-button]))})
               
 
-(defn root [{:keys [all-columns visible-column-ids views selected-view temp-view
+(defn root [{:keys [all-columns visible-column-ids
+                    views selected-view temp-view temp-view-changed?
                     show-relays? active-key identities identity-metadata
                     relays refresh-relays-ts connected-info
                     show-add-timeline-dialog? new-timeline
@@ -494,6 +497,7 @@
             :views views
             :selected-view selected-view
             :temp-view temp-view
+            :temp-view-changed? temp-view-changed?
             :relays relays
             :show-add-timeline-dialog? show-add-timeline-dialog?
             :new-timeline new-timeline
@@ -524,7 +528,7 @@
                      show-add-timeline-dialog? new-timeline
                      show-new-identity? new-identity-error active-reply-context
                      contact-lists identity-active-contact metadata-cache
-                     last-refresh views selected-view temp-view
+                     last-refresh views selected-view temp-view temp-view-changed?
                      status-message status-message-timestamp
                      ]}]
   (log/debugf "Stage with %d identities and active key %s" (count identities) active-key)
@@ -555,6 +559,7 @@
            :views views
            :selected-view (or selected-view (:name (first (vals views))))
            :temp-view (or temp-view (first (vals views)))
+           :temp-view-changed? temp-view-changed?
            :show-add-timeline-dialog? show-add-timeline-dialog?
            :new-timeline new-timeline
            :metadata-cache metadata-cache

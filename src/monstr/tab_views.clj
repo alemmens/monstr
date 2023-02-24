@@ -48,6 +48,7 @@
     (swap! domain/*state assoc-in
            [:views new-name]
            temp-view)
+    (swap! domain/*state assoc :temp-view-changed? false)
     (when-not (= old-name new-name)
       (swap! domain/*state assoc
              :views (dissoc (:views @domain/*state) old-name)
@@ -66,7 +67,8 @@
   (log/debugf "Updating temp-view's %s to %s" property value)
   (swap! domain/*state assoc-in
          [:temp-view property]
-         value))
+         value)
+  (swap! domain/*state assoc :temp-view-changed? true))
       
     
                                       
@@ -128,9 +130,9 @@
                               :text r}]}))})
 
 (defn show-tab
-  [{:keys [views selected-view temp-view]}]
-  (log/debugf "Views tab with views=%s, selected=%s, temp=%s"
-              views selected-view temp-view)
+  [{:keys [views selected-view temp-view temp-view-changed?]}]
+  (log/debugf "Views tab with views=%s, selected=%s, temp=%s, changed=%s"
+              views selected-view temp-view temp-view-changed?)
   {:fx/type :h-box
    :padding 10
    :children (let [items (sort (keys views))
@@ -145,7 +147,8 @@
                                                        (log/debugf "View for %s = %s" new-value view)
                                                        (swap! domain/*state assoc
                                                               :selected-view new-value
-                                                              :temp-view view)))}
+                                                              :temp-view view
+                                                              :temp-view-changed? false)))}
                  :desc {:fx/type :list-view
                         :focus-traversable true
                         :padding 10
@@ -176,6 +179,7 @@
                             {:fx/type :h-box
                              :children [{:fx/type field-label :text ""}
                                         {:fx/type :button
+                                         :disable (not temp-view-changed?)
                                          :text "Save"
                                          :padding 5
                                          :on-mouse-pressed (fn [e] (save-view!))}]}

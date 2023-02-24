@@ -2,6 +2,9 @@
   (:require
    [clojure.set :as set]))
 
+;; NOTE: changes to active-key and mutations to home-ux, timelines must be done within a
+;; mutex, i.e. on the fx thread!
+
 (defn initial-state
   []
   {;; Dialog related
@@ -11,6 +14,7 @@
    :new-identity-error ""
    :active-reply-context nil  ; for the reply dialog
    ;; Identities and contacts
+   :active-key nil           ; the public key of the active identity
    :identities []             ; sequence of Identity
    :identity-metadata {}      ; map from pubkey to ParsedMetadata
    :identity-active-contact {}   
@@ -18,15 +22,14 @@
    ;; Relays
    :relays []                 ; list of Relay
    :connected-info {}
-   ;; NOTE: changes to active-key and mutations to home-ux, timelines must be done
-   ;; within a mutex, i.e. on the fx thread!
+   ;; Views and columns
    :views {}                 ; map from view names to views
    :selected-view nil        ; the view name that is currently selected in the Views tab
    :temp-view nil            ; the view that's being edited in the Views tab
-   :active-key nil           ; the public key of the active identity
-   :new-timeline nil         ; relay url to be added to the visible timelines
+   :temp-view-changed? false ; if true, we activate the Save button in the Views tab
    :all-columns nil          ; a list with all columns
    :visible-column-ids nil   ; a list with the ids of the visible columns
+   :new-timeline nil         ; relay url to be added to the visible timelines
    ;; Refresh
    :last-refresh nil         ; Java Instant indicating when the most recent refresh started
    ;; Status bar
