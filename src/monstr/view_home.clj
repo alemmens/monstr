@@ -299,6 +299,7 @@
                               (timeline/show-column-thread! *state column event-obj)))}]})
 
 (defn- thread-action-button-row
+  ;; Like action-button-row but without the 'thread' button.
   [*state db root-data item-id pubkey column-id]
   {:fx/type :h-box
    :style-class ["ndesk-content-controls"] ;; used for .lookup

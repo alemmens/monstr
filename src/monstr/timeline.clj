@@ -130,6 +130,7 @@
         (let [curr-wrapper (.get observable-list existing-index)
               new-wrapper (timeline-support/contribute!
                            curr-wrapper event-obj etag-ids ptag-ids)]
+          #_(log/debugf "Updating wrapper to %s" (pr-str new-wrapper))
           (doseq [x id-closure]
             (.put item-id->index x existing-index))
           (.set observable-list existing-index new-wrapper))
@@ -137,6 +138,7 @@
         ;; list.
         (let [init-index (.size observable-list)
               init-wrapper (timeline-support/init! event-obj etag-ids ptag-ids)]
+          #_(log/debugf "Created wrapper %s" (pr-str init-wrapper))
           (doseq [x id-closure]
             (.put item-id->index x init-index))
           (.add observable-list init-wrapper))))))
@@ -146,8 +148,8 @@
   (let [active-key (:active-key @*state)
         columns (:all-columns @*state)]
     (swap! *state assoc
-           :columns (conj (remove #(= (:id %) (:id new-column)) columns)
-                          new-column))))
+           :all-columns (conj (remove #(= (:id %) (:id new-column)) columns)
+                              new-column))))
 
 (defn- clear-column-thread!
   [*state column]
