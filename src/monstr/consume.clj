@@ -5,11 +5,12 @@
     [manifold.stream :as s]
     [monstr.cache :as cache]
     [monstr.consume-verify :refer [verify-maybe-persist-event!]]
+    [monstr.domain :as domain]    
     [monstr.json :as json]
-    [monstr.relay-conn :as relay-conn]
     [monstr.metadata :as metadata]
-    [monstr.domain :as domain]
-    [monstr.parse :as parse]
+    [monstr.parse :as parse]    
+    [monstr.relay-conn :as relay-conn]
+    [monstr.status-bar :as status-bar]
     [monstr.subscribe :as subscribe]
     [monstr.timeline :as timeline])
   (:import (java.util.concurrent ScheduledExecutorService ScheduledFuture TimeUnit)))
@@ -114,7 +115,7 @@
 
 (defn- consume-eose
   [relay-url subscription-id]
-  (log/info "EOSE: " relay-url subscription-id)
+  (log/debugf "Unsubscribing from %s in %s." subscription-id relay-url)
   (locking relay-conn/conn-registry
     (let [read-connections @(:read-connections-vol relay-conn/conn-registry)
           connection (get read-connections relay-url)]

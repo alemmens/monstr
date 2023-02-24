@@ -7,13 +7,13 @@
    [monstr.cache :as cache]
    [monstr.domain :as domain]
    [monstr.event :as ev]
+   [monstr.status-bar :as status-bar]
    [monstr.style :as style :refer [BORDER|]]
    [monstr.subscribe :as subscribe]
    [monstr.tab-views :as tab-views]
    [monstr.util :as util]
    [monstr.util-domain :as util-domain]
    [monstr.view-new-identity :as view-new-identity]
-   [monstr.view-relays :as view-relays]
    [monstr.util-java :as util-java]
    [monstr.util-fx :as util-fx]
    [monstr.view-common :as view-common]
@@ -22,9 +22,7 @@
    [clojure.string :as str]
    [clojure.set :as set]
    [monstr.metadata :as metadata])
-  (:import (javafx.scene.canvas Canvas)
-           (javafx.scene.paint Color)
-           (javafx.geometry Pos)
+  (:import (javafx.geometry Pos)
            (javafx.scene.layout VBox Priority)
            (javafx.scene.control TextFormatter$Change TextArea)
            (javafx.beans.property ReadOnlyProperty)))
@@ -442,66 +440,6 @@
                    :show-new-identity? show-new-identity?
                    :new-identity-error new-identity-error}]))})
 
-(defn relay-dot
-  [{:keys [connected-info] {:keys [url read? write?] :as _relay} :relay}]
-  {:fx/type :label
-   :style {:-fx-padding [0 2]}
-   :tooltip
-   {:fx/type :tooltip
-    :text (format "%s%s" url
-            (cond
-              (and read? write?) ""
-              read? " (read-only)"
-              write? " (write-only)"
-              :else " (disabled)"))}
-   :graphic
-   (let [dim 12]
-     {:fx/type :canvas
-      :width dim
-      :height dim
-      :draw
-      (fn [^Canvas canvas]
-        (doto (.getGraphicsContext2D canvas)
-          (.setFill (if (get connected-info url) Color/LIGHTGREEN Color/LIGHTGREY))
-          (.fillOval 0 0 dim dim)))})})
-
-(defn relay-dots
-  [{:keys [relays connected-info]}]
-  {:fx/type :h-box
-   :style {:-fx-padding [0 5 0 0]}
-   :children
-   (mapv #(hash-map
-            :fx/type relay-dot
-            :relay %
-            :connected-info connected-info) relays)})
-
-(defn status-relays
-  [{:keys [show-relays? relays refresh-relays-ts connected-info]}]
-  {:fx/type fx/ext-let-refs
-   :refs {:dialog {:fx/type view-relays/dialog
-                   :show-relays? show-relays?
-                   :relays relays
-                   :refresh-relays-ts refresh-relays-ts}}
-   :desc {:fx/type :h-box
-          :style-class ["ndesk-status-relays"]
-          :alignment :center
-          :children [{:fx/type :text :text "Relays: "}
-                     (if (nil? relays)
-                       {:fx/type :text :text "..."}
-                       {:fx/type relay-dots :relays relays :connected-info connected-info})]
-          :cursor :hand
-          :on-mouse-clicked {:event/type :show-relays}}})
-
-(defn status-bar [{:keys [show-relays? relays refresh-relays-ts connected-info]}]
-  {:fx/type :border-pane
-   :style-class "ndesk-status-bar"
-   :left {:fx/type :h-box :children []}
-   :right {:fx/type status-relays
-           :show-relays? show-relays?
-           :relays relays
-           :refresh-relays-ts refresh-relays-ts
-           :connected-info connected-info}})
-
 (defn identity-selector
   [{:keys [identities active-key identity-metadata show-new-identity?]}]
   {:fx/type :h-box
@@ -538,6 +476,7 @@
                     show-new-identity? new-identity-error active-reply-context contact-lists
                     identity-active-contact metadata-cache
                     last-refresh
+                    status-message status-message-timestamp
                     ]}]
   (log/debugf "Root with columns=%s" (pr-str visible-column-ids))
   {:fx/type :border-pane
@@ -567,7 +506,13 @@
             :identity-metadata identity-metadata
             :metadata-cache metadata-cache
             }
-   :bottom {:fx/type status-bar
+   :bottom {:fx/type status-bar/pane
+            :status-message (if (> (- (util/now-epoch-second)
+                                      (or status-message-timestamp
+                                          (util/now-epoch-second)))
+                                   5)
+                              "" ; clear status message after 5 seconds
+                              status-message)
             :show-relays? show-relays?
             :relays relays
             :refresh-relays-ts refresh-relays-ts
@@ -580,6 +525,7 @@
                      show-new-identity? new-identity-error active-reply-context
                      contact-lists identity-active-contact metadata-cache
                      last-refresh views selected-view temp-view
+                     status-message status-message-timestamp
                      ]}]
   (log/debugf "Stage with %d identities and active key %s" (count identities) active-key)
   {:fx/type :stage
@@ -612,4 +558,6 @@
            :show-add-timeline-dialog? show-add-timeline-dialog?
            :new-timeline new-timeline
            :metadata-cache metadata-cache
+           :status-message status-message
+           :status-message-timestamp status-message-timestamp           
            }}})

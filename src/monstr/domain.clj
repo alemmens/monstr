@@ -29,6 +29,9 @@
    :visible-column-ids nil   ; a list with the ids of the visible columns
    ;; Refresh
    :last-refresh nil         ; Java Instant indicating when the most recent refresh started
+   ;; Status bar
+   :status-message nil
+   :status-message-timestamp nil ; seconds since start of epoch
    })
 
 (defonce *state

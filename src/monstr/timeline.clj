@@ -98,6 +98,7 @@
                 ^HashMap item-id->index
                 ^HashSet item-ids]}
         timeline]
+    #_(log/debugf "Flat dispatch of event %s with content %s" id content)
     (when-not (.contains item-ids id)
       (let [ptag-ids (parse/parse-tags event-obj "p")]
         (when (accept-text-note? *state ptag-ids event-obj)

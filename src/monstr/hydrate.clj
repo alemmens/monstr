@@ -5,6 +5,7 @@
    [monstr.util :as util]
    [monstr.store :as store]
    [monstr.metadata :as metadata]
+   [monstr.status-bar :as status-bar]
    [monstr.subscribe :as subscribe]
    [monstr.view-home :as view-home]
    [clojure.tools.logging :as log])
@@ -35,13 +36,13 @@
     contact-lists))
 
 (defn dispatch-text-notes
-  [*state relay-url timeline-data]
+  [*state relay-url events]
   ;; TODO consider transduce iterate over timeline-data and throttling
   ;;      dispatches via yielding of bg thread; this way we'd move
   ;;      on to subscriptions, allowing new stuff to come in sooner
   ;;      as we backfill
-  (log/debugf "Dispatching %d text notes from %s" (count timeline-data) relay-url)
-  (doseq [event-obj timeline-data]
+  (status-bar/message! (format "Dispatching %d text notes from %s" (count events) relay-url))
+  (doseq [event-obj events]
     (timeline/dispatch-text-note! *state
                                   false
                                   (assoc event-obj :relays (list relay-url))
@@ -62,20 +63,17 @@
         (-> curr-state
             (update :identities into new-identities)
             (update :identity-metadata merge identity-metadata))))
+    (when-let [first-identity-key (first new-public-keys)]
+      (log/debugf "Hydrating with first identity key %s" first-identity-key)
+      (timeline/update-active-timelines! *state first-identity-key))    
     (let [contact-lists (hydrate-contact-lists! *state db new-identities)
-          closure-public-keys (subscribe/whale-of-pubkeys* new-public-keys contact-lists)
-          ;; TODO: also limit timeline events to something, some cardinality?
-          ;; TODO: also load watermarks and include in new subscriptions.
-          relay-events (map (fn [r]
-                              [r
-                               (store/load-relay-events db r closure-public-keys)])
-                            relay-urls)]
-      (log/debugf "Loaded %s relay events" (doall (map (comp count second) relay-events)))
-      (when-let [first-identity-key (first new-public-keys)]
-        (log/debugf "Hydrating with first identity key %s" first-identity-key)
-        (timeline/update-active-timelines! *state first-identity-key))
-      (doseq [[relay-url events] relay-events]
-        (dispatch-text-notes *state relay-url events)))
+          closure-public-keys (subscribe/whale-of-pubkeys* new-public-keys contact-lists)]
+      ;; TODO: also limit timeline events to something, some cardinality?
+      ;; TODO: also load watermarks and include in new subscriptions.
+      (doseq [r relay-urls]
+        (let [events (store/load-relay-events db r closure-public-keys)]
+          (status-bar/message! (format "Loaded %s relay events" (count events)))
+          (dispatch-text-notes *state r events))))
     ;; NOTE: use *all* identities to update subscriptions.
     (let [{:keys [identities contact-lists]} @*state]
       (subscribe/overwrite-subscriptions! identities contact-lists))))

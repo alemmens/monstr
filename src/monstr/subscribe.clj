@@ -1,8 +1,9 @@
 (ns monstr.subscribe
   (:require
+   [clojure.tools.logging :as log]
    [monstr.domain :as domain]
    [monstr.relay-conn :as relay-conn]
-   [clojure.tools.logging :as log]
+   [monstr.status-bar :as status-bar]
    [monstr.util :as util])
   (:import (java.time Instant)))
 
@@ -38,7 +39,7 @@
      (overwrite-subscriptions! identities contact-lists since))))
   
 (defn refresh! []
-  (log/debugf "Refreshing...")
+  (status-bar/message! "Refreshing subscriptions.")
   (overwrite-subscriptions! (:identities @domain/*state)
                             (:contact-lists @domain/*state)))
 

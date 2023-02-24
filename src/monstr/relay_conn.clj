@@ -2,11 +2,12 @@
   (:require
     [aleph.http :as http]
     [clojure.tools.logging :as log]
-    [monstr.json :as json*]
-    [monstr.util :as util]
     [manifold.deferred :as d]
     [manifold.stream :as s]
-    [manifold.time :as t]))
+    [manifold.time :as t]
+    [monstr.json :as json*]
+    [monstr.status-bar :as status-bar]
+    [monstr.util :as util]))
 
 (defn- websocket-client*
   [relay-url]
@@ -46,7 +47,7 @@
       (doseq [[id filters] subscriptions-snapshot]
         (s/put! new-raw-conn
           (json*/write-str* (vec (concat ["REQ" id] filters))))
-        (log/debugf "subscribed %s %s" id relay-url)))))
+        (status-bar/message! (format "subscribed %s to %s" id relay-url))))))
 
 (defn on-failure
   [conn-vol err]
