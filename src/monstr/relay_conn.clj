@@ -130,13 +130,12 @@
     (vswap! conn-vol update :subscriptions assoc id filters)
     (let [{:keys [relay-url deferred-conn]} @conn-vol]
       (d/chain deferred-conn
-        (util/wrap-exc-fn
-          ::subscribe!
-          (fn [raw-conn]
-            (log/debugf "subscribing %s %s" id relay-url (type raw-conn))
-            (s/put! @deferred-conn
-              (json*/write-str*
-                (vec (concat ["REQ" id] filters))))))))))
+        (util/wrap-exc-fn ::subscribe!
+                          (fn [raw-conn]
+                            (log/debugf "subscribing %s %s" id relay-url (type raw-conn))
+                            (s/put! @deferred-conn
+                                    (json*/write-str*
+                                     (vec (concat ["REQ" id] filters))))))))))
 
 (defn unsubscribe!
   [conn-vol id]
@@ -180,11 +179,10 @@
       (doseq [[relay-url deferred-conn] @(:write-connections-vol conn-registry)]
         (when (or (not (write-url? relay-url)) (read-url? relay-url))
           (d/chain deferred-conn
-            (util/wrap-exc-fn
-              ::update-relays!
-              (fn [raw-conn]
-                (log/debugf "closing write conn %s" relay-url)
-                (s/close! raw-conn))))
+            (util/wrap-exc-fn ::update-relays!
+                              (fn [raw-conn]
+                                (log/debugf "closing write conn %s" relay-url)
+                                (s/close! raw-conn))))
           (vswap! (:write-connections-vol conn-registry) dissoc relay-url)))
       ;; close all removed read connections
       (doseq [[relay-url read-conn-vol] @(:read-connections-vol conn-registry)]
@@ -206,11 +204,10 @@
                 (subscribe! read-conn-vol id filters))
               ;; :downstream? false means when conn-sink-stream closes global conn-registry stream will not
               (let [{reg-sink-stream :sink-stream} conn-registry]
-                (s/connect-via
-                  conn-sink-stream
-                  #(s/put! reg-sink-stream [url %])
-                  reg-sink-stream
-                  {:downstream? false}))
+                (s/connect-via conn-sink-stream
+                               #(s/put! reg-sink-stream [url %])
+                               reg-sink-stream
+                               {:downstream? false}))
               (vswap! (:read-connections-vol conn-registry) assoc url read-conn-vol))))))))
 
 (defn subscribe-all!
@@ -220,8 +217,7 @@
     (locking conn-registry
       (vswap! (:subscriptions conn-registry) assoc id filters')
       (doseq [[_ read-conn-vol] @(:read-connections-vol conn-registry)]
-        (subscribe! read-conn-vol id filters')))
-    (status-bar/message! "")))
+        (subscribe! read-conn-vol id filters')))))
 
 (defn unsubscribe-all!
   [id]

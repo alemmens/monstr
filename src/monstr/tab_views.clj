@@ -6,7 +6,9 @@
    [clojure.tools.logging :as log]
    [clojure.set :as set]
    [monstr.domain :as domain]
-   [monstr.file-sys :as file-sys]))
+   [monstr.file-sys :as file-sys]
+   [monstr.status-bar :as status-bar]
+   ))
 
 (defn- field-row
   [label content]
@@ -53,7 +55,8 @@
       (swap! domain/*state assoc
              :views (dissoc (:views @domain/*state) old-name)
              :selected-view new-name))
-    (file-sys/save-views (:views @domain/*state))))
+    (file-sys/save-views (:views @domain/*state))
+    (status-bar/message! (format "Saved view '%s'" new-name))))
 
 (defn update-temp-view!
   [property value]
@@ -148,7 +151,92 @@
     (swap! domain/*state assoc
            :selected-view (:name new-view)
            :temp-view new-view
-           :temp-view-changed? true)))
+           :temp-view-changed? true)
+    (status-bar/message! (format "Added view '%s'" new-name))))
+
+#_
+(defn confirmation-alert
+  ;; TODO: FINISH THIS.
+  [_]
+  {:fx/type :dialog
+   :showing true
+   :on-hidden (fn [^DialogEvent e]
+                (condp = (.getButtonData ^ButtonType (.getResult ^Dialog (.getSource e)))
+                  ButtonBar$ButtonData/NO (reset! *state :select-action)
+                  ButtonBar$ButtonData/YES (reset! *state :confirmed)))
+   :dialog-pane {:fx/type :dialog-pane
+                 :header-text "Confirm"
+                 :content-text "This view is used by one or more columns. These columns
+will be removed when the view is deleted. Continue?"
+                 :expandable-content {:fx/type :label
+                                      :text "This action can't be undone."}
+                 :button-types [:no :yes]}})
+
+(defn delete-view! [selected-view]
+  (let [views (:views @domain/*state)
+        using-columns (domain/columns-using-view selected-view)]
+    ;; TODO: Check if the view is in use. If so, ask for confirmation first.
+    (when (> (count views) 1)
+      ;; Move listview focus to the first view in the list.
+      (let [new-view-name (first (sort (keys views)))
+            new-view (domain/find-view new-view-name)
+            new-columns (remove #(domain/column-uses-view? % selected-view)
+                                (:all-columns @domain/*state))]
+        (swap! domain/*state assoc
+               :selected-view new-view-name
+               :temp-view new-view
+               :temp-view-changed? false
+               :views (dissoc views selected-view)
+               ;; Remove all columns (both visible and hidden) that use the deleted view.               
+               :all-columns new-columns
+               :visible-column-ids (map :id
+                                        (keep domain/find-column-by-id
+                                              (:visible-column-ids @domain/*state)))))
+      ;; Remember that this view is now gone.
+      (file-sys/save-views (:views @domain/*state))
+      ;; Show status.
+      (status-bar/message! (format "Deleted view '%s'" selected-view)))))
+
+(defn right-hand-side
+  [{:keys [views selected-view temp-view temp-view-changed? name]}]
+  {:fx/type :v-box
+   :padding 30
+   :spacing 20
+   :children [;; Name
+              {:fx/type text-input
+               :label "Name:"
+               :style "monstr-view-name"
+               :value name
+               :on-text-changed (fn [new-name]
+                                  (update-temp-view! :name new-name))}
+              ;; Follow
+              {:fx/type :h-box
+               :children [{:fx/type field-label :text "Follow:"}
+                          {:fx/type follow-radiogroup
+                           :temp-view temp-view}]}
+              ;; Relays
+              {:fx/type :h-box
+               :children [{:fx/type field-label :text "Relays:"}
+                          {:fx/type relay-group
+                           :temp-view temp-view}]}
+              ;; Save button
+              {:fx/type :h-box
+               :children [{:fx/type field-label :text ""}
+                          {:fx/type :h-box
+                           :spacing 100
+                           :children [;; Save button
+                                      {:fx/type :button
+                                       :disable (not temp-view-changed?)
+                                       :text "Save"
+                                       :padding 5
+                                       :on-mouse-pressed (fn [e] (save-view!))}
+                                      ;; Delete button (disable when temp-view is for a
+                                      ;; new view that hasn't been saved yet).
+                                      {:fx/type :button
+                                       :disable (not (domain/find-view selected-view))
+                                       :text "Delete"
+                                       :padding 5
+                                       :on-mouse-pressed (fn [e] (delete-view! selected-view))}]}]}]})
 
 (defn show-tab
   [{:keys [views selected-view temp-view temp-view-changed?]}]
@@ -186,34 +274,12 @@
                                          :padding 5
                                          :on-mouse-pressed (fn [_] (add-view!))}
                                         {:fx/type :h-box :h-box/hgrow :always}]}]}
-                ;; Fields to edit the view.
-                {:fx/type :v-box
-                 :padding 30
-                 :spacing 20
-                 :children [;; Name
-                            {:fx/type text-input
-                             :label "Name:"
-                             :style "monstr-view-name"
-                             :value value
-                             :on-text-changed (fn [new-name]
-                                                (update-temp-view! :name new-name))}
-                            ;; Follow
-                            {:fx/type :h-box
-                             :children [{:fx/type field-label :text "Follow:"}
-                                        {:fx/type follow-radiogroup
-                                         :temp-view temp-view}]}
-                            ;; Relays
-                            {:fx/type :h-box
-                             :children [{:fx/type field-label :text "Relays:"}
-                                        {:fx/type relay-group
-                                         :temp-view temp-view}]}
-                            ;; Save button
-                            {:fx/type :h-box
-                             :children [{:fx/type field-label :text ""}
-                                        {:fx/type :button
-                                         :disable (not temp-view-changed?)
-                                         :text "Save"
-                                         :padding 5
-                                         :on-mouse-pressed (fn [e] (save-view!))}]}
-                            ]}])})
+                ;; Form to edit, save and delete the view.
+                {:fx/type right-hand-side
+                 :temp-view temp-view
+                 :name value
+                 :temp-view-changed? temp-view-changed?
+                 :selected-view selected-view
+                 :views views}])})
+
 

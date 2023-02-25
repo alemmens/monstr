@@ -112,6 +112,13 @@
   (first (filter #(= (:id %) id)
                  (:all-columns @*state))))
 
+(defn column-uses-view? [column view-name]
+  (= (:name (:view column)) view-name))
+
+(defn columns-using-view [view-name]
+  (filter #(column-uses-view? % view-name)
+          (:all-columns @*state)))
+
 (defrecord Identity
   [public-key secret-key])
 
