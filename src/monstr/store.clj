@@ -146,7 +146,7 @@
                 " where r.relay_url='" relay-url "'"
                 " and e.pubkey in (%s) and e.kind = 1"
                 " order by e.created_at desc"
-                " limit 500")
+                " limit 100")
                (str/join ", " (map #(str "'" % "'") pubkeys)))])
 
 (defn load-relay-events

@@ -149,6 +149,7 @@
     (timeline/update-column-timelines! column)))
 
 (defn refresh-column! [column]
-  (timeline/clear-column! column false)
-  (hydrate-column! column))
+  (fx/run-later
+   (timeline/clear-column! column false)
+   (hydrate-column! column)))
 

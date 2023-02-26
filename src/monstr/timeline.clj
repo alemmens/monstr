@@ -50,23 +50,31 @@
       relays
       show-thread?)))
 
-(defn accept-text-note?
-  [*state parsed-ptags {:keys [pubkey] :as _event-obj}]
-  (let [identity-pubkey (:active-key @*state)
-        {:keys [contact-lists]} @*state
-        {:keys [parsed-contacts] :as _contact-list} (get contact-lists identity-pubkey)
-        ;; consider: optimization--not having to create contact set each note
-        contact-keys-set (into #{} (map :public-key) parsed-contacts)
-        ptag-keys-set (set parsed-ptags)]
-    (or
-     ;; identity's own note
-     (= pubkey identity-pubkey)
-     ;; the text-note's pubkey matches an identity's contact
-     (contact-keys-set pubkey)
-     ;; the text-note's ptags reference identity itself
-     (ptag-keys-set identity-pubkey)
-     ;; the text-note's ptags references one of identities contacts
-     (not-empty (set/intersection contact-keys-set ptag-keys-set)))))
+(defn follows-all? [column]
+  (= (:follow (:view column))
+     :all))
+
+(defn- accept-text-note?
+  [*state column parsed-ptags {:keys [pubkey] :as _event-obj}]
+  (or
+   ;; If this view follows all, we accept the text note.
+   (follows-all? column)
+   ;; Otherwise we need to do more work.
+   (let [identity-pubkey (:active-key @*state)
+         {:keys [contact-lists]} @*state
+         {:keys [parsed-contacts] :as _contact-list} (get contact-lists identity-pubkey)
+         ;; consider: optimization--not having to create contact set each note
+         contact-keys-set (into #{} (map :public-key) parsed-contacts)
+         ptag-keys-set (set parsed-ptags)]
+     (or
+      ;; identity's own note
+      (= pubkey identity-pubkey)
+      ;; the text-note's pubkey matches an identity's contact
+      (contact-keys-set pubkey)
+      ;; the text-note's ptags reference identity itself
+      (ptag-keys-set identity-pubkey)
+      ;; the text-note's ptags references one of identities contacts
+      (not-empty (set/intersection contact-keys-set ptag-keys-set))))))
 
 (defn dispatch-metadata-update!
   [*state {:keys [pubkey]}]
@@ -96,6 +104,8 @@
   (not-empty (set/intersection (set (:relay-urls (:view column)))
                                (set (:relays event)))))
 
+
+
 (defn flat-dispatch!
   [*state timeline {:keys [id pubkey created_at content] :as event-obj} column]
   (let [{:keys [^ObservableList observable-list
@@ -109,7 +119,7 @@
                   (:name (:view column)))
     (when-not (.contains item-ids id)
       (let [ptag-ids (parse/parse-tags event-obj "p")]
-        (when (accept-text-note? *state ptag-ids event-obj)
+        (when (accept-text-note? *state column ptag-ids event-obj)
           #_(log/debugf "Adding event %s" id)
           (.add item-ids id)
           (.merge author-pubkey->item-id-set
@@ -226,9 +236,8 @@
    (doseq [column (:all-columns @*state)]
      (update-column-timelines! column))
    ;; Update the state's active public key.
-   (swap! *state
-          (fn [state]
-            (assoc state :active-key public-key)))))
+   (swap! *state assoc
+          :active-key public-key)))
 
 (defn- load-from-store [db event-id]
   (when-let [event (store/load-event db event-id)]
