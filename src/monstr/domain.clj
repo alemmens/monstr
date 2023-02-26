@@ -1,6 +1,12 @@
 (ns monstr.domain
   (:require
-   [clojure.set :as set]))
+   [clojure.set :as set])
+  (:import
+    (java.util.concurrent ThreadFactory Executors ScheduledExecutorService TimeUnit)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; State
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; NOTE: changes to active-key and mutations to home-ux, timelines must be done within a
 ;; mutex, i.e. on the fx thread!
@@ -10,7 +16,7 @@
   {;; Dialog related
    :show-relays? false        ; indicates if the relays dialog must be shown
    :show-new-identity? false
-   :show-add-timeline-dialog? false   
+   :show-add-column-dialog? false   
    :new-identity-error ""
    :active-reply-context nil  ; for the reply dialog
    ;; Identities and contacts
@@ -61,7 +67,21 @@
 (defn find-view [name]
   (get (:views @*state) name))
 
-;; --
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Executor
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defonce ^ScheduledExecutorService daemon-scheduled-executor
+  (let [factory (reify ThreadFactory
+                  (newThread [_ runnable]
+                    (let [thread-name "nostr-desk-scheduled-executor-thread"]
+                      (doto (Thread. runnable thread-name)
+                        (.setDaemon true)))))]
+    (Executors/newSingleThreadScheduledExecutor factory)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Views, columns, etc.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defrecord View
     ;; A view defines what is shown in a column.
@@ -118,6 +138,9 @@
 (defn columns-using-view [view-name]
   (filter #(column-uses-view? % view-name)
           (:all-columns @*state)))
+
+(defn find-column-with-view-name [view-name]
+  (first (columns-using-view view-name)))
 
 (defrecord Identity
   [public-key secret-key])

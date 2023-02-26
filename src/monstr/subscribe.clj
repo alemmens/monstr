@@ -35,7 +35,7 @@
          (log/info "overwrote subscriptions")))))
   ([identities contact-lists]
    (let [last-refresh (:last-refresh @domain/*state)
-         since (or last-refresh (util/days-ago 2))]
+         since (or last-refresh (util/days-ago 1))]
      (overwrite-subscriptions! identities contact-lists since))))
   
 (defn refresh! []

@@ -31,6 +31,7 @@
   ;; NOTE: we're querying and subscribing to all of time but for now, for ux
   ;; experience, we filter underlying data by n days
   ;; todo we'll really wish to query/subscribe at an epoch and only update it on scroll etc.
+  (log/debugf "New timeline for relays %s" (pr-str relays))
   (let [init-timeline-epoch (-> (util/days-ago 1) .getEpochSecond)
         timeline-epoch-vol (volatile! init-timeline-epoch)
         observable-list (FXCollections/observableArrayList)
@@ -88,20 +89,28 @@
   overlap with the event's relays and if the column's filters also allow the event."
   [event timeline column]
   ;; TODO: Check pubkeys etc.
-  (not-empty (set/intersection (set (:relays timeline))
+  #_(log/debugf "Checking relevance for column with view '%s', column relays %s and event relays %s"
+                (:name (:view column))
+                (:relay-urls (:view column))
+                (:relays event))
+  (not-empty (set/intersection (set (:relay-urls (:view column)))
                                (set (:relays event)))))
 
 (defn flat-dispatch!
-  [*state timeline {:keys [id pubkey created_at content] :as event-obj}]
+  [*state timeline {:keys [id pubkey created_at content] :as event-obj} column]
   (let [{:keys [^ObservableList observable-list
                 ^HashMap author-pubkey->item-id-set
                 ^HashMap item-id->index
                 ^HashSet item-ids]}
         timeline]
-    #_(log/debugf "Flat dispatch of event %s with content %s" id content)
+    #_(log/debugf "Flat dispatch of event %s for column %s with view %s"
+                  id
+                  (:id column)
+                  (:name (:view column)))
     (when-not (.contains item-ids id)
       (let [ptag-ids (parse/parse-tags event-obj "p")]
         (when (accept-text-note? *state ptag-ids event-obj)
+          #_(log/debugf "Adding event %s" id)
           (.add item-ids id)
           (.merge author-pubkey->item-id-set
                   pubkey
@@ -152,15 +161,18 @@
            :all-columns (conj (remove #(= (:id %) (:id new-column)) columns)
                               new-column))))
 
-(defn- clear-column-thread!
-  [*state column]
-  (let [listview (:thread-listview column)
-        timeline (:thread-timeline column)]
-    (log/debugf "Clearing listview %s and timeline %s" listview timeline)
-    ;; Clear the column's thread timeline/listview
+(defn clear-column! [column thread?]
+  (let [listview ((if thread? :thread-listview :flat-listview) column)
+        timeline ((if thread? :thread-timeline :flat-timeline) column)]
+    ;; Clear the column's thread timeline/listview    
+    (log/debugf "Clearing listview %s and timeline %s" listview timeline)    
     (doseq [property [:observable-list :adapted-list :author-pubkey->item-id-set :item-id->index :item-ids]]
       (.clear (property timeline)))
     (.setItems listview (:adapted-list timeline))))
+                     
+(defn- clear-column-thread!
+  [*state column]
+  (clear-column! column true))
 
 (defn events-share-etags?
   [event-a event-b]
@@ -189,10 +201,22 @@
      (let [column (domain/find-column-by-id column-id)]
        (thread-dispatch! *state column event-obj check-relevance?))
      (doseq [column (:all-columns @*state)]
+       #_(log/debugf "Dispatching to column %s with view '%s'"
+                     (:id column)
+                     (:name (:view column)))
        (let [flat-timeline (:flat-timeline column)]
          (when (event-is-relevant-for-timeline? event-obj flat-timeline column)
-           (flat-dispatch! *state flat-timeline event-obj)))))))
+           (flat-dispatch! *state flat-timeline event-obj column)))))))
 
+(defn update-column-timelines! [column]
+  (log/debugf "Updating timelines for column %s with view '%s'" (:id column) (:name (:view column)))
+  (.setItems (:flat-listview column)
+             ^ObservableList (or (:adapted-list (:flat-timeline column))
+                                 (FXCollections/emptyObservableList)))
+  (.setItems (:thread-listview column)
+             ^ObservableList (or (:adapted-list (:thread-timeline column))
+                                 (FXCollections/emptyObservableList))))
+  
 (defn update-active-timelines!
   "Update the active timelines for the identity with the given public key."
   [*state public-key] ;; note public-key may be nil!
@@ -200,12 +224,7 @@
    (log/debugf "Updating active timelines for %s" public-key)
    ;; Update the listviews.
    (doseq [column (:all-columns @*state)]
-     (.setItems (:flat-listview column)
-                ^ObservableList (or (:adapted-list (:flat-timeline column))
-                                    (FXCollections/emptyObservableList)))
-     (.setItems (:thread-listview column)
-                ^ObservableList (or (:adapted-list (:thread-timeline column))
-                                    (FXCollections/emptyObservableList))))
+     (update-column-timelines! column))
    ;; Update the state's active public key.
    (swap! *state
           (fn [state]

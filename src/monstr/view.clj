@@ -206,11 +206,11 @@
                  :create #(doto listview
                             (VBox/setVgrow Priority/ALWAYS))}])})
 
-(defn add-timeline-button
+(defn add-column-button
   [text]
   {:fx/type :button
    :padding 5
-   :on-mouse-pressed {:event/type :show-add-timeline-dialog}
+   :on-mouse-pressed {:event/type :show-add-column-dialog}
    :text text})
 
 (defn back-from-thread-button
@@ -264,8 +264,8 @@
    :content content})
 
 (defn main-panes
-  [{:keys [all-columns visible-column-ids
-           relays show-add-timeline-dialog? can-publish? active-reply-context active-contact-pubkey metadata-cache]}]
+  [{:keys [all-columns views visible-column-ids
+           relays show-add-column-dialog? can-publish? active-reply-context active-contact-pubkey metadata-cache]}]
   (log/debugf "Main panes with %d columns=%s and views %s"
               (count visible-column-ids)
               (pr-str visible-column-ids)
@@ -334,13 +334,13 @@
                                                            (not (nil?
                                                                  (hidden-columns all-columns
                                                                                  visible-column-ids))))
-                                                  (add-timeline-button "+"))])}
+                                                  (add-column-button "+"))])}
                             {:fx/type main-pane
                              :listview listview}]}))
             visible-column-ids)
        ;; If there are no relay timelines, just show an "Add timeline" button (centered).
        [{:fx/type :h-box :h-box/hgrow :always}
-        (add-timeline-button "Add timeline")
+        (add-column-button "Add timeline")
         {:fx/type :h-box :h-box/hgrow :always}])}]})
 
 
@@ -361,27 +361,31 @@
 
 
 (defn new-column-dialog
-  [{:keys [all-columns visible-column-ids new-timeline show-add-timeline-dialog?]}]
-  (let [items (hidden-columns all-columns visible-column-ids)]
+  [{:keys [all-columns visible-column-ids new-timeline show-add-column-dialog?]}]
+  (log/debugf "New column dialog with all-columns=%s visible=%s"
+              (pr-str (map (comp :name :view) all-columns)) (pr-str visible-column-ids))
+  (let [column-ids (hidden-columns all-columns visible-column-ids)
+        view-names (map (comp :name :view domain/find-column-by-id)
+                        column-ids)]
     {:fx/type :choice-dialog
-     :selected-item (first items)
+     :selected-item (first view-names)
      :title "New column"
-     :showing show-add-timeline-dialog?
+     :showing show-add-column-dialog?
      :header-text "Add a column"
-     :on-close-request {:event/type :add-timeline-close-request}
-     :items items}))
+     :on-close-request {:event/type :add-column-close-request}
+     :items view-names}))
 
 (defn tab-pane
   [{:keys [all-columns visible-column-ids
            views selected-view temp-view temp-view-changed?
-           relays show-add-timeline-dialog? new-timeline
+           relays show-add-column-dialog? new-timeline
            can-publish? active-reply-context active-contact-list
            active-key active-contact-pubkey identities
            identity-metadata metadata-cache
            ]}]
   (log/debugf "Tab pane with columns=%s and show=%s"
               (pr-str visible-column-ids)
-              show-add-timeline-dialog?)
+              show-add-column-dialog?)
   {:fx/type fx/ext-let-refs
    :refs {:dialog {:fx/type view-reply/dialog
                    :active-reply-context active-reply-context}
@@ -389,15 +393,16 @@
                             :all-columns all-columns
                             :visible-column-ids visible-column-ids
                             :new-timeline new-timeline
-                            :show-add-timeline-dialog? show-add-timeline-dialog?}}
+                            :show-add-column-dialog? show-add-column-dialog?}}
    :desc {:fx/type :tab-pane
           :side :top
           :tabs (for [[label content]
                       {"Home" {:fx/type main-panes
+                               :views views
                                :all-columns all-columns
                                :visible-column-ids visible-column-ids
                                :can-publish? can-publish?
-                               :show-add-timeline-dialog? show-add-timeline-dialog?
+                               :show-add-column-dialog? show-add-column-dialog?
                                :active-reply-context active-reply-context
                                :active-contact-list active-contact-list
                                :active-contact-pubkey active-contact-pubkey
@@ -475,13 +480,13 @@
                     views selected-view temp-view temp-view-changed?
                     show-relays? active-key identities identity-metadata
                     relays refresh-relays-ts connected-info
-                    show-add-timeline-dialog? new-timeline
+                    show-add-column-dialog? new-timeline
                     show-new-identity? new-identity-error active-reply-context contact-lists
                     identity-active-contact metadata-cache
                     last-refresh
                     status-message status-message-timestamp
                     ]}]
-  (log/debugf "Root with columns=%s" (pr-str visible-column-ids))
+  (log/debugf "Root with column ids=%s" (pr-str visible-column-ids))
   {:fx/type :border-pane
    :top {:fx/type :h-box
          :children [{:fx/type identity-selector
@@ -499,7 +504,7 @@
             :temp-view temp-view
             :temp-view-changed? temp-view-changed?
             :relays relays
-            :show-add-timeline-dialog? show-add-timeline-dialog?
+            :show-add-column-dialog? show-add-column-dialog?
             :new-timeline new-timeline
             :can-publish? (util-domain/can-publish? active-key identities)
             :active-key active-key
@@ -525,7 +530,7 @@
 (defn stage [{:keys [all-columns visible-column-ids
                      show-relays? active-key identities identity-metadata
                      relays refresh-relays-ts connected-info
-                     show-add-timeline-dialog? new-timeline
+                     show-add-column-dialog? new-timeline
                      show-new-identity? new-identity-error active-reply-context
                      contact-lists identity-active-contact metadata-cache
                      last-refresh views selected-view temp-view temp-view-changed?
@@ -560,7 +565,7 @@
            :selected-view (or selected-view (:name (first (vals views))))
            :temp-view (or temp-view (first (vals views)))
            :temp-view-changed? temp-view-changed?
-           :show-add-timeline-dialog? show-add-timeline-dialog?
+           :show-add-column-dialog? show-add-column-dialog?
            :new-timeline new-timeline
            :metadata-cache metadata-cache
            :status-message status-message

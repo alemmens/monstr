@@ -1,5 +1,6 @@
 (ns monstr.hydrate
   (:require
+   [cljfx.api :as fx]   
    [monstr.timeline :as timeline]
    [monstr.domain :as domain]
    [monstr.util :as util]
@@ -13,7 +14,7 @@
            (java.util UUID)))
 
 (defn new-column
-  [view executor]
+  [view]
   (log/debugf "New column for %s" (pr-str view))
   (let [id (.toString (UUID/randomUUID))
         column (domain/->Column id
@@ -24,16 +25,17 @@
     (assoc column
            :flat-listview (view-home/create-list-view id domain/*state store/db
                                                       metadata/cache
-                                                      executor)
+                                                      domain/daemon-scheduled-executor)
            :thread-listview (view-home/create-thread-view id domain/*state store/db
                                                           metadata/cache
-                                                          executor))))
+                                                          domain/daemon-scheduled-executor))))
+
 
 (defn- hydrate-contact-lists!
-  [*state db new-identities]
-  (let [contact-lists (store/load-contact-lists db new-identities)]
+  [new-identities]
+  (let [contact-lists (store/load-contact-lists store/db new-identities)]
     (status-bar/message! "Loading contact lists")
-    (swap! *state update :contact-lists merge contact-lists)
+    (swap! domain/*state update :contact-lists merge contact-lists)
     contact-lists))
 
 (defn dispatch-text-notes
@@ -51,7 +53,7 @@
 
 (defn hydrate!*
   ;; The first of new-identities will become the active identity.
-  [*state db ^ScheduledExecutorService executor new-identities]
+  [*state db new-identities]
   ;; TODO: consider transduce iterate over timeline-data and throttling dispatches via
   ;; yielding of bg thread; this way we'd move on to subscriptions, allowing new stuff to
   ;; come in sooner as we backfill.
@@ -67,7 +69,7 @@
     (when-let [first-identity-key (first new-public-keys)]
       (log/debugf "Hydrating with first identity key %s" first-identity-key)
       (timeline/update-active-timelines! *state first-identity-key))    
-    (let [contact-lists (hydrate-contact-lists! *state db new-identities)
+    (let [contact-lists (hydrate-contact-lists! new-identities)
           closure-public-keys (subscribe/whale-of-pubkeys* new-public-keys contact-lists)]
       ;; TODO: also limit timeline events to something, some cardinality?
       ;; TODO: also load watermarks and include in new subscriptions.
@@ -91,7 +93,7 @@
             (fn [{curr-active-key :active-key :as curr-state}]
               (let [{remaining-identities :identities :as curr-state'}
                     (update curr-state :identities
-                      #(remove (comp dead-public-keys-set :public-key) %))
+                            #(remove (comp dead-public-keys-set :public-key) %))
                     curr-active-key-is-still-alive?
                     (some #(= (:public-key %) curr-active-key) remaining-identities)]
                 (cond-> curr-state'
@@ -110,12 +112,43 @@
       ;; watermark strategy.
       (subscribe/overwrite-subscriptions! new-identities new-contact-lists))))
 
-(defn hydrate!
-  [*state db ^ScheduledExecutorService executor new-identities]
+(defn hydrate! [*state db executor new-identities]
   (util/submit! executor
-    #(hydrate!* *state db ^ScheduledExecutorService executor new-identities)))
+                #(hydrate!* *state db new-identities)))
 
-(defn dehydrate!
-  [*state db ^ScheduledExecutorService executor dead-identities]
+(defn dehydrate! [*state db executor dead-identities]
   (util/submit! executor
-    #(dehydrate!* *state db ^ScheduledExecutorService executor dead-identities)))
+                #(dehydrate!* *state db dead-identities)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Hydrating per column
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- hydrate-column! [column]
+  (log/debugf "Hydrating column '%s' with view '%s' and relays %s"
+              (:id column)
+              (:name (:view column))
+              (:relay-urls (:view column)))
+  (let [identities (:identities @domain/*state)
+        new-public-keys (mapv :public-key identities)
+        contact-lists (hydrate-contact-lists! identities)
+        closure-public-keys (subscribe/whale-of-pubkeys* new-public-keys contact-lists)]
+    (doseq [r (:relay-urls (:view column))]
+      (let [events (store/load-relay-events store/db r closure-public-keys)]
+        (status-bar/message! (format "Loaded %d events for %s from database"
+                                     (count events)
+                                     r))
+        ;; TODO: Optimize by only dispatching to the given column.
+        (dispatch-text-notes domain/*state r events)))
+    (subscribe/overwrite-subscriptions! identities contact-lists (util/days-ago 1))))
+
+(defn add-column-for-view! [view]
+  (let [column (new-column view)]
+    (swap! domain/*state assoc
+           :all-columns (conj (:all-columns @domain/*state) column))
+    (timeline/update-column-timelines! column)))
+
+(defn refresh-column! [column]
+  (timeline/clear-column! column false)
+  (hydrate-column! column))
+

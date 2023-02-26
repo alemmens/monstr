@@ -5,10 +5,12 @@
     [clojure.tools.logging :as log]
     [clojure.string :as str]
     [monstr.domain :as domain]
+    [monstr.file-sys :as file-sys]
     [monstr.hydrate :as hydrate]    
     [monstr.modal :as modal]
     [monstr.publish :as publish]
     [monstr.relay-conn :as relay-conn]
+    [monstr.status-bar :as status-bar]
     [monstr.store :as store]
     [monstr.timeline :as timeline]
     [monstr.util :as util]
@@ -228,30 +230,130 @@
   [show?]
   [[:bg
     (fn [*state _db _exec _dispatch!]
-      (swap! *state assoc :show-add-timeline-dialog? show?))]])
+      (swap! *state assoc :show-add-column-dialog? show?))]])
   
 (defn- add-column-close-request
   [{^DialogEvent dialog-event :fx/event}]
   [[:bg
     (fn [*state _db _exec _dispatch!]
       ;; Add a new column if the user has selected a column id.
-      (when-let [new-column-id (.getResult (.getSource dialog-event))]
-        (swap! *state update
-               :visible-column-ids #(conj % new-column-id)))
-      (swap! *state assoc :show-add-timeline-dialog? false))]])
+      (when-let [view-name (.getResult (.getSource dialog-event))]
+        (when-let [new-column-id (:id (domain/find-column-with-view-name view-name))]
+          (swap! *state update
+                 :visible-column-ids #(conj % new-column-id))))
+      (swap! *state assoc :show-add-column-dialog? false))]])
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Managing views
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+#_
+(defn confirmation-alert
+  ;; TODO: FINISH THIS.
+  [_]
+  {:fx/type :dialog
+   :showing true
+   :on-hidden (fn [^DialogEvent e]
+                (condp = (.getButtonData ^ButtonType (.getResult ^Dialog (.getSource e)))
+                  ButtonBar$ButtonData/NO (reset! *state :select-action)
+                  ButtonBar$ButtonData/YES (reset! *state :confirmed)))
+   :dialog-pane {:fx/type :dialog-pane
+                 :header-text "Confirm"
+                 :content-text "This view is used by one or more columns. These columns
+will be removed when the view is deleted. Continue?"
+                 :expandable-content {:fx/type :label
+                                      :text "This action can't be undone."}
+                 :button-types [:no :yes]}})
 
 (defn save-view
   [{:keys [temp-view]}]
   [[:bg
     (fn [*state _db _exec _dispatch!]
-      (log/debugf "Mouse pressed with temp-view %s and selected view %s"
-                  (:name temp-view)
-                  (:selected-view @*state))
-      (swap! *state update-in
-             [:views (:selected-view @*state)]
-             (constantly temp-view))
-      (swap! *state assoc
-             :selected-view (:name temp-view)))]])
+      (let [temp-view (:temp-view @*state)
+            old-name (:selected-view @*state)
+            new-name (:name temp-view)]
+        (log/debugf "Saving view with new name %s and old name %s and relays %s"
+                    new-name
+                    old-name
+                    (:relay-urls temp-view))
+        (swap! *state assoc-in
+               [:views new-name]
+               temp-view)
+        (swap! *state assoc :temp-view-changed? false)
+        ;; Update the column that uses this view.    
+        (let [old-column (domain/find-column-with-view-name old-name)
+              new-column (assoc old-column :view temp-view)
+              column-id (:id old-column)]
+          (swap! *state assoc
+                 :all-columns (conj (remove #(= (:id %) column-id)
+                                            (:all-columns @*state))
+                                    new-column)))
+        ;; Update views if necessary.
+        (when-not (= old-name new-name)
+          (swap! *state assoc
+                 :views (dissoc (:views @*state) old-name)
+                 :selected-view new-name))
+        ;; Save view and refresh the column timelines.
+        (file-sys/save-views (:views @*state))
+        (status-bar/message! (format "Saved view '%s'" new-name))
+        (hydrate/refresh-column! (domain/find-column-with-view-name new-name))))]])
+
+(defn delete-view [event]
+  [[:bg
+    (fn [*state _db _exec _dispatch!]
+      (let [views (:views @*state)
+            selected-view (:selected-view @*state)
+            using-columns (domain/columns-using-view selected-view)]
+        ;; TODO: Check if the view is in use. If so, ask for confirmation first.
+        (when (> (count views) 1)
+          ;; Move listview focus to the first view in the list.
+          (let [new-view-name (first (sort (keys views)))
+                new-view (domain/find-view new-view-name)
+                new-columns (remove #(domain/column-uses-view? % selected-view)
+                                    (:all-columns @*state))]
+            (swap! *state assoc
+                   :selected-view new-view-name
+                   :temp-view new-view
+                   :temp-view-changed? false
+                   :views (dissoc views selected-view)
+                   ;; Remove all columns (both visible and hidden) that use the deleted view.               
+                   :all-columns new-columns
+                   :visible-column-ids (map :id
+                                            (keep domain/find-column-by-id
+                                                  (:visible-column-ids @*state)))))
+          ;; Remember that this view is now gone.
+          (file-sys/save-views (:views @domain/*state))
+          ;; Show status.
+          (status-bar/message! (format "Deleted view '%s'" selected-view)))))]])
+
+(defn- new-view-name
+  ([] (if (domain/find-view "New view")
+        (new-view-name 2)
+        "New view"))
+  ([n] (if (domain/find-view (format "New view %d" n))
+         (new-view-name (inc n))
+         (format "New view %d" n))))
+
+(defn- add-view [event]
+  [[:bg
+    (fn [*state _db _exec _dispatch!]
+      (let [new-name (new-view-name)
+            new-view (domain/make-view new-name
+                                       #{(first (sort (domain/relay-urls @*state)))}
+                                       #{})]
+        (swap! *state assoc-in
+               [:views new-name]
+               new-view)
+        (swap! *state assoc
+               :selected-view (:name new-view)
+               :temp-view new-view
+               :temp-view-changed? true)
+        (status-bar/message! (format "Added view '%s'" new-name))
+        (hydrate/add-column-for-view! new-view)))]])
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Event handler
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn handle
   [{:event/keys [type] :as event}]
@@ -268,7 +370,9 @@
     :click-reply-button (click-reply-button event)
     ;; Add/remove visible columns.
     :remove-visible-column (remove-visible-column! event)
-    :show-add-timeline-dialog (show-add-column-effect true)
-    :add-timeline-close-request (add-column-close-request event)
+    :show-add-column-dialog (show-add-column-effect true)
+    :add-column-close-request (add-column-close-request event)
     :save-view (save-view event)
+    :delete-view (delete-view event)
+    :add-view (add-view event)
     (log/error "no matching clause" type)))

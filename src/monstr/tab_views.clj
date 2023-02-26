@@ -7,6 +7,7 @@
    [clojure.set :as set]
    [monstr.domain :as domain]
    [monstr.file-sys :as file-sys]
+   [monstr.hydrate :as hydrate]
    [monstr.status-bar :as status-bar]
    ))
 
@@ -37,26 +38,6 @@
                :text value
                :style-class ["text-input" "monstr-view-name"]
                :on-text-changed on-text-changed}]})
-
-(defn- save-view!
-  []
-  (let [temp-view (:temp-view @domain/*state)
-        old-name (:selected-view @domain/*state)
-        new-name (:name temp-view)]
-    (log/debugf "Saving view with new name %s and old name %s and relays %s"
-                new-name
-                old-name
-                (:relay-urls temp-view))
-    (swap! domain/*state assoc-in
-           [:views new-name]
-           temp-view)
-    (swap! domain/*state assoc :temp-view-changed? false)
-    (when-not (= old-name new-name)
-      (swap! domain/*state assoc
-             :views (dissoc (:views @domain/*state) old-name)
-             :selected-view new-name))
-    (file-sys/save-views (:views @domain/*state))
-    (status-bar/message! (format "Saved view '%s'" new-name))))
 
 (defn update-temp-view!
   [property value]
@@ -123,79 +104,12 @@
                   :children [{:fx/type :check-box
                               :selected (boolean (when relay-urls (get relay-urls r)))
                               :on-selected-changed (fn [e]
-                                                     (log/debugf "Selected of %s changed to %s"
-                                                                 r e)
                                                      (update-temp-view! :relay-urls
                                                                         (if e
                                                                           (conj relay-urls r)
                                                                           (disj relay-urls r))))}
                              {:fx/type :label
                               :text r}]}))})
-
-(defn new-view-name
-  ([] (if (domain/find-view "New view name")
-        (new-view-name 1)
-        "New view name"))
-  ([n] (if (domain/find-view (format "New view name %d" n))
-         (new-view-name (inc 1))
-         (format "New view name %d" n))))
-                        
-(defn add-view! []
-  (let [new-name (new-view-name)
-        new-view (domain/make-view new-name
-                                   #{(first (sort (domain/relay-urls @domain/*state)))}
-                                   #{})]
-    (swap! domain/*state assoc-in
-           [:views new-name]
-           new-view)
-    (swap! domain/*state assoc
-           :selected-view (:name new-view)
-           :temp-view new-view
-           :temp-view-changed? true)
-    (status-bar/message! (format "Added view '%s'" new-name))))
-
-#_
-(defn confirmation-alert
-  ;; TODO: FINISH THIS.
-  [_]
-  {:fx/type :dialog
-   :showing true
-   :on-hidden (fn [^DialogEvent e]
-                (condp = (.getButtonData ^ButtonType (.getResult ^Dialog (.getSource e)))
-                  ButtonBar$ButtonData/NO (reset! *state :select-action)
-                  ButtonBar$ButtonData/YES (reset! *state :confirmed)))
-   :dialog-pane {:fx/type :dialog-pane
-                 :header-text "Confirm"
-                 :content-text "This view is used by one or more columns. These columns
-will be removed when the view is deleted. Continue?"
-                 :expandable-content {:fx/type :label
-                                      :text "This action can't be undone."}
-                 :button-types [:no :yes]}})
-
-(defn delete-view! [selected-view]
-  (let [views (:views @domain/*state)
-        using-columns (domain/columns-using-view selected-view)]
-    ;; TODO: Check if the view is in use. If so, ask for confirmation first.
-    (when (> (count views) 1)
-      ;; Move listview focus to the first view in the list.
-      (let [new-view-name (first (sort (keys views)))
-            new-view (domain/find-view new-view-name)
-            new-columns (remove #(domain/column-uses-view? % selected-view)
-                                (:all-columns @domain/*state))]
-        (swap! domain/*state assoc
-               :selected-view new-view-name
-               :temp-view new-view
-               :temp-view-changed? false
-               :views (dissoc views selected-view)
-               ;; Remove all columns (both visible and hidden) that use the deleted view.               
-               :all-columns new-columns
-               :visible-column-ids (map :id
-                                        (keep domain/find-column-by-id
-                                              (:visible-column-ids @domain/*state)))))
-      ;; Remember that this view is now gone.
-      (file-sys/save-views (:views @domain/*state))
-      ;; Show status.
-      (status-bar/message! (format "Deleted view '%s'" selected-view)))))
 
 (defn right-hand-side
   [{:keys [views selected-view temp-view temp-view-changed? name]}]
@@ -229,14 +143,14 @@ will be removed when the view is deleted. Continue?"
                                        :disable (not temp-view-changed?)
                                        :text "Save"
                                        :padding 5
-                                       :on-mouse-pressed (fn [e] (save-view!))}
+                                       :on-mouse-pressed {:event/type :save-view}}
                                       ;; Delete button (disable when temp-view is for a
                                       ;; new view that hasn't been saved yet).
                                       {:fx/type :button
                                        :disable (not (domain/find-view selected-view))
                                        :text "Delete"
                                        :padding 5
-                                       :on-mouse-pressed (fn [e] (delete-view! selected-view))}]}]}]})
+                                       :on-mouse-pressed {:event/type :delete-view}}]}]}]})
 
 (defn show-tab
   [{:keys [views selected-view temp-view temp-view-changed?]}]
@@ -272,7 +186,7 @@ will be removed when the view is deleted. Continue?"
                                         {:fx/type :button
                                          :text "Add new view"
                                          :padding 5
-                                         :on-mouse-pressed (fn [_] (add-view!))}
+                                         :on-mouse-pressed {:event/type :add-view}}
                                         {:fx/type :h-box :h-box/hgrow :always}]}]}
                 ;; Form to edit, save and delete the view.
                 {:fx/type right-hand-side
