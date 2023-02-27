@@ -38,12 +38,16 @@
     (catch Exception e
       (log/warn e "while handling metadata event"))))
 
-(defn consume-text-note [_db *state relay-url event-obj column-id]
-  #_(log/debug "text note: " relay-url (:id event-obj))
+(defn consume-text-note [_db *state relay-url event-obj column-id thread?]
+  #_(log/debugf "Text note with id %s from %s for column %s"
+                (:id event-obj)
+                relay-url
+                (:name (:view (domain/find-column-by-id column-id))))
   (timeline/dispatch-text-note! *state
                                 column-id ; can be nil
                                 (assoc event-obj :relays (list relay-url))
-                                false))
+                                false
+                                thread?))
 
 (defn consume-recommend-server [db relay-url event-obj]
   (log/info "recommend server (TODO): " relay-url (:id event-obj))
@@ -55,11 +59,7 @@
     (fn [^ScheduledFuture fut]
       (when fut
         (.cancel fut false))
-      (.schedule executor ^Runnable
-        (fn []
-          (let [{:keys [identities contact-lists]} @*state]
-            (subscribe/overwrite-subscriptions! identities contact-lists)))
-        15 TimeUnit/SECONDS))))
+      (.schedule executor subscribe/refresh! 15 TimeUnit/SECONDS))))
 
 (defn consume-contact-list [_db *state ^ScheduledExecutorService executor resubscribe-future-vol relay-url
                             {:keys [id pubkey created_at] :as event-obj}]
@@ -68,12 +68,12 @@
     (when (some #(= % pubkey) (mapv :public-key identities))
       (let [{:keys [created-at]} (get contact-lists pubkey)]
         (when (or (nil? created-at) (> created_at created-at))
-          (let [new-contact-list
-                (domain/->ContactList pubkey created_at
-                  (parse/parse-contacts* event-obj))]
+          (let [new-contact-list (domain/->ContactList pubkey created_at
+                                                       (parse/parse-contacts* event-obj))]
             (swap! *state
               (fn [curr-state]
                 (assoc-in curr-state [:contact-lists pubkey] new-contact-list)))
+            ;; TODO: I don't think this resubscribe is the right way.
             (resubscribe! *state executor resubscribe-future-vol)))))))
 
 (defn consume-direct-message [db relay-url event-obj]
@@ -83,15 +83,15 @@
 (defn- consume-verified-event
   [db *state metadata-cache executor resubscribe-future-vol relay-url subscription-id {:keys [kind] :as verified-event}]
   (let [force-acceptance? (str/starts-with? subscription-id "load-event:")]
-    ;; If the subscription id starts with "load-event:", the event is caused by async-load-event!,
-    ;; which means it's for a thread view. That means we consider the event to be relevant for
+    ;; If the subscription id starts with "thread:", the event is caused by async-load-event!,
+    ;; and it's for a thread view. That means we consider the event to be relevant for
     ;; any thread-timeline.
     (case kind
       0 (consume-set-metadata-event db *state metadata-cache relay-url verified-event)
       1 (let [parts (str/split subscription-id #":")
-              column-id (when (= (first parts) "monstr:")
-                          (second parts))]
-          (consume-text-note db *state relay-url verified-event column-id))
+              thread? (= (first parts) "thread:")
+              column-id (second parts)]
+          (consume-text-note db *state relay-url verified-event column-id thread?))
       2 (consume-recommend-server db relay-url verified-event)
       3 (consume-contact-list db *state executor resubscribe-future-vol relay-url verified-event)
       4 (consume-direct-message db relay-url verified-event)

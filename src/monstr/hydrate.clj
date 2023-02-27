@@ -49,6 +49,7 @@
     (timeline/dispatch-text-note! *state
                                   false
                                   (assoc event-obj :relays (list relay-url))
+                                  false
                                   false)))
 
 (defn hydrate!*
@@ -80,9 +81,9 @@
                                        r))
           (dispatch-text-notes *state r events))))
     ;; NOTE: use *all* identities to update subscriptions.
-    (let [{:keys [identities contact-lists]} @*state]
-      (subscribe/overwrite-subscriptions! identities contact-lists))))
+    (subscribe/refresh!)))
 
+#_
 (defn dehydrate!*
   [*state _db ^ScheduledExecutorService _executor dead-identities]
   (let [dead-public-keys-set (into #{} (map :public-key) dead-identities)]
@@ -116,6 +117,7 @@
   (util/submit! executor
                 #(hydrate!* *state db new-identities)))
 
+#_
 (defn dehydrate! [*state db executor dead-identities]
   (util/submit! executor
                 #(dehydrate!* *state db dead-identities)))
@@ -140,7 +142,7 @@
                                      r))
         ;; TODO: Optimize by only dispatching to the given column.
         (dispatch-text-notes domain/*state r events)))
-    (subscribe/overwrite-subscriptions! identities contact-lists (util/days-ago 1))))
+    (subscribe/overwrite-subscriptions! identities contact-lists column)))
 
 (defn add-column-for-view! [view]
   (let [column (new-column view)]

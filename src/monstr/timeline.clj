@@ -50,15 +50,12 @@
       relays
       show-thread?)))
 
-(defn follows-all? [column]
-  (= (:follow (:view column))
-     :all))
 
 (defn- accept-text-note?
   [*state column parsed-ptags {:keys [pubkey] :as _event-obj}]
   (or
    ;; If this view follows all, we accept the text note.
-   (follows-all? column)
+   (domain/follows-all? column)
    ;; Otherwise we need to do more work.
    (let [identity-pubkey (:active-key @*state)
          {:keys [contact-lists]} @*state
@@ -114,9 +111,9 @@
                 ^HashSet item-ids]}
         timeline]
     #_(log/debugf "Flat dispatch of event %s for column %s with view %s"
-                  id
-                  (:id column)
-                  (:name (:view column)))
+                id
+                (:id column)
+                (:name (:view column)))
     (when-not (.contains item-ids id)
       (let [ptag-ids (parse/parse-tags event-obj "p")]
         (when (accept-text-note? *state column ptag-ids event-obj)
@@ -204,16 +201,19 @@
   "Dispatch a text note to all timelines for which the given event is relevant.
   If COLUMN-ID is a string, the note is supposed to be for a thread view and
   it's only dispatched to the specified column."
-  [*state column-id event-obj check-relevance?]
-  ;; CONSIDER if is this too much usage of on-fx-thread - do we need to batch/debounce?
+  [*state column-id event-obj check-relevance? thread?]
+  ;; CONSIDER if this is too much usage of on-fx-thread - do we need to batch/debounce?
   (fx/run-later
-   (if (string? column-id)
+   (if (and thread? (string? column-id))
      (let [column (domain/find-column-by-id column-id)]
        (thread-dispatch! *state column event-obj check-relevance?))
      (doseq [column (:all-columns @*state)]
-       #_(log/debugf "Dispatching to column %s with view '%s'"
-                     (:id column)
-                     (:name (:view column)))
+       #_(log/debugf "Dispatching event %s from %s to column %s with view '%s' and relays %s"
+                   (:id event-obj)
+                   (:relays event-obj)
+                   (:id column)
+                   (:name (:view column))
+                   (:relay-urls (:view column)))
        (let [flat-timeline (:flat-timeline column)]
          (when (event-is-relevant-for-timeline? event-obj flat-timeline column)
            (flat-dispatch! *state flat-timeline event-obj column)))))))
@@ -251,17 +251,16 @@
     ;; Create a unique subscription id to load the event and subscribe to all relays in
     ;; the hope that we find the event.  We'll unsubscribe automatically when we get an
     ;; EOSE event.
-    (let [subscription-id (format "monstr:%s:%s" column-id (rand-int 1000000000))]
+    (let [subscription-id (format "thread:%s:%s" column-id (rand-int 1000000000))]
       (relay-conn/subscribe-all! subscription-id
-                                 [(domain/->subscription-filter
-                                   [event-id] [1] nil nil nil nil nil)]))))
+                                 [{:ids [event-id] :kinds [1]}]))))
 
 (defn refresh-thread-events!
   [*state column-id]
   (let [timestamp (:thread-refresh-timestamp @*state)
         events (store/load-events-since store/db timestamp)]
     (doseq [e events]
-      (dispatch-text-note! *state column-id e true))
+      (dispatch-text-note! *state column-id e true true))
     ;; TODO: Also load recent events from relays.
     ))
 

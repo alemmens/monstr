@@ -60,7 +60,7 @@
    {:all "all (global)",
     :use-identity "contacts of active identity"})
 
-(defn- radio-group [{:keys [options value on-action]}]
+(defn- radio-group [{:keys [options value]}]
   {:fx/type fx/ext-let-refs
    :refs {::toggle-group {:fx/type :toggle-group}}
    :desc {:fx/type :v-box
@@ -82,16 +82,6 @@
    :children [{:fx/type radio-group
                :options (vals follow-options)
                :value (get follow-options (:follow temp-view))}]})
-
-(defn- relay-checkbox [relay-url selected]
-  {:fx/type :h-box
-   :padding 5
-   :spacing 5
-   :children [{:fx/type :check-box
-               :selected selected
-               :on-selected-changed (fn [_] :later)}
-              {:fx/type :label
-               :text relay-url}]})
 
 (defn- relay-group
   [{:keys [temp-view]}]

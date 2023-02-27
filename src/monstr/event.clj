@@ -40,6 +40,7 @@
           (cond-> (assoc curr-state :show-new-identity? show-new-identity?)
             (not show-new-identity?) (assoc :new-identity-error "")))))]])
 
+#_
 (defn delete-keycard
   [{:keys [identity_]}]
   (when (modal/blocking-yes-no-alert "" "Are you sure?")
@@ -361,7 +362,7 @@ will be removed when the view is deleted. Continue?"
     :click-keycard (click-keycard event)
     :show-new-identity (show-new-identity-effect true)
     :new-identity-close-request (new-identity-close-request event)
-    :delete-keycard (delete-keycard event)
+    ; :delete-keycard (delete-keycard event)
     :show-relays (show-relays-effect true)
     :relays-close-request (relays-close-request event)
     :publish! (publish! event)

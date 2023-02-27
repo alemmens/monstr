@@ -80,7 +80,7 @@
     (Executors/newSingleThreadScheduledExecutor factory)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Views, columns, etc.
+;;; Views and columns
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defrecord View
@@ -90,8 +90,8 @@
      follow       ; either :use-identity \(i.e. follow the contacts of the active
                   ; identity) or :all \(i.e. global) or a set of (pubkeys of) authors the
                   ; user wants to follow for this view
-     friends-of-friends? ; Integer that indicates to which degree follows of follows must
-                         ; also be followed. Default is 1, meaning only follows themselves.
+     friends-of-friends ; Integer that indicates to which degree follows of follows must
+                        ; also be followed. Default is 1, meaning only follows themselves.
      mute-authors ; a set of (pubkeys of) authors to be muted
      words        ; a set of words, at least one of which must occur in the text note
      mute-words   ; a set of words to be muted
@@ -100,11 +100,11 @@
 
 (defn make-view
   [name relay-urls
-   {:keys [follow friends-of-friends? mute-authors words mute-words channels]}]
+   {:keys [follow friends-of-friends mute-authors words mute-words channels]}]
   (->View name
           relay-urls
           (or follow :use-identity)
-          (or friends-of-friends? 1)
+          (or friends-of-friends 1)
           (or mute-authors #{})
           (or words #{})
           (or mute-words #{})
@@ -141,6 +141,14 @@
 
 (defn find-column-with-view-name [view-name]
   (first (columns-using-view view-name)))
+
+(defn follows-all? [column]
+  (= (:follow (:view column))
+     :all))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Rest
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defrecord Identity
   [public-key secret-key])
