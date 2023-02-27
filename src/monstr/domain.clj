@@ -53,10 +53,12 @@
   (:all-columns state))
 
 (defn flat-timelines [state]
-  (map :flat-timeline (columns state)))
+  (map :flat-timeline
+       (vals (:identity->timeline-pair (columns state)))))
 
 (defn thread-timelines [state]
-  (map :thread-timeline (columns state)))
+  (map :thread-timeline
+       (vals (:identity->timeline-pair (columns state)))))
 
 (defn all-timelines [state]
   (concat (flat-timelines state) (thread-timelines state)))
@@ -110,13 +112,16 @@
           (or mute-words #{})
           (or channels #{})))
 
+(defrecord TimelinePair
+    [flat-timeline
+     thread-timeline
+     flat-listview
+     thread-listview])
+  
 (defrecord Column
     [id           ; a random UUID
      view
-     flat-timeline
-     thread-timeline
-     flat-listview
-     thread-listview
+     identity->timeline-pair ; a map from identity pubkeys to TimelinePair records
      show-thread?
      thread-focus  ; The note (event-obj) that is the focus of the thread. Only relevant when showing a thread.
      ])

@@ -14,7 +14,7 @@
            (javafx.collections.transformation FilteredList)
            (javafx.scene.control ListView)))
 
-(defrecord TimelineNew
+(defrecord Timeline
   ;; these field values are only ever mutated on fx thread
   [^ObservableList adapted-list
    ^ObservableList observable-list ;; contains UITextNoteWrapper
@@ -22,16 +22,12 @@
    ^HashMap item-id->index
    ^HashSet item-ids
    timeline-epoch-vol
-   relays        ; Set of relay urls for this timeline.
-   show-thread?  ; If true, show the current thread instead of a flat timeline.
    ])
 
-(defn new-timeline
-  [relays show-thread?]
+(defn new-timeline []
   ;; NOTE: we're querying and subscribing to all of time but for now, for ux
   ;; experience, we filter underlying data by n days
   ;; todo we'll really wish to query/subscribe at an epoch and only update it on scroll etc.
-  (log/debugf "New timeline for relays %s" (pr-str relays))
   (let [init-timeline-epoch (-> (util/days-ago 1) .getEpochSecond)
         timeline-epoch-vol (volatile! init-timeline-epoch)
         observable-list (FXCollections/observableArrayList)
@@ -40,25 +36,22 @@
         adapted-list (.sorted filtered-list
                               ;; latest wrapper entries first:
                               (comparator #(< (:max-timestamp %2) (:max-timestamp %1))))]
-    (->TimelineNew
+    (->Timeline
       adapted-list
       observable-list
       (HashMap.)
       (HashMap.)
       (HashSet.)
-      timeline-epoch-vol
-      relays
-      show-thread?)))
+      timeline-epoch-vol)))
 
 
 (defn- accept-text-note?
-  [*state column parsed-ptags {:keys [pubkey] :as _event-obj}]
+  [*state column identity-pubkey parsed-ptags {:keys [pubkey] :as _event-obj}]
   (or
    ;; If this view follows all, we accept the text note.
    (domain/follows-all? column)
    ;; Otherwise we need to do more work.
-   (let [identity-pubkey (:active-key @*state)
-         {:keys [contact-lists]} @*state
+   (let [{:keys [contact-lists]} @*state
          {:keys [parsed-contacts] :as _contact-list} (get contact-lists identity-pubkey)
          ;; consider: optimization--not having to create contact set each note
          contact-keys-set (into #{} (map :public-key) parsed-contacts)
@@ -89,9 +82,9 @@
              (.set observable-list item-idx
                    (assoc curr-wrapper :touch-ts (System/currentTimeMillis))))))))))
 
-(defn- event-is-relevant-for-timeline?
-  "An event is relevant for a timeline in a column if the timeline's relays have some
-  overlap with the event's relays and if the column's filters also allow the event."
+(defn- event-is-relevant-for-column?
+  "An event is relevant for a column if the column's relays have some overlap with the
+  event's relays and if the column's filters also allow the event."
   [event timeline column]
   ;; TODO: Check pubkeys etc.
   #_(log/debugf "Checking relevance for column with view '%s', column relays %s and event relays %s"
@@ -103,8 +96,8 @@
 
 
 
-(defn flat-dispatch!
-  [*state timeline {:keys [id pubkey created_at content] :as event-obj} column]
+(defn- flat-dispatch!
+  [*state timeline identity-pubkey {:keys [id pubkey created_at content] :as event-obj} column]
   (let [{:keys [^ObservableList observable-list
                 ^HashMap author-pubkey->item-id-set
                 ^HashMap item-id->index
@@ -116,7 +109,7 @@
                 (:name (:view column)))
     (when-not (.contains item-ids id)
       (let [ptag-ids (parse/parse-tags event-obj "p")]
-        (when (accept-text-note? *state column ptag-ids event-obj)
+        (when (accept-text-note? *state column identity-pubkey ptag-ids event-obj)
           #_(log/debugf "Adding event %s" id)
           (.add item-ids id)
           (.merge author-pubkey->item-id-set
@@ -168,14 +161,19 @@
            :all-columns (conj (remove #(= (:id %) (:id new-column)) columns)
                               new-column))))
 
-(defn clear-column! [column thread?]
-  (let [listview ((if thread? :thread-listview :flat-listview) column)
-        timeline ((if thread? :thread-timeline :flat-timeline) column)]
-    ;; Clear the column's thread timeline/listview    
+(defn- clear-timeline-pair! [pair thread?]
+  (let [listview ((if thread? :thread-listview :flat-listview) pair)
+        timeline ((if thread? :thread-timeline :flat-timeline) pair)]
+    ;; Clear the pair's timeline and listview    
     (log/debugf "Clearing listview %s and timeline %s" listview timeline)    
     (doseq [property [:observable-list :adapted-list :author-pubkey->item-id-set :item-id->index :item-ids]]
       (.clear (property timeline)))
     (.setItems listview (:adapted-list timeline))))
+                     
+  
+(defn clear-column! [column thread?]
+  (doseq [pair (vals (:identity->timeline-pair column))]
+    (clear-timeline-pair! pair thread?)))
                      
 (defn- clear-column-thread!
   [*state column]
@@ -189,13 +187,14 @@
 (defn- thread-dispatch!
   [*state column event-obj check-relevance?]
   ;; CONSIDER if is this too much usage of on-fx-thread - do we need to batch/debounce
-  (let [timeline (:thread-timeline column)]
-    (when-not (.contains (:item-ids timeline) (:id event-obj))
-      (when (or (not check-relevance?)
-                ;; TODO: Try to find a more precise way to check if an event should be
-                ;; added to a thread.
-                (events-share-etags? event-obj (:thread-focus column)))
-        (add-item-to-thread-timeline! timeline (parse/parse-tags event-obj "p") event-obj)))))
+  (doseq [[pubkey pair] (:identity->timeline-pair column)]
+    (let [timeline (:thread-timeline pair)]
+      (when-not (.contains (:item-ids timeline) (:id event-obj))
+        (when (or (not check-relevance?)
+                  ;; TODO: Try to find a more precise way to check if an event should be
+                  ;; added to a thread.
+                  (events-share-etags? event-obj (:thread-focus column)))
+          (add-item-to-thread-timeline! timeline (parse/parse-tags event-obj "p") event-obj))))))
 
 (defn dispatch-text-note!
   "Dispatch a text note to all timelines for which the given event is relevant.
@@ -214,18 +213,23 @@
                    (:id column)
                    (:name (:view column))
                    (:relay-urls (:view column)))
-       (let [flat-timeline (:flat-timeline column)]
-         (when (event-is-relevant-for-timeline? event-obj flat-timeline column)
-           (flat-dispatch! *state flat-timeline event-obj column)))))))
+       (doseq [[identity-pubkey pair] (:identity->timeline-pair column)]
+         (let [timeline (:flat-timeline pair)]
+           (when (event-is-relevant-for-column? event-obj timeline column)
+             (flat-dispatch! *state timeline identity-pubkey event-obj column))))))))
 
+(defn- update-timeline-pair! [pair]
+  (.setItems (:flat-listview pair)
+             ^ObservableList (or (:adapted-list (:flat-timeline pair))
+                                 (FXCollections/emptyObservableList)))
+  (.setItems (:thread-listview pair)
+             ^ObservableList (or (:adapted-list (:thread-timeline pair))
+                                 (FXCollections/emptyObservableList))))
+  
 (defn update-column-timelines! [column]
   (log/debugf "Updating timelines for column %s with view '%s'" (:id column) (:name (:view column)))
-  (.setItems (:flat-listview column)
-             ^ObservableList (or (:adapted-list (:flat-timeline column))
-                                 (FXCollections/emptyObservableList)))
-  (.setItems (:thread-listview column)
-             ^ObservableList (or (:adapted-list (:thread-timeline column))
-                                 (FXCollections/emptyObservableList))))
+  (doseq [[pubkey pair] (:identity->timeline-pair column)]
+    (update-timeline-pair! pair)))
   
 (defn update-active-timelines!
   "Update the active timelines for the identity with the given public key."
@@ -247,7 +251,7 @@
   "Load the event with the given id from either the database or from the relays."
   [*state db column-id event-id]
   (if-let [event-from-store (load-from-store db event-id)]
-    (dispatch-text-note! *state column-id event-from-store false)
+    (dispatch-text-note! *state column-id event-from-store false true)
     ;; Create a unique subscription id to load the event and subscribe to all relays in
     ;; the hope that we find the event.  We'll unsubscribe automatically when we get an
     ;; EOSE event.
@@ -277,8 +281,9 @@
                                    :thread-focus event-obj))
      ;; Add the given event-obj.
      (let [ptag-ids (parse/parse-tags event-obj "p")]
-       (add-item-to-thread-timeline! (:thread-timeline (domain/find-column-by-id column-id))
-                                     ptag-ids event-obj))
+       (doseq [pair (vals (:identity->timeline-pair (domain/find-column-by-id column-id)))]
+         (add-item-to-thread-timeline! (:thread-timeline pair)
+                                       ptag-ids event-obj)))
      ;; Refresh events to find any children.
      (when-not (:thread-refresh-timestamp @*state)
        (swap! *state assoc

@@ -32,9 +32,7 @@
                       {:kinds [1 4] :#p pubkeys :since use-since}
                       {:kinds [4] :since use-since :authors pubkeys}]]
          (swap! domain/*state assoc :last-refresh (Instant/now))
-         (log/debugf "Subscribing all for '%s' with filters %s"
-                     (:name (:view column))
-                     filters)
+         (log/debugf "Subscribing all for '%s'" (:name (:view column)))
          (relay-conn/subscribe-all! (format "flat:%s" (:id column))
                                     filters)
          (log/info "overwrote subscriptions")))))

@@ -265,8 +265,11 @@
 
 (defn main-panes
   [{:keys [all-columns views visible-column-ids
-           relays show-add-column-dialog? can-publish? active-reply-context active-contact-pubkey metadata-cache]}]
-  (log/debugf "Main panes with %d columns=%s and views %s"
+           relays show-add-column-dialog? can-publish?
+           active-key active-reply-context active-contact-pubkey
+           metadata-cache]}]
+  (log/debugf "Main panes with active key='%s', %d columns=%s and views %s"
+              active-key
               (count visible-column-ids)
               (pr-str visible-column-ids)
               (pr-str (map (comp :view domain/find-column-by-id) visible-column-ids)))
@@ -295,20 +298,19 @@
      :children
      (if (seq visible-column-ids)
        (map (fn [column-id]
-              ;; TODO: For now we assume that the relay-url set contains only one
-              ;; element. We probably want to move towards arbitrary-sized relay-url sets
-              ;; instead.
               (let [column (domain/find-column-by-id column-id)
                     name (:name (:view column))
                     show-thread? (:show-thread? column)
+                    pair (get (:identity->timeline-pair column) active-key)
                     listview (if show-thread?
-                               (:thread-listview column)
-                               (:flat-listview column))]
-                (if (nil? column)
-                  (log/debugf "No column found for %s" column-id)
-                  (log/debugf "Creating pane for column %s with view %s (show-thread=%s listview=%s)"
+                               (:thread-listview pair)
+                               (:flat-listview pair))]
+                (if (nil? pair)
+                  (log/debugf "No pair found for active key %s and column %s" active-key column-id)
+                  (log/debugf "Creating pane for column %s with view %s (show-thread=%s pair=%s listview=%s)"
                               column-id (pr-str (:view column))
-                              show-thread? listview))
+                              show-thread?
+                              pair listview))
                 {:fx/type :v-box
                  :h-box/margin 5
                  :h-box/hgrow :always
@@ -403,6 +405,7 @@
                                :visible-column-ids visible-column-ids
                                :can-publish? can-publish?
                                :show-add-column-dialog? show-add-column-dialog?
+                               :active-key active-key
                                :active-reply-context active-reply-context
                                :active-contact-list active-contact-list
                                :active-contact-pubkey active-contact-pubkey

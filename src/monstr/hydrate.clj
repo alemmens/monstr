@@ -13,23 +13,33 @@
   (:import (java.util.concurrent ScheduledExecutorService)
            (java.util UUID)))
 
+
+(defn- new-timelines-map
+  [column-id pubkeys]
+  (log/debugf "New timelines map with pubkeys=%s" (pr-str pubkeys))
+  (into {}
+        (map (fn [pubkey]
+               (let [flat-timeline (timeline/new-timeline)
+                     thread-timeline (timeline/new-timeline)
+                     flat-listview (view-home/create-list-view column-id
+                                                               domain/*state store/db
+                                                               metadata/cache
+                                                               domain/daemon-scheduled-executor)                     
+                     thread-listview (view-home/create-thread-view column-id
+                                                                   domain/*state store/db
+                                                                   metadata/cache
+                                                                   domain/daemon-scheduled-executor)]
+                 [pubkey (domain/->TimelinePair flat-timeline thread-timeline
+                                                flat-listview thread-listview)]))
+             pubkeys)))
+
 (defn new-column
-  [view]
+  [view identities]
   (log/debugf "New column for %s" (pr-str view))
   (let [id (.toString (UUID/randomUUID))
-        column (domain/->Column id
-                                view
-                                (timeline/new-timeline (:relay-urls view) false)
-                                (timeline/new-timeline (:relay-urls view) true)
-                                nil nil false nil)]
+        column (domain/->Column id view nil false nil)]
     (assoc column
-           :flat-listview (view-home/create-list-view id domain/*state store/db
-                                                      metadata/cache
-                                                      domain/daemon-scheduled-executor)
-           :thread-listview (view-home/create-thread-view id domain/*state store/db
-                                                          metadata/cache
-                                                          domain/daemon-scheduled-executor))))
-
+           :identity->timeline-pair (new-timelines-map id (map :public-key identities)))))
 
 (defn- hydrate-contact-lists!
   [new-identities]

@@ -29,10 +29,13 @@
                   (into {}
                         (map (fn [url] [url (domain/make-view url #{url} {})])
                              (take 3 urls))))
-        all-columns (map hydrate/new-column (vals views))]
+        identities (store/load-identities store/db)
+        all-columns (map #(hydrate/new-column % identities)
+                         (vals views))]
     (swap! domain/*state assoc
            :views views
            :all-columns all-columns
+           :identities identities
            :visible-column-ids (map :id (take 3 all-columns)))))
 
 (defn- load-relays!
