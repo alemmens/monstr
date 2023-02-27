@@ -14,23 +14,24 @@
            (java.util UUID)))
 
 
+(defn new-timeline-pair [column-id]
+  (let [flat-timeline (timeline/new-timeline)
+        thread-timeline (timeline/new-timeline)
+        flat-listview (view-home/create-list-view column-id
+                                                  domain/*state store/db
+                                                  metadata/cache
+                                                  domain/daemon-scheduled-executor)                     
+        thread-listview (view-home/create-thread-view column-id
+                                                      domain/*state store/db
+                                                      metadata/cache
+                                                      domain/daemon-scheduled-executor)]
+    (domain/->TimelinePair flat-timeline thread-timeline
+                           flat-listview thread-listview)))
 (defn- new-timelines-map
   [column-id pubkeys]
   (log/debugf "New timelines map with pubkeys=%s" (pr-str pubkeys))
   (into {}
-        (map (fn [pubkey]
-               (let [flat-timeline (timeline/new-timeline)
-                     thread-timeline (timeline/new-timeline)
-                     flat-listview (view-home/create-list-view column-id
-                                                               domain/*state store/db
-                                                               metadata/cache
-                                                               domain/daemon-scheduled-executor)                     
-                     thread-listview (view-home/create-thread-view column-id
-                                                                   domain/*state store/db
-                                                                   metadata/cache
-                                                                   domain/daemon-scheduled-executor)]
-                 [pubkey (domain/->TimelinePair flat-timeline thread-timeline
-                                                flat-listview thread-listview)]))
+        (map (fn [pubkey] [pubkey (new-timeline-pair column-id)])
              pubkeys)))
 
 (defn new-column

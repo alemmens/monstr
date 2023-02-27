@@ -66,6 +66,10 @@
                                     (assoc identity- :secret-key maybe-private-key)
                                     identity-)) identities))))))
 
+(defn add-timeline-pair-to-column [pubkey column]
+  (update-in column [:identity->timeline-pair]
+             #(conj %[pubkey (hydrate/new-timeline-pair (:id column))])))
+
 (defn add-identity-and-close-dialog-effect
   [public-key maybe-private-key]
   (util/concatv
@@ -75,10 +79,15 @@
         (store/insert-identity! db public-key maybe-private-key) ;; idempotent
         (maybe-contribute-secret-key* *state public-key maybe-private-key)
         (let [{curr-identities :identities} @*state]
-          ;; don't hydrate identity if it's already hydrated
+          ;; Don't hydrate identity if it's already hydrated.
           (when-not (some #(= public-key (:public-key %)) curr-identities)
+            ;; Add a new timeline pair to all columns for the new public key.
+            (swap! *state assoc
+                   :all-columns (map #(add-timeline-pair-to-column public-key %)
+                                     (:all-columns @*state)))
+            ;; Hydrate the new identity.
             (hydrate/hydrate! *state db executor
-              [(domain/->Identity public-key maybe-private-key)]))))]]))
+                              [(domain/->Identity public-key maybe-private-key)]))))]]))
 
 (defn new-identity-close-request
   [{^DialogEvent dialog-event :fx/event}]
