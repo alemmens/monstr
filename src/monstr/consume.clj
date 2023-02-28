@@ -50,7 +50,7 @@
                                 thread?))
 
 (defn consume-recommend-server [db relay-url event-obj]
-  (log/info "recommend server (TODO): " relay-url (:id event-obj))
+  #_(log/info "recommend server (TODO): " relay-url (:id event-obj))
   )
 
 (defn resubscribe!

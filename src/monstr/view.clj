@@ -28,9 +28,21 @@
            (javafx.beans.property ReadOnlyProperty)))
 
 (defn avatar [{:keys [width picture-url]}]
-  (when-not (str/blank? picture-url)
+  (if-let [image (when-not (str/blank? picture-url)
+                   (try (cache/get* avatar/image-cache [picture-url width])
+                        (catch Exception e
+                          (log/debugf "Can't find %s in image cache: %s"
+                                      picture-url
+                                      (.getMessage e)))))]
     {:fx/type :image-view
-     :image (cache/get* avatar/image-cache [picture-url width])}))
+     :image image}
+    {:fx/type :label
+     :min-width width
+     :min-height width
+     :max-width width
+     :max-height width
+     :text ""}))
+
 
 (defn keycard
   [{:keys [active? profile?]

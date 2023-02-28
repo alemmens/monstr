@@ -52,6 +52,9 @@
 (defn columns [state]
   (:all-columns state))
 
+(defn all-column-ids []
+  (map :id (:all-columns @*state)))
+
 (defn flat-timelines [state]
   (map :flat-timeline
        (vals (:identity->timeline-pair (columns state)))))
