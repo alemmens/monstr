@@ -156,13 +156,19 @@
     (subscribe/overwrite-subscriptions! identities contact-lists column)))
 
 (defn add-column-for-view! [view]
-  (let [column (new-column view)]
+  (let [column (new-column view (:identities @domain/*state))]
     (swap! domain/*state assoc
            :all-columns (conj (:all-columns @domain/*state) column))
+    (log/debugf "Added column %s for view %s"
+                (:id column)
+                (:name view))
     (timeline/update-column-timelines! column)))
 
 (defn refresh-column! [column]
   (fx/run-later
+   (log/debugf "Refreshing column %s with view %s"
+               (:id column)
+               (:name (:view column)))
    (timeline/clear-column! column false)
    (hydrate-column! column)))
 

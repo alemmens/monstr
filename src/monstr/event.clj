@@ -228,6 +228,10 @@
       (swap! *state assoc :active-reply-context
              (domain/->UIReplyContext (:id event-obj) (:id event-obj))))]])
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Adding/removing columns
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defn remove-visible-column!
   [{:keys [column-id]}]
   [[:bg
@@ -249,6 +253,8 @@
       ;; Add a new column if the user has selected a column id.
       (when-let [view-name (.getResult (.getSource dialog-event))]
         (when-let [new-column-id (:id (domain/find-column-with-view-name view-name))]
+          (log/debugf "Adding visible column with id %s for view %s."
+                      new-column-id view-name)
           (swap! *state update
                  :visible-column-ids #(conj % new-column-id))))
       (swap! *state assoc :show-add-column-dialog? false))]])
@@ -306,7 +312,9 @@ will be removed when the view is deleted. Continue?"
         ;; Save view and refresh the column timelines.
         (file-sys/save-views (:views @*state))
         (status-bar/message! (format "Saved view '%s'" new-name))
-        (hydrate/refresh-column! (domain/find-column-with-view-name new-name))))]])
+        (let [column (domain/find-column-with-view-name new-name)]
+          (assert column)
+          (hydrate/refresh-column! column))))]])
 
 (defn delete-view [event]
   [[:bg

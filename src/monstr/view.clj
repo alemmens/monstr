@@ -86,9 +86,10 @@
          :text (or about "")}]}]}))
 
 (defn keycard-create-new
-  [{:keys [show-new-identity? new-identity-error]}]
+  [{:keys [show-new-identity? new-identity-error views]}]
   {:fx/type fx/ext-let-refs
    :refs {:dialog {:fx/type view-new-identity/dialog
+                   :views views
                    :show-new-identity? show-new-identity?
                    :new-identity-error new-identity-error}}
    :desc {:fx/type :h-box
@@ -363,7 +364,7 @@
 
 
 (defn new-column-dialog
-  [{:keys [all-columns visible-column-ids new-timeline show-add-column-dialog?]}]
+  [{:keys [all-columns views visible-column-ids new-timeline show-add-column-dialog?]}]
   (log/debugf "New column dialog with all-columns=%s visible=%s"
               (pr-str (map (comp :name :view) all-columns)) (pr-str visible-column-ids))
   (let [column-ids (hidden-columns all-columns visible-column-ids)
@@ -433,7 +434,7 @@
                    :content content})}})
 
 (defn keycards
-  [{:keys [active-key identities identity-metadata show-new-identity? new-identity-error]}]
+  [{:keys [active-key views identities identity-metadata show-new-identity? new-identity-error]}]
   {:fx/type :v-box
    :style-class "ndesk-lhs-pane"
    :children (vec
@@ -447,11 +448,12 @@
                       :this-identity-metadata (get identity-metadata (:public-key %)))
                    identities)
                  [{:fx/type keycard-create-new
+                   :views views
                    :show-new-identity? show-new-identity?
                    :new-identity-error new-identity-error}]))})
 
 (defn identity-selector
-  [{:keys [identities active-key identity-metadata show-new-identity?]}]
+  [{:keys [identities views active-key identity-metadata show-new-identity?]}]
   {:fx/type :h-box
    ; :alignment :center
    :padding 10

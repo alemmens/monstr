@@ -146,6 +146,7 @@
         (log/debugf "Closing subscription with id %s (%d left)"
                     id
                     (count (:subscriptions @conn-vol)))
+        (status-bar/message! "")
         (s/put! @deferred-conn
           (json*/write-str* ["CLOSE" id]))))))
 
