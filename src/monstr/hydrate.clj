@@ -73,11 +73,10 @@
   (let [new-public-keys (mapv :public-key new-identities)
         identity-metadata (store/load-metadata db new-public-keys)
         relay-urls (domain/relay-urls @*state)]
-    (swap! *state
-      (fn [curr-state]
-        (-> curr-state
-            (update :identities into new-identities)
-            (update :identity-metadata merge identity-metadata))))
+    (swap! *state assoc
+           :identities (distinct (concat (:identities @*state) new-identities)))
+    (swap! *state update
+           :identity-metadata merge identity-metadata)
     (when-let [first-identity-key (first new-public-keys)]
       (log/debugf "Hydrating with first identity key %s" first-identity-key)
       (timeline/update-active-timelines! *state first-identity-key))    
