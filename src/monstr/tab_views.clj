@@ -144,8 +144,8 @@
 
 (defn show-tab
   [{:keys [views selected-view temp-view temp-view-changed?]}]
-  (log/debugf "Views tab with views=%s, selected=%s, temp=%s, changed=%s"
-              views selected-view temp-view temp-view-changed?)
+  (log/debugf "Views tab with selected=%s, temp=%s, changed=%s"
+              selected-view temp-view temp-view-changed?)
   {:fx/type :h-box
    :padding 10
    :children (let [items (sort (keys views))
@@ -160,7 +160,7 @@
                                                                  (let [view (domain/find-view new-value)]
                                                                    (assert view
                                                                            (format "Can't find view for %s" new-value))
-                                                                   (log/debugf "View for %s = %s" new-value view)
+                                                                   #_(log/debugf "View for %s = %s" new-value view)
                                                                    (swap! domain/*state assoc
                                                                           :selected-view new-value
                                                                           :temp-view view

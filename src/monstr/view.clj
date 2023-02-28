@@ -251,9 +251,9 @@
               {:fx/type :h-box :v-box/vgrow :always}]})
               
 
-(defn hidden-columns [all-columns visible-column-ids]
+(defn hidden-columns [all-column-ids visible-column-ids]
   "Returns a list of the ids of those columns that are not visible."
-  (sort (seq (set/difference (set (map :id all-columns))
+  (sort (seq (set/difference (set all-column-ids)
                              visible-column-ids))))
 
 (defn find-column [relay-urls columns]
@@ -277,7 +277,7 @@
    :content content})
 
 (defn main-panes
-  [{:keys [all-columns views visible-column-ids
+  [{:keys [views visible-column-ids all-columns
            relays show-add-column-dialog? can-publish?
            active-key active-reply-context active-contact-pubkey
            metadata-cache]}]
@@ -347,7 +347,7 @@
                                                 {:fx/type :h-box :h-box/hgrow :always}
                                                 (when (and (= column-id (last visible-column-ids))
                                                            (not (nil?
-                                                                 (hidden-columns all-columns
+                                                                 (hidden-columns (domain/all-column-ids)
                                                                                  visible-column-ids))))
                                                   (add-column-button "+"))])}
                             {:fx/type main-pane
@@ -376,10 +376,10 @@
 
 
 (defn new-column-dialog
-  [{:keys [all-columns views visible-column-ids new-timeline show-add-column-dialog?]}]
-  (log/debugf "New column dialog with all-columns=%s visible=%s"
-              (pr-str (map (comp :name :view) all-columns)) (pr-str visible-column-ids))
-  (let [column-ids (hidden-columns all-columns visible-column-ids)
+  [{:keys [views visible-column-ids new-timeline show-add-column-dialog?]}]
+  #_(log/debugf "New column dialog with all-columns=%s visible=%s"
+                (pr-str (map (comp :name :view) all-columns)) (pr-str visible-column-ids))
+  (let [column-ids (hidden-columns (domain/all-column-ids) visible-column-ids)
         view-names (map (comp :name :view domain/find-column-by-id)
                         column-ids)]
     {:fx/type :choice-dialog
@@ -391,7 +391,7 @@
      :items view-names}))
 
 (defn tab-pane
-  [{:keys [all-columns visible-column-ids
+  [{:keys [visible-column-ids all-columns
            views selected-view temp-view temp-view-changed?
            relays show-add-column-dialog? new-timeline
            can-publish? active-reply-context active-contact-list
@@ -405,7 +405,7 @@
    :refs {:dialog {:fx/type view-reply/dialog
                    :active-reply-context active-reply-context}
           :timeline-dialog {:fx/type new-column-dialog
-                            :all-columns all-columns
+                            :views views
                             :visible-column-ids visible-column-ids
                             :new-timeline new-timeline
                             :show-add-column-dialog? show-add-column-dialog?}}
@@ -414,8 +414,8 @@
           :tabs (for [[label content]
                       {"Home" {:fx/type main-panes
                                :views views
-                               :all-columns all-columns
                                :visible-column-ids visible-column-ids
+                               :all-columns all-columns
                                :can-publish? can-publish?
                                :show-add-column-dialog? show-add-column-dialog?
                                :active-key active-key
@@ -493,7 +493,7 @@
                  [label add-new-button]))})
               
 
-(defn root [{:keys [all-columns visible-column-ids
+(defn root [{:keys [visible-column-ids all-columns
                     views selected-view temp-view temp-view-changed?
                     show-relays? active-key identities identity-metadata
                     relays refresh-relays-ts connected-info
@@ -514,8 +514,8 @@
                     {:fx/type :h-box :h-box/hgrow :always}
                     (refresh-button last-refresh)]}
    :center {:fx/type tab-pane
-            :all-columns all-columns
             :visible-column-ids visible-column-ids
+            :all-columns all-columns
             :views views
             :selected-view selected-view
             :temp-view temp-view
@@ -544,7 +544,7 @@
             :refresh-relays-ts refresh-relays-ts
             :connected-info connected-info}})
 
-(defn stage [{:keys [all-columns visible-column-ids
+(defn stage [{:keys [visible-column-ids all-columns
                      show-relays? active-key identities identity-metadata
                      relays refresh-relays-ts connected-info
                      show-add-column-dialog? new-timeline
@@ -576,8 +576,8 @@
            :last-refresh last-refresh
            :refresh-relays-ts refresh-relays-ts
            :connected-info connected-info
-           :all-columns all-columns
            :visible-column-ids visible-column-ids
+           :all-columns all-columns
            :views views
            :selected-view (or selected-view (:name (first (vals views))))
            :temp-view (or temp-view (first (vals views)))
