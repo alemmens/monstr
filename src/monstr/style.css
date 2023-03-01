@@ -32,6 +32,10 @@
     -fx-fill: blue;
 }
 
+.monstr-author-hbox: hover {
+    -fx-border-color: lightblue;
+}
+
 .ndesk-lhs-pane {
     -fx-pref-width: 275;
     -fx-border-color: transparent -nd-basic-border-color transparent transparent;

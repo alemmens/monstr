@@ -23,6 +23,11 @@
    (let [use-since (.getEpochSecond since)
          pubkeys (mapv :public-key identities)]
      (when-not (empty? pubkeys)
+       ;; 0: set_metadata
+       ;; 1: text note
+       ;; 2: recommend server
+       ;; 3: contact list
+       ;; 4: direct message
        (let [filters [{:kinds [0 1 2 3]
                        :since use-since
                        :authors (if (domain/follows-all? column)
@@ -30,7 +35,8 @@
                                   (whale-of-pubkeys* pubkeys contact-lists))
                        :limit 1000}
                       {:kinds [1 4] :#p pubkeys :since use-since}
-                      {:kinds [4] :since use-since :authors pubkeys}]]
+                      {:kinds [4]
+                       :since use-since :authors pubkeys}]]
          (swap! domain/*state assoc :last-refresh (Instant/now))
          (log/debugf "Subscribing all for '%s'" (:name (:view column)))
          (relay-conn/subscribe-all! (format "flat:%s" (:id column))

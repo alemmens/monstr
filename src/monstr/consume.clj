@@ -74,7 +74,7 @@
               (fn [curr-state]
                 (assoc-in curr-state [:contact-lists pubkey] new-contact-list)))
             ;; TODO: I don't think this resubscribe is the right way.
-            (resubscribe! *state executor resubscribe-future-vol)))))))
+            #_(resubscribe! *state executor resubscribe-future-vol)))))))
 
 (defn consume-direct-message [db relay-url event-obj]
   #_(log/info "direct message (TODO): " relay-url (:id event-obj))

@@ -311,7 +311,29 @@
               (reply-button *state
                             (if (nil? root-data) item-id (:id root-data))
                             item-id)]})
-  
+
+(defn- author-pane [name pubkey timestamp]
+  {:fx/type :border-pane
+   :style (BORDER| :white)
+   :border-pane/margin (Insets. 0.0 5.0 0.0 5.0)
+   :left {:fx/type :h-box
+          :cursor :hand
+          :style-class "monstr-author-hbox"
+          :on-mouse-pressed (fn [_]
+                              (log/debugf "Updating open-profile-pubkeys with %s" pubkey)
+                              (swap! domain/*state assoc
+                                     :open-profile-pubkeys (distinct (cons pubkey
+                                                                           (:open-profile-pubkeys @domain/*state)))))
+          :children [{:fx/type :label
+                      :style-class "ndesk-timeline-item-name"
+                      :text name}
+                     {:fx/type :label
+                      :style-class "ndesk-timeline-item-pubkey"
+                      :text (or (some-> pubkey util/format-pubkey-short) "?")}]}
+   :right {:fx/type :label
+           :style-class "ndesk-timeline-item-timestamp"
+           :text (or (some-> timestamp util/format-timestamp) "?")}})
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Thread pane
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -337,10 +359,7 @@
     (let [item-id (:id item-data)
           pubkey (:pubkey item-data)
           pubkey-for-avatar (or (some-> pubkey (subs 0 3)) "?")
-          pubkey-short (or (some-> pubkey util/format-pubkey-short) "?")
           timestamp (:timestamp item-data)
-          content (:content item-data)
-          tags (:tags item-data)
           {:keys [name about picture-url nip05-id created-at]} (some->> pubkey (metadata/get* metadata-cache))
           avatar-color (or (some-> pubkey avatar/color) :lightgray)]
       {:fx/type :border-pane
@@ -348,24 +367,12 @@
        :on-mouse-exited (partial show-action-row! *state false)
        :left (avatar-or-empty-space picture-url avatar-color pubkey-for-avatar)
        :center {:fx/type :border-pane
-                :top {:fx/type :border-pane
-                      :border-pane/margin (Insets. 0.0 5.0 0.0 5.0)
-                      :left {:fx/type :h-box
-                             :children [{:fx/type :label
-                                         :style-class "ndesk-timeline-item-name"
-                                         :text name}
-                                        {:fx/type :label
-                                         :style-class "ndesk-timeline-item-pubkey"
-                                         :text pubkey-short}]}
-                      :right {:fx/type :h-box
-                              :children [{:fx/type :label
-                                          :style-class "ndesk-timeline-item-timestamp"                                          
-                                          :text (or (some-> timestamp util/format-timestamp) "?")}]}}
+                :top (author-pane name pubkey timestamp)
                 :bottom {:fx/type :h-box
                          :children [{:fx/type timeline-item-content
                                      :h-box/hgrow :always
-                                     :content content
-                                     :tags tags
+                                     :content (:content item-data)
+                                     :tags (:tags item-data)
                                      :metadata-cache metadata-cache}]}}
      ;; The action buttons (Reply, Info, ...) are at the bottom of the timeline item.
      :bottom (thread-action-button-row *state db root-data item-id pubkey column-id)})))
@@ -445,7 +452,6 @@
   (let [event-obj (:event-obj text-note-new)
         pubkey (:pubkey event-obj)
         pubkey-for-avatar (or (some-> pubkey (subs 0 3)) "?")
-        pubkey-short (or (some-> pubkey util/format-pubkey-short) "?")
         {:keys [name about picture-url nip05-id created-at]} (some->> pubkey (metadata/get* metadata-cache))
         avatar-color (or (some-> pubkey avatar/color) :lightgray)]
     {:fx/type :border-pane
@@ -455,27 +461,14 @@
      :center {:fx/type :border-pane
               :style (BORDER| :white)
               ;; Show name, pubkey and timestamp.              
-              :top {:fx/type :border-pane
-                    :style (BORDER| :white)
-                    :border-pane/margin (Insets. 0.0 5.0 0.0 5.0)
-                    :left {:fx/type :h-box
-                           :children [{:fx/type :label
-                                       :style-class "ndesk-timeline-item-name"
-                                       :text name}
-                                      {:fx/type :label
-                                       :style-class "ndesk-timeline-item-pubkey"
-                                       :text pubkey-short}]}
-                    :right {:fx/type :label
-                            :style-class "ndesk-timeline-item-timestamp"
-                            :text (or (some-> (:created_at event-obj) util/format-timestamp) "?")}}
+              :top (author-pane name pubkey (:created_at event-obj))
               ;; Show the actual content.
               :bottom {:fx/type :h-box
                        :children [{:fx/type timeline-item-content
                                    :h-box/hgrow :always
                                    :content (:content event-obj)
                                    :tags (:tags event-obj)
-                                   :metadata-cache metadata-cache}
-                                  ]}}
+                                   :metadata-cache metadata-cache}]}}
      ;; The action buttons (Reply, Thread, ...) are at the bottom of the timeline item.
      :bottom (action-button-row *state db event-obj root-data (:id event-obj) pubkey column-id)}))
 

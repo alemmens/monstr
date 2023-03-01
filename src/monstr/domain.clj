@@ -36,6 +36,8 @@
    :all-columns nil          ; a list with all columns
    :visible-column-ids nil   ; a list with the ids of the visible columns
    :new-timeline nil         ; relay url to be added to the visible timelines
+   ;; Profiles
+   :open-profile-pubkeys []  ; a sequence of pubkeys of open profile tabs
    ;; Refresh
    :last-refresh nil         ; Java Instant indicating when the most recent refresh started
    ;; Status bar

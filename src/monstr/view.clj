@@ -2,26 +2,26 @@
   (:require
    [cljfx.api :as fx]
    [cljfx.ext.list-view :as fx.ext.list-view]
+   [clojure.set :as set]
+   [clojure.string :as str]
    [clojure.tools.logging :as log]
    [monstr.avatar :as avatar]
    [monstr.cache :as cache]
    [monstr.domain :as domain]
    [monstr.event :as ev]
+   [monstr.metadata :as metadata]   
    [monstr.status-bar :as status-bar]
    [monstr.style :as style :refer [BORDER|]]
    [monstr.subscribe :as subscribe]
    [monstr.tab-views :as tab-views]
+   [monstr.timeline :as timeline]   
    [monstr.util :as util]
    [monstr.util-domain :as util-domain]
-   [monstr.view-new-identity :as view-new-identity]
    [monstr.util-java :as util-java]
    [monstr.util-fx :as util-fx]
    [monstr.view-common :as view-common]
-   [monstr.view-reply :as view-reply]
-   [monstr.timeline :as timeline]
-   [clojure.string :as str]
-   [clojure.set :as set]
-   [monstr.metadata :as metadata])
+   [monstr.view-new-identity :as view-new-identity]
+   [monstr.view-reply :as view-reply])
   (:import (javafx.geometry Pos)
            (javafx.scene.layout VBox Priority)
            (javafx.scene.control TextFormatter$Change TextArea)
@@ -45,12 +45,11 @@
 
 
 (defn keycard
-  [{:keys [active? profile?]
-    {:keys [public-key] :as identity_} :identity_
-    ;; possibly nil:
-    {:keys [name about picture-url nip05-id]} :this-identity-metadata}]
+  [{:keys [active? profile? public-key metadata identity_]}]
   (let [avatar-dim 75.0
-        avatar-color (avatar/color public-key)]
+        avatar-color (avatar/color public-key)
+        picture-url (:picture-url metadata)]
+    (log/debugf "Keycard for %s with metadata %s" public-key metadata)
     {:fx/type :h-box
      :style (cond-> {}
               active? (assoc :-fx-border-color avatar-color))
@@ -82,7 +81,7 @@
                   name (conj {:fx/type :label
                               :alignment :top-left
                               :style-class ["label" "ndesk-keycard-name"]
-                              :text name})
+                              :text (:name metadata)})
                   true (conj {:fx/type :label
                               :alignment :top-left
                               :style-class ["label" "ndesk-keycard-pubkey"]
@@ -95,7 +94,7 @@
                  :on-action {:event/type :delete-keycard :identity_ identity_}}}
         {:fx/type :label
          :style-class "ndesk-keycard-about"
-         :text (or about "")}]}]}))
+         :text (or (:about metadata) "")}]}]}))
 
 (defn keycard-create-new
   [{:keys [show-new-identity? new-identity-error views]}]
@@ -270,9 +269,15 @@
                             (VBox/setVgrow Priority/ALWAYS))}])})
 
 (defn tab*
-  [{:keys [label content]}]
+  "PUBKEY is only given for closable profile tabs."
+  [{:keys [label content closable pubkey]}]
   {:fx/type :tab
-   :closable false
+   :closable closable
+   :on-closed (fn [_]
+                (log/debugf "Closing tab %s with pubkey %s" label pubkey)
+                (swap! domain/*state assoc
+                       :open-profile-pubkeys (remove #{pubkey}
+                                                     (:open-profile-pubkeys @domain/*state))))
    :text label
    :content content})
 
@@ -360,17 +365,18 @@
 
 
 (defn profile
-  [{:keys [pubkey identities identity-metadata]}]
+  [{:keys [pubkey identities metadata]}]
   (let [identity (first (filter (fn [id] (= (:public-key id) pubkey))
                                 identities))]
-    (log/debugf "Profile for %s with identity %s" pubkey identity)
-    (if (and pubkey identity)
+    (log/debugf "Profile for %s with identity %s and metadata %s" pubkey identity metadata)
+    (if pubkey
       {:fx/type keycard
        :fx/key pubkey
+       :public-key pubkey
        :active? false
        :profile? true
        :identity_ identity
-       :this-identity-metadata (get identity-metadata pubkey)}
+       :metadata metadata}
       {:fx/type :label
        :text "No pubkey selected for profile"})))
 
@@ -392,6 +398,7 @@
 
 (defn tab-pane
   [{:keys [visible-column-ids all-columns
+           open-profile-pubkeys
            views selected-view temp-view temp-view-changed?
            relays show-add-column-dialog? new-timeline
            can-publish? active-reply-context active-contact-list
@@ -411,38 +418,54 @@
                             :show-add-column-dialog? show-add-column-dialog?}}
    :desc {:fx/type :tab-pane
           :side :top
-          :tabs (for [[label content]
-                      {"Home" {:fx/type main-panes
-                               :views views
-                               :visible-column-ids visible-column-ids
-                               :all-columns all-columns
-                               :can-publish? can-publish?
-                               :show-add-column-dialog? show-add-column-dialog?
-                               :active-key active-key
-                               :active-reply-context active-reply-context
-                               :active-contact-list active-contact-list
-                               :active-contact-pubkey active-contact-pubkey
-                               :metadata-cache metadata-cache
-                               }
-                       "Contacts" {:fx/type contacts
-                                   :active-contact-list active-contact-list
-                                   :active-contact-pubkey active-contact-pubkey
-                                   :metadata-cache metadata-cache},
-                       ;;"Messages" {:fx/type messages}
-                       "Profile" {:fx/type profile
-                                  :pubkey active-key
-                                  :identities identities
-                                  :identity-metadata identity-metadata},
-                       "Views" {:fx/type tab-views/show-tab
-                                :views views
-                                :selected-view selected-view
-                                :temp-view temp-view
-                                :temp-view-changed? temp-view-changed?
-                                },
-                       ;;"Search" {:fx/type search}
-                       }]
+          :tabs (for [[label content closable pubkey]
+                      (concat [["Home" {:fx/type main-panes
+                                        :views views
+                                        :visible-column-ids visible-column-ids
+                                        :all-columns all-columns
+                                        :can-publish? can-publish?
+                                        :show-add-column-dialog? show-add-column-dialog?
+                                        :active-key active-key
+                                        :active-reply-context active-reply-context
+                                        :active-contact-list active-contact-list
+                                        :active-contact-pubkey active-contact-pubkey
+                                        :metadata-cache metadata-cache
+                                        }
+                                false]
+                               ["Views" {:fx/type tab-views/show-tab
+                                         :views views
+                                         :selected-view selected-view
+                                         :temp-view temp-view
+                                         :temp-view-changed? temp-view-changed?
+                                         }
+                                false]
+                               ["Contacts" {:fx/type contacts
+                                            :active-contact-list active-contact-list
+                                            :active-contact-pubkey active-contact-pubkey
+                                            :metadata-cache metadata-cache}
+                                false]
+                                ;;"Messages" {:fx/type messages}
+                               ["Profile" {:fx/type profile
+                                           :pubkey active-key
+                                           :identities identities
+                                           :metadata (get identity-metadata active-key)}
+                                false]]
+                              (map (fn [pubkey]
+                                     (let [metadata (metadata/get* metadata-cache pubkey)]
+                                       [(format "Profile: %s" (or (:name metadata)
+                                                                  (util/format-pubkey-short pubkey)))
+                                        {:fx/type profile
+                                         :pubkey pubkey
+                                         :identities identities
+                                         :metadata metadata}
+                                        true
+                                        pubkey
+                                        ]))
+                                   open-profile-pubkeys))]
                   {:fx/type tab*
                    :label label
+                   :pubkey pubkey
+                   :closable closable
                    :content content})}})
 
 (defn keycards
@@ -502,6 +525,7 @@
                     identity-active-contact metadata-cache
                     last-refresh
                     status-message status-message-timestamp
+                    open-profile-pubkeys
                     ]}]
   (log/debugf "Root with column ids=%s" (pr-str visible-column-ids))
   {:fx/type :border-pane
@@ -531,6 +555,7 @@
             :identities identities
             :identity-metadata identity-metadata
             :metadata-cache metadata-cache
+            :open-profile-pubkeys open-profile-pubkeys
             }
    :bottom {:fx/type status-bar/pane
             :status-message (if (> (- (util/now-epoch-second)
@@ -552,6 +577,7 @@
                      contact-lists identity-active-contact metadata-cache
                      last-refresh views selected-view temp-view temp-view-changed?
                      status-message status-message-timestamp
+                     open-profile-pubkeys
                      ]}]
   (log/debugf "Stage with %d identities and active key %s" (count identities) active-key)
   {:fx/type :stage
@@ -586,5 +612,6 @@
            :new-timeline new-timeline
            :metadata-cache metadata-cache
            :status-message status-message
-           :status-message-timestamp status-message-timestamp           
+           :status-message-timestamp status-message-timestamp
+           :open-profile-pubkeys open-profile-pubkeys
            }}})
