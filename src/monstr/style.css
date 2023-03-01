@@ -49,11 +49,6 @@
     -fx-background-insets: 5px;
     -fx-border-color: -nd-basic-border-color;
     -fx-background-color: white;
-    -fx-cursor: hand;
-}
-
-.ndesk-keycard-active {
-    -fx-border-width: 5px;
 }
 
 .ndesk-keycard-photo {
@@ -64,20 +59,18 @@
 }
 
 .ndesk-keycard-name {
-    -fx-min-height: 50;
     -fx-padding: 0 0 0 10px;
     -fx-font-weight: bold;
 }
 
 .ndesk-keycard-pubkey {
-    -fx-min-height: 50;
     -fx-padding: 0 10px;
     -fx-font-weight: bold;
     -fx-text-fill: -nd-timeline-item-pubkey-color;
 }
 
 .ndesk-keycard-about {
-    -fx-padding: 3px;
+    -fx-padding: 20px;
 }
 
 .ndesk-status-bar {

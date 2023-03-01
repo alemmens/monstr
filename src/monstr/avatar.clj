@@ -28,3 +28,19 @@
                   (log/debugf "Image cache exception for %s: %s"
                               url
                               (.getMessage e))))))))))
+
+(defn avatar [{:keys [width picture-url]}]
+  (if-let [image (when-not (str/blank? picture-url)
+                   (try (cache/get* image-cache [picture-url width])
+                        (catch Exception e
+                          (log/debugf "Can't find %s in image cache: %s"
+                                      picture-url
+                                      (.getMessage e)))))]
+    {:fx/type :image-view
+     :image image}
+    {:fx/type :label
+     :min-width width
+     :min-height width
+     :max-width width
+     :max-height width
+     :text ""}))

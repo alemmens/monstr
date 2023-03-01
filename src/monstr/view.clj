@@ -14,6 +14,7 @@
    [monstr.style :as style :refer [BORDER|]]
    [monstr.subscribe :as subscribe]
    [monstr.tab-views :as tab-views]
+   [monstr.tab-profile :as tab-profile]
    [monstr.timeline :as timeline]   
    [monstr.util :as util]
    [monstr.util-domain :as util-domain]
@@ -27,74 +28,6 @@
            (javafx.scene.control TextFormatter$Change TextArea)
            (javafx.beans.property ReadOnlyProperty)))
 
-(defn avatar [{:keys [width picture-url]}]
-  (if-let [image (when-not (str/blank? picture-url)
-                   (try (cache/get* avatar/image-cache [picture-url width])
-                        (catch Exception e
-                          (log/debugf "Can't find %s in image cache: %s"
-                                      picture-url
-                                      (.getMessage e)))))]
-    {:fx/type :image-view
-     :image image}
-    {:fx/type :label
-     :min-width width
-     :min-height width
-     :max-width width
-     :max-height width
-     :text ""}))
-
-
-(defn keycard
-  [{:keys [active? profile? public-key metadata identity_]}]
-  (let [avatar-dim 75.0
-        avatar-color (avatar/color public-key)
-        picture-url (:picture-url metadata)]
-    (log/debugf "Keycard for %s with metadata %s" public-key metadata)
-    {:fx/type :h-box
-     :style (cond-> {}
-              active? (assoc :-fx-border-color avatar-color))
-     :style-class ["ndesk-keycard"
-                   (when active?
-                     "ndesk-keycard-active")]
-     :on-mouse-clicked {:event/type :click-keycard :public-key public-key}
-     :children
-     [(if (str/blank? picture-url)
-        {:fx/type :label
-         :min-width avatar-dim
-         :min-height avatar-dim
-         :max-width avatar-dim
-         :max-height avatar-dim
-         :style {:-fx-background-color avatar-color}
-         :style-class "ndesk-keycard-photo"
-         :text (subs public-key 0 3)}
-        {:fx/type avatar
-         :picture-url picture-url
-         :width avatar-dim})
-      {:fx/type :v-box
-       :h-box/hgrow :always
-       :children
-       [{:fx/type :border-pane
-         :max-width Integer/MAX_VALUE
-         :left {:fx/type :h-box
-                :children
-                (cond-> []
-                  name (conj {:fx/type :label
-                              :alignment :top-left
-                              :style-class ["label" "ndesk-keycard-name"]
-                              :text (:name metadata)})
-                  true (conj {:fx/type :label
-                              :alignment :top-left
-                              :style-class ["label" "ndesk-keycard-pubkey"]
-                              :text (if profile?
-                                      ;; In the profile tab we have enough room to
-                                      ;; show the whole public key.
-                                      public-key
-                                      (util/format-pubkey-short public-key))}))}
-         :right {:fx/type :hyperlink :text "X"
-                 :on-action {:event/type :delete-keycard :identity_ identity_}}}
-        {:fx/type :label
-         :style-class "ndesk-keycard-about"
-         :text (or (:about metadata) "")}]}]}))
 
 (defn keycard-create-new
   [{:keys [show-new-identity? new-identity-error views]}]
@@ -134,7 +67,7 @@
            :style {:-fx-background-color avatar-color}
            :style-class "ndesk-contact-photo"
            :text (subs public-key 0 3)}
-          {:fx/type avatar
+          {:fx/type avatar/avatar
            :picture-url picture-url
            :width avatar-dim})
         {:fx/type :v-box
@@ -364,21 +297,6 @@
         {:fx/type :h-box :h-box/hgrow :always}])}]})
 
 
-(defn profile
-  [{:keys [pubkey identities metadata]}]
-  (let [identity (first (filter (fn [id] (= (:public-key id) pubkey))
-                                identities))]
-    (log/debugf "Profile for %s with identity %s and metadata %s" pubkey identity metadata)
-    (if pubkey
-      {:fx/type keycard
-       :fx/key pubkey
-       :public-key pubkey
-       :active? false
-       :profile? true
-       :identity_ identity
-       :metadata metadata}
-      {:fx/type :label
-       :text "No pubkey selected for profile"})))
 
 
 (defn new-column-dialog
@@ -439,24 +357,28 @@
                                          :temp-view-changed? temp-view-changed?
                                          }
                                 false]
+                               ;; Contacts (i.e. follows) for the active identity.
                                ["Contacts" {:fx/type contacts
                                             :active-contact-list active-contact-list
                                             :active-contact-pubkey active-contact-pubkey
                                             :metadata-cache metadata-cache}
                                 false]
-                                ;;"Messages" {:fx/type messages}
-                               ["Profile" {:fx/type profile
+                               ;; Profile tab for the active identity.
+                               ["Profile" {:fx/type tab-profile/profile
                                            :pubkey active-key
                                            :identities identities
                                            :metadata (get identity-metadata active-key)}
                                 false]]
+                              ;; Profile tabs for authors.
                               (map (fn [pubkey]
                                      (let [metadata (metadata/get* metadata-cache pubkey)]
                                        [(format "Profile: %s" (or (:name metadata)
                                                                   (util/format-pubkey-short pubkey)))
-                                        {:fx/type profile
+                                        {:fx/type tab-profile/profile
                                          :pubkey pubkey
+                                         :views views
                                          :identities identities
+                                         :identity-metadata identity-metadata
                                          :metadata metadata}
                                         true
                                         pubkey
@@ -476,7 +398,7 @@
                (concat
                  (map
                    #(hash-map
-                      :fx/type keycard
+                      :fx/type tab-profile/keycard
                       :fx/key (:public-key %)
                       :active? (= active-key (:public-key %))
                       :identity_ %
