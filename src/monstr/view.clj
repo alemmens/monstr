@@ -354,6 +354,7 @@
                                          :selected-view selected-view
                                          :temp-view temp-view
                                          :temp-view-changed? temp-view-changed?
+                                         :metadata-cache metadata-cache
                                          }
                                 false]
                                ;; Contacts (i.e. follows) for the active identity.

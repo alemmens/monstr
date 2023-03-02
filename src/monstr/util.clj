@@ -1,5 +1,6 @@
 (ns monstr.util
-  (:require [clojure.tools.logging :as log])
+  (:require [clojure.tools.logging :as log]
+            [monstr.metadata :as metadata])
   (:import (java.util Random Date)
            (java.text SimpleDateFormat)
            (java.util.function BiFunction)
@@ -47,6 +48,11 @@
 (defn format-pubkey-short
   [pubkey]
   (str (subs pubkey 0 3) "..." (subs pubkey (- (count pubkey) 4))))
+
+(defn name-for-pubkey [pubkey metadata-cache]
+  (or (when metadata-cache
+        (:name (metadata/get* metadata-cache pubkey)))
+      (format-pubkey-short pubkey)))
 
 (defn format-event-id-short
   [event-id]

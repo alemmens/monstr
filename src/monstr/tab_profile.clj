@@ -62,7 +62,7 @@
                  (swap! domain/*state assoc-in
                         [:open-profile-states pubkey :followers]
                         (if (get followers pubkey)
-                          (remove #{pubkey} followers)
+                          (disj followers pubkey)
                           (conj followers pubkey))))]
     {:fx/type :scroll-pane
      :padding 20
@@ -100,17 +100,21 @@
                  (swap! domain/*state assoc-in
                         [:open-profile-states pubkey :following-views-changed?]
                         true)
-                 (swap! domain/*state assoc-in
-                        [:open-profile-states pubkey :following-views]
-                        (if (get following-views view-name)
-                          (remove #{view-name} following-views)
-                          (conj following-views view-name))))]
+                 (let [following-views (:following-views (get (:open-profile-states @domain/*state) pubkey))]
+                   (log/debugf "Switching with following views: %s"
+                               (pr-str following-views))
+                   (swap! domain/*state assoc-in
+                          [:open-profile-states pubkey :following-views]
+                          (if (get following-views view-name)
+                            (disj following-views view-name)
+                            (conj following-views view-name)))))]
+        (log/debugf "Following views: %s" (pr-str following-views))
     {:fx/type :scroll-pane
      :padding 20
      :hbar-policy :never
      :vbar-policy :as-needed
      :content {:fx/type :v-box
-               :children [{:fx/type :label :text "Visible in: "}
+               :children [{:fx/type :label :text "Show in: "}
                           {:fx/type :v-box
                            :spacing 10
                            :padding 10
@@ -126,7 +130,19 @@
                            :children [{:fx/type :button
                                        :disable (not (:following-views-changed?
                                                       (get (:open-profile-states @domain/*state) pubkey)))
-                                       :on-action identity
+                                       :on-action (fn [_]
+                                                    (log/debugf "Saving following views %s"
+                                                                (pr-str following-views))
+                                                    (doseq [v (keys views)]
+                                                      (let [follow-set (:follow-set (domain/find-view v))]
+                                                        (domain/update-view! v :follow-set
+                                                                             (if (following-views v)
+                                                                               (conj follow-set pubkey)
+                                                                               (disj follow-set pubkey)))))
+                                                    (log/debugf "Views are now %s" (pr-str (:views @domain/*state)))
+                                                    (swap! domain/*state assoc-in
+                                                           [:open-profile-states pubkey :following-views-changed?]
+                                                           false))
                                        :text "Save"}]}]}}))
 
 (defn follows
@@ -151,19 +167,22 @@
   [{:keys [pubkey identities views metadata identity-metadata open-profile-states]}]
   (let [identity (first (filter (fn [id] (= (:public-key id) pubkey))
                                 identities))]
-    #_(log/debugf "Profile for %s with identity %s and metadata %s"
-                  pubkey identity metadata)
+    (log/debugf "Profile for %s with states %s"
+                pubkey (pr-str open-profile-states))
     (if pubkey
       {:fx/type :v-box
        :padding 10
        :spacing 10
-       :children [{:fx/type keycard
-                   :fx/key pubkey
-                   :public-key pubkey
-                   :active? false
-                   :profile? true
-                   :identity_ identity
-                   :metadata metadata}
+       :children [{:fx/type :h-box
+                   :children [{:fx/type keycard
+                               :fx/key pubkey
+                               :public-key pubkey
+                               :active? false
+                               :profile? true
+                               :identity_ identity
+                               :metadata metadata}
+                              ;; Placeholder for posts by this user.
+                              {:fx/type :h-box :h-box/hgrow :always}]}
                   {:fx/type :h-box
                    :padding 10
                    :children [(if identity

@@ -1,6 +1,7 @@
 (ns monstr.domain
   (:require
-   [clojure.set :as set])
+   [clojure.set :as set]
+   [clojure.tools.logging :as log])
   (:import
     (java.util.concurrent ThreadFactory Executors ScheduledExecutorService TimeUnit)))
 
@@ -96,11 +97,12 @@
 
 (defrecord View
     ;; A view defines what is shown in a column.
-    [name         ; a string
+    [id           ; a random number
+     name         ; a string
      relay-urls   ; a set of relay urls
      follow       ; Either :use-identity \(i.e. follow the contacts of the active
                   ; identity) or :all \(i.e. global) or :use-list.
-     follows      ; A set of (pubkeys of) authors the user wants to follow for this view.
+     follow-set   ; A set of (pubkeys of) authors the user wants to follow for this view.
                   ; Applicable if FOLLOW is :use-list.
      friends-of-friends ; Integer that indicates to which degree follows of follows must
                         ; also be followed. Default is 1, meaning only follows themselves.
@@ -110,13 +112,20 @@
      channels     ; a set of (pubkeys of) Nostr channels (defined by kind 40 and 41 events)
      ])
 
+(defn update-view! [name property value]
+  (assert (find-view name))
+  (swap! *state assoc-in
+         [:views name property]
+         value))
+
 (defn make-view
   [name relay-urls
-   {:keys [follow follows friends-of-friends mute-authors words mute-words channels]}]
-  (->View name
+   {:keys [follow follow-set friends-of-friends mute-authors words mute-words channels]}]
+  (->View (rand-int 100000000)
+          name
           relay-urls
           (or follow :use-identity)
-          (or follows #{})
+          (or follow-set #{})
           (or friends-of-friends 1)
           (or mute-authors #{})
           (or words #{})
@@ -202,7 +211,7 @@
      ;; A set of pubkeys (normally 0 or 1) of identities for which the profile's author is
      ;; / must be followed.
      followers
-     ;; A set of view names to which the profile's author is / must be in the set of follows.
+     ;; A set of view names for which the profile's author is / must be in the set of follows.
      following-views])
 
 (defn new-profile-state [pubkey]
@@ -213,8 +222,10 @@
                               (some #(= pubkey (:public-key %))
                                     (:parsed-contacts contact-list))))
                           (map :public-key (:identities @*state)))
-        following-views (filter (fn [v] (get (:follows v) pubkey))
-                                (keys (:views @*state)))]
+        following-views (map :name
+                             (filter (fn [v] (get (:follow-set v) pubkey))
+                                     (vals (:views @*state))))]
+    (log/debugf "New profile state with following-views %s" (pr-str following-views))
     (->ProfileState false false
                     (set followers)
                     (set following-views))))

@@ -9,6 +9,7 @@
    [monstr.file-sys :as file-sys]
    [monstr.hydrate :as hydrate]
    [monstr.status-bar :as status-bar]
+   [monstr.util :as util]
    ))
 
 (defn- field-row
@@ -57,8 +58,9 @@
     
                                       
 (def follow-options
-   {:all "all (global)",
-    :use-identity "contacts of active identity"})
+   {:all "all (global)"
+    :use-identity "contacts of active account"
+    :use-list "user list"})
 
 (defn- radio-group [{:keys [options value]}]
   {:fx/type fx/ext-let-refs
@@ -83,6 +85,18 @@
                :options (vals follow-options)
                :value (get follow-options (:follow temp-view))}]})
 
+(defn- follow-set-pane [{:keys [temp-view metadata-cache]}]
+  {:fx/type :h-box
+   :padding 15
+   :children [{:fx/type :scroll-pane
+               :padding 10
+               :hbar-policy :never
+               :vbar-policy :as-needed
+               :content {:fx/type :v-box
+                         :children (for [user (sort (map #(util/name-for-pubkey % metadata-cache)
+                                             (:follow-set temp-view)))]
+                                     {:fx/type :label :text user})}}]})
+
 (defn- relay-group
   [{:keys [temp-view]}]
   {:fx/type :v-box
@@ -101,8 +115,8 @@
                              {:fx/type :label
                               :text r}]}))})
 
-(defn right-hand-side
-  [{:keys [views selected-view temp-view temp-view-changed? name]}]
+(defn- right-hand-side
+  [{:keys [views selected-view temp-view temp-view-changed? name metadata-cache]}]
   {:fx/type :v-box
    :padding 30
    :spacing 20
@@ -113,18 +127,27 @@
                :value name
                :on-text-changed (fn [new-name]
                                   (update-temp-view! :name new-name))}
-              ;; Follow
               {:fx/type :h-box
-               :children [{:fx/type field-label :text "Follow:"}
-                          {:fx/type follow-radiogroup
-                           :temp-view temp-view}]}
-              ;; Relays
+               :spacing 40
+               :children [{:fx/type :v-box
+                           :spacing 20
+                           :children [;; Follow
+                                      {:fx/type :h-box
+                                       :children [{:fx/type field-label :text "Follow:"}
+                                                  {:fx/type :v-box
+                                                   :children [{:fx/type follow-radiogroup
+                                                               :temp-view temp-view}
+                                                              {:fx/type follow-set-pane
+                                                               :temp-view temp-view
+                                                               :metadata-cache metadata-cache}]}]}]}
+                          ;; Relays
+                          {:fx/type :h-box
+                           :children [{:fx/type field-label :text "Relays:"}
+                                      {:fx/type relay-group
+                                       :temp-view temp-view}]}]}
+              ;; Save and Delete buttons
               {:fx/type :h-box
-               :children [{:fx/type field-label :text "Relays:"}
-                          {:fx/type relay-group
-                           :temp-view temp-view}]}
-              ;; Save button
-              {:fx/type :h-box
+               :padding 30
                :children [{:fx/type field-label :text ""}
                           {:fx/type :h-box
                            :spacing 100
@@ -134,18 +157,19 @@
                                        :text "Save"
                                        :padding 5
                                        :on-mouse-pressed {:event/type :save-view}}
-                                      ;; Delete button (disable when temp-view is for a
+                                      ;; Delete button (disabled when temp-view is for a
                                       ;; new view that hasn't been saved yet).
                                       {:fx/type :button
                                        :disable (not (domain/find-view selected-view))
                                        :text "Delete"
                                        :padding 5
-                                       :on-mouse-pressed {:event/type :delete-view}}]}]}]})
+                                       :on-mouse-pressed {:event/type :delete-view}}]}]}
+              ]})
 
 (defn show-tab
-  [{:keys [views selected-view temp-view temp-view-changed?]}]
-  (log/debugf "Views tab with selected=%s, temp=%s, changed=%s"
-              selected-view temp-view temp-view-changed?)
+  [{:keys [views selected-view temp-view temp-view-changed? metadata-cache]}]
+  (log/debugf "Views tab with selected=%s, temp=%s, changed=%s metadata-cache=%s"
+              selected-view temp-view temp-view-changed? metadata-cache)
   {:fx/type :h-box
    :padding 10
    :children (let [items (sort (keys views))
@@ -172,6 +196,7 @@
                                     :items items}}
                             ;; 'Add new view' button (centered horizontally)
                             {:fx/type :h-box
+                             :padding 20
                              :children [{:fx/type :h-box :h-box/hgrow :always}
                                         {:fx/type :button
                                          :text "Add new view"
@@ -182,6 +207,7 @@
                 {:fx/type right-hand-side
                  :temp-view temp-view
                  :name value
+                 :metadata-cache metadata-cache
                  :temp-view-changed? temp-view-changed?
                  :selected-view selected-view
                  :views views}])})
