@@ -42,7 +42,7 @@
           :on-mouse-clicked {:event/type :show-new-identity}
           :children
           [{:fx/type :label
-            :text "add identity"}]}})
+            :text "Add account"}]}})
 
 (defn contact-card
   [{:keys [active? parsed-contact parsed-metadata]}]
@@ -208,9 +208,8 @@
    :closable closable
    :on-closed (fn [_]
                 (log/debugf "Closing tab %s with pubkey %s" label pubkey)
-                (swap! domain/*state assoc
-                       :open-profile-pubkeys (remove #{pubkey}
-                                                     (:open-profile-pubkeys @domain/*state))))
+                (swap! domain/*state update-in
+                       [:open-profile-states] dissoc pubkey))
    :text label
    :content content})
 
@@ -316,7 +315,7 @@
 
 (defn tab-pane
   [{:keys [visible-column-ids all-columns
-           open-profile-pubkeys
+           open-profile-states
            views selected-view temp-view temp-view-changed?
            relays show-add-column-dialog? new-timeline
            can-publish? active-reply-context active-contact-list
@@ -377,13 +376,14 @@
                                         {:fx/type tab-profile/profile
                                          :pubkey pubkey
                                          :views views
+                                         :open-profile-states open-profile-states
                                          :identities identities
                                          :identity-metadata identity-metadata
                                          :metadata metadata}
                                         true
                                         pubkey
                                         ]))
-                                   open-profile-pubkeys))]
+                                   (keys open-profile-states)))]
                   {:fx/type tab*
                    :label label
                    :pubkey pubkey
@@ -417,7 +417,7 @@
    :children (let [label {:fx/type :label
                           :alignment :center
                           :padding 10
-                          :text "Identity: "}
+                          :text "Account: "}
                    combo-box (when active-key
                                {:fx/type :combo-box
                                 :value active-key
@@ -447,7 +447,7 @@
                     identity-active-contact metadata-cache
                     last-refresh
                     status-message status-message-timestamp
-                    open-profile-pubkeys
+                    open-profile-states
                     ]}]
   (log/debugf "Root with column ids=%s" (pr-str visible-column-ids))
   {:fx/type :border-pane
@@ -477,7 +477,7 @@
             :identities identities
             :identity-metadata identity-metadata
             :metadata-cache metadata-cache
-            :open-profile-pubkeys open-profile-pubkeys
+            :open-profile-states open-profile-states
             }
    :bottom {:fx/type status-bar/pane
             :status-message (if (> (- (util/now-epoch-second)
@@ -499,12 +499,12 @@
                      contact-lists identity-active-contact metadata-cache
                      last-refresh views selected-view temp-view temp-view-changed?
                      status-message status-message-timestamp
-                     open-profile-pubkeys
+                     open-profile-states
                      ]}]
   (log/debugf "Stage with %d identities and active key %s" (count identities) active-key)
   {:fx/type :stage
    :showing true
-   :title "Monstr"
+   :title "Nuestr"
    :width 1272
    :height 800
    :scene
@@ -535,5 +535,5 @@
            :metadata-cache metadata-cache
            :status-message status-message
            :status-message-timestamp status-message-timestamp
-           :open-profile-pubkeys open-profile-pubkeys
+           :open-profile-states open-profile-states
            }}})

@@ -37,7 +37,7 @@
    :visible-column-ids nil   ; a list with the ids of the visible columns
    :new-timeline nil         ; relay url to be added to the visible timelines
    ;; Profiles
-   :open-profile-pubkeys []  ; a sequence of pubkeys of open profile tabs
+   :open-profile-states {}   ; a map from pubkeys (of open profile tabs) to ProfileState
    ;; Refresh
    :last-refresh nil         ; Java Instant indicating when the most recent refresh started
    ;; Status bar
@@ -74,6 +74,10 @@
 (defn find-view [name]
   (get (:views @*state) name))
 
+(defn identity-name [id]
+  (or (:name (get (:identity-metadata @*state) (:public-key id)))
+      (:public-key id)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Executor
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -94,9 +98,10 @@
     ;; A view defines what is shown in a column.
     [name         ; a string
      relay-urls   ; a set of relay urls
-     follow       ; either :use-identity \(i.e. follow the contacts of the active
-                  ; identity) or :all \(i.e. global) or a set of (pubkeys of) authors the
-                  ; user wants to follow for this view
+     follow       ; Either :use-identity \(i.e. follow the contacts of the active
+                  ; identity) or :all \(i.e. global) or :use-list.
+     follows      ; A set of (pubkeys of) authors the user wants to follow for this view.
+                  ; Applicable if FOLLOW is :use-list.
      friends-of-friends ; Integer that indicates to which degree follows of follows must
                         ; also be followed. Default is 1, meaning only follows themselves.
      mute-authors ; a set of (pubkeys of) authors to be muted
@@ -107,10 +112,11 @@
 
 (defn make-view
   [name relay-urls
-   {:keys [follow friends-of-friends mute-authors words mute-words channels]}]
+   {:keys [follow follows friends-of-friends mute-authors words mute-words channels]}]
   (->View name
           relay-urls
           (or follow :use-identity)
+          (or follows #{})
           (or friends-of-friends 1)
           (or mute-authors #{})
           (or words #{})
@@ -161,31 +167,58 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defrecord Identity
-  [public-key secret-key])
+    [public-key secret-key])
 
 (defrecord Relay
-  [url read? write?])
+    [url read? write?])
 
 (defrecord ParsedContact
-  [public-key main-relay-url petname])
+    [public-key main-relay-url petname])
 
 (defrecord ContactList
-  [pubkey created-at parsed-contacts])
+    [pubkey created-at
+     ;; Sequence of ParsedContact.
+     parsed-contacts])
 
 (defrecord ParsedMetadata
-  [name about picture-url nip05-id created-at])
+    [name about picture-url nip05-id created-at])
 
 (defrecord UITextNote
-  [id pubkey content timestamp tags e-tags p-tags children missing?])
+    [id pubkey content timestamp tags e-tags p-tags children missing?])
 
 (defrecord UITextNoteWrapper
-  [loom-graph note-count max-timestamp ^UITextNote root])
+    [loom-graph note-count max-timestamp ^UITextNote root])
 
 (defrecord UITextNoteNew
-  [event-obj max-timestamp])
+    [event-obj max-timestamp])
 
 (defrecord UIReplyContext
-  [root-event-id event-id])
+    [root-event-id event-id])
+
+(defrecord ProfileState
+    [;; If changed? is true, the Save button will be enabled.
+     followers-changed?
+     following-views-changed?
+     ;; A set of pubkeys (normally 0 or 1) of identities for which the profile's author is
+     ;; / must be followed.
+     followers
+     ;; A set of view names to which the profile's author is / must be in the set of follows.
+     following-views])
+
+(defn new-profile-state [pubkey]
+  (let [followers (filter (fn [k]
+                            (when-let [contact-list (get (:contact-lists @*state) k)]
+                              ;; One of the contacts (i.e. follows) of K is the given
+                              ;; pubkey, so K is one of pubkey's followers.
+                              (some #(= pubkey (:public-key %))
+                                    (:parsed-contacts contact-list))))
+                          (map :public-key (:identities @*state)))
+        following-views (filter (fn [v] (get (:follows v) pubkey))
+                                (keys (:views @*state)))]
+    (->ProfileState false false
+                    (set followers)
+                    (set following-views))))
+
 
 ;; --
 

@@ -33,11 +33,6 @@
 
 (def avatar-dim 40)
 
-(defn avatar [{:keys [picture-url]}]
-  {:fx/type :image-view
-   :style (BORDER|)
-   :image (cache/get* avatar/image-cache [picture-url avatar-dim])})
-
 (defn url-summarize [url]
   url)
 
@@ -52,7 +47,8 @@
      :style {:-fx-background-color avatar-color}
      :style-class "ndesk-timeline-item-photo"
      :text pubkey-for-avatar}
-    {:fx/type avatar
+    {:fx/type avatar/avatar
+     :width avatar-dim
      :picture-url picture-url}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -320,10 +316,11 @@
           :cursor :hand
           :style-class "monstr-author-hbox"
           :on-mouse-pressed (fn [_]
-                              (log/debugf "Updating open-profile-pubkeys with %s" pubkey)
-                              (swap! domain/*state assoc
-                                     :open-profile-pubkeys (distinct (cons pubkey
-                                                                           (:open-profile-pubkeys @domain/*state)))))
+                              (log/debugf "Updating open-profile-states with %s" pubkey)
+                              (when-not (get (:open-profile-states @domain/*state) pubkey)
+                                (swap! domain/*state assoc-in
+                                       [:open-profile-states pubkey]
+                                       (domain/new-profile-state pubkey))))
           :children [{:fx/type :label
                       :style-class "ndesk-timeline-item-name"
                       :text name}

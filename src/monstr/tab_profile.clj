@@ -4,6 +4,7 @@
    [clojure.tools.logging :as log]
    [clojure.string :as str]
    [monstr.avatar :as avatar]
+   [monstr.domain :as domain]
    [monstr.util :as util])
   (:import (javafx.geometry Insets)))
 
@@ -15,8 +16,7 @@
         picture-url (:picture-url metadata)]
     (log/debugf "Keycard for %s with metadata %s" public-key metadata)
     {:fx/type :v-box
-     :max-height 400
-
+     ; :max-height 400
      :style-class ["ndesk-keycard"]                   
      :children [{:fx/type :h-box
                  :children
@@ -46,71 +46,116 @@
                                        public-key
                                        (util/format-pubkey-short public-key))}]}]}
                 {:fx/type :h-box
-                 :padding 20
+                 :padding 10
                  :children [{:fx/type :text
                              :style-class "ndesk-keycard-about"
                              :wrapping-width 400
                              :text (or (:about metadata) "")}]}]}))
 
-(defn follow-pubkey! [pubkey]
-  )
+(defn followers-pane
+  [{:keys [pubkey open-profile-states identities identity-metadata]}]
+  (let [followers (:followers (get open-profile-states pubkey))
+        switch (fn [id]
+                 (swap! domain/*state assoc-in
+                        [:open-profile-states pubkey :followers-changed?]
+                        true)
+                 (swap! domain/*state assoc-in
+                        [:open-profile-states pubkey :followers]
+                        (if (get followers pubkey)
+                          (remove #{pubkey} followers)
+                          (conj followers pubkey))))]
+    {:fx/type :scroll-pane
+     :padding 20
+     :hbar-policy :never
+     :vbar-policy :as-needed
+     :content {:fx/type :v-box
+               ; :spacing 5
+               :children [{:fx/type :label :text "Accounts that follow this user:"}
+                          {:fx/type :v-box
+                           :padding 10
+                           :spacing 10
+                           :children (for [id (sort-by domain/identity-name identities)]
+                                       (let [pubkey (:public-key id)]
+                                         {:fx/type :h-box
+                                          :spacing 10
+                                          :children [{:fx/type :check-box
+                                                      :disable (not (:secret-key id))
+                                                      :selected (boolean (get followers pubkey))
+                                                      :on-selected-changed (fn [_] (switch id))}
+                                                     {:fx/type :label
+                                                      :disable (not (:secret-key id))
+                                                      :text (domain/identity-name id)}]}))}
+                          {:fx/type :h-box
+                           :padding 10
+                           :children [{:fx/type :button
+                                       :disable (not (:followers-changed?
+                                                      (get open-profile-states pubkey)))                                       
+                                       :on-action identity
+                                       :text "Save"}]}]}}))
+
+(defn following-views-pane
+  [{:keys [pubkey open-profile-states views]}]
+  (let [following-views (:following-views (get open-profile-states pubkey))
+        switch (fn [view-name]
+                 (swap! domain/*state assoc-in
+                        [:open-profile-states pubkey :following-views-changed?]
+                        true)
+                 (swap! domain/*state assoc-in
+                        [:open-profile-states pubkey :following-views]
+                        (if (get following-views view-name)
+                          (remove #{view-name} following-views)
+                          (conj following-views view-name))))]
+    {:fx/type :scroll-pane
+     :padding 20
+     :hbar-policy :never
+     :vbar-policy :as-needed
+     :content {:fx/type :v-box
+               :children [{:fx/type :label :text "Visible in: "}
+                          {:fx/type :v-box
+                           :spacing 10
+                           :padding 10
+                           :children (for [name (sort (keys views))]
+                                       {:fx/type :h-box
+                                        :spacing 10
+                                        :children [{:fx/type :check-box
+                                                    :selected (boolean (get following-views name))
+                                                    :on-selected-changed (fn [_] (switch name))}
+                                                   {:fx/type :label :text name}]})}
+                          {:fx/type :h-box
+                           :padding 10
+                           :children [{:fx/type :button
+                                       :disable (not (:following-views-changed?
+                                                      (get (:open-profile-states @domain/*state) pubkey)))
+                                       :on-action identity
+                                       :text "Save"}]}]}}))
 
 (defn follows
-  [{:keys [pubkey identities identity-metadata views]}]
-  (let [identities-with-secret-keys (remove (comp not :secret-key) identities)]  
-    {:fx/type :grid-pane
-     :children [{:fx/type :label :text "Follow for: "
-                 :grid-pane/column 1
-                 :grid-pane/row 1}
-                {:fx/type :v-box
-                 :grid-pane/column 2
-                 :grid-pane/row 1
-                 :padding 10
-                 :spacing 10
-                 :children (for [id identities-with-secret-keys]
-                             (let [pubkey (:public-key id)
-                                   name (or (:name (get identity-metadata pubkey))
-                                            pubkey)]
-                               {:fx/type :h-box
-                                :spacing 10
-                                :children [{:fx/type :check-box
-                                            :selected false
-                                            :on-selected-changed identity}
-                                           {:fx/type :label :text name}]}))}
-                {:fx/type :v-box
-                 :grid-pane/column 1
-                 :grid-pane/row 2
-                 :children [{:fx/type :label :text "Make visible in: "}
-                            {:fx/type :v-box :v-box/vgrow :always}]}
-                {:fx/type :v-box
-                 :spacing 10
-                 :padding (Insets. 0.0 0.0 0.0 10.0)
-                 :grid-pane/column 2
-                 :grid-pane/row 2
-                 :children (for [name (sort (keys views))]
-                             {:fx/type :h-box
-                              :spacing 10
-                              :children [{:fx/type :check-box
-                                          :selected false
-                                          :on-selected-changed identity}
-                                         {:fx/type :label :text name}]})}
-                {:fx/type :h-box
-                 :grid-pane/column 2
-                 :grid-pane/row 3
-                 :padding 10
-                 :children [{:fx/type :button
-                             :on-action identity
-                             :text "Save"}]}]}))
+  [{:keys [pubkey open-profile-states identities identity-metadata views]}]
+  {:fx/type :h-box
+   :spacing 10
+   :children [{:fx/type followers-pane
+               :pubkey pubkey
+               :open-profile-states open-profile-states
+               :identity-metadata identity-metadata
+               :identities identities
+               :views views}
+              {:fx/type following-views-pane
+               :pubkey pubkey
+               :open-profile-states open-profile-states
+               :identity-metadata identity-metadata
+               :identities identities
+               :views views}]})
               
-
+               
 (defn profile
-  [{:keys [pubkey identities views metadata identity-metadata]}]
+  [{:keys [pubkey identities views metadata identity-metadata open-profile-states]}]
   (let [identity (first (filter (fn [id] (= (:public-key id) pubkey))
                                 identities))]
-    (log/debugf "Profile for %s with identity %s and metadata %s" pubkey identity metadata)
+    #_(log/debugf "Profile for %s with identity %s and metadata %s"
+                  pubkey identity metadata)
     (if pubkey
       {:fx/type :v-box
-       :padding 20
+       :padding 10
        :spacing 10
        :children [{:fx/type keycard
                    :fx/key pubkey
@@ -126,13 +171,12 @@
                                  :text "Delete identity"
                                  :disable true ; TODO: fix this
                                  :on-action {:event/type :delete-keycard :identity_ identity}}
-                                {:fx/type :v-box
-                                 :spacing 20
-                                 :children [{:fx/type follows
-                                             :pubkey pubkey
-                                             :identity-metadata identity-metadata
-                                             :identities identities
-                                             :views views}]})]}]}
+                                {:fx/type follows
+                                 :pubkey pubkey
+                                 :open-profile-states open-profile-states
+                                 :identity-metadata identity-metadata
+                                 :identities identities
+                                 :views views})]}]}
       {:fx/type :label
        :text "No pubkey found for profile"})))
 
