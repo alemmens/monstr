@@ -10,6 +10,7 @@
             [monstr.rich-text :as rich-text]
             [monstr.store :as store]
             [monstr.style :as style :refer [BORDER|]]
+            [monstr.tab-profile :as tab-profile]
             [monstr.timeline :as timeline]
             [monstr.util :as util]
             [monstr.util-domain :as util-domain]
@@ -315,12 +316,7 @@
    :left {:fx/type :h-box
           :cursor :hand
           :style-class "monstr-author-hbox"
-          :on-mouse-pressed (fn [_]
-                              (log/debugf "Updating open-profile-states with %s" pubkey)
-                              (when-not (get (:open-profile-states @domain/*state) pubkey)
-                                (swap! domain/*state assoc-in
-                                       [:open-profile-states pubkey]
-                                       (domain/new-profile-state pubkey))))
+          :on-mouse-pressed (fn [_] (tab-profile/maybe-add-open-profile-state! pubkey))
           :children [{:fx/type :label
                       :style-class "ndesk-timeline-item-name"
                       :text name}

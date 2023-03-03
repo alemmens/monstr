@@ -6,6 +6,7 @@
             [monstr.parse :as parse]
             [monstr.relay-conn :as relay-conn]
             [monstr.store :as store]
+            [monstr.tab-profile :as tab-profile]
             [monstr.timeline-support :as timeline-support]
             [monstr.util :as util]
             [monstr.util-java :as util-java])
@@ -44,27 +45,26 @@
       (HashSet.)
       timeline-epoch-vol)))
 
+(defn user-matches-event? [user-pubkey event-pubkey parsed-ptags]
+  (or
+   ;; The note was written by the user.
+   (= event-pubkey user-pubkey)
+   ;; The note's ptags reference the user.
+   (some #(= % user-pubkey) parsed-ptags)))
+
 
 (defn- accept-text-note?
   [*state column identity-pubkey parsed-ptags {:keys [pubkey] :as _event-obj}]
-  (or
-   ;; If this view follows all, we accept the text note.
-   (domain/follows-all? column)
-   ;; Otherwise we need to do more work.
-   (let [{:keys [contact-lists]} @*state
-         {:keys [parsed-contacts] :as _contact-list} (get contact-lists identity-pubkey)
-         ;; consider: optimization--not having to create contact set each note
-         contact-keys-set (into #{} (map :public-key) parsed-contacts)
-         ptag-keys-set (set parsed-ptags)]
-     (or
-      ;; identity's own note
-      (= pubkey identity-pubkey)
-      ;; the text-note's pubkey matches an identity's contact
-      (contact-keys-set pubkey)
-      ;; the text-note's ptags reference identity itself
-      (ptag-keys-set identity-pubkey)
-      ;; the text-note's ptags references one of identities contacts
-      (not-empty (set/intersection contact-keys-set ptag-keys-set))))))
+  (let [view (:view column)]
+    (case (:follow view)
+      :all true
+      :use-list (some #(= % pubkey)  ; only show notes where user is the author
+                      (:follow-set view))
+      :use-identity (or (user-matches-event? identity-pubkey pubkey parsed-ptags)
+                        (let [contacts (:parsed-contacts (get (:contact-lists @domain/*state)
+                                                              identity-pubkey))]
+                          (some #(user-matches-event? % pubkey parsed-ptags)
+                                (map :public-key contacts)))))))
 
 (defn dispatch-metadata-update!
   [*state {:keys [pubkey]}]
@@ -240,6 +240,8 @@
    (doseq [column (:all-columns @*state)]
      (update-column-timelines! column))
    ;; Update the state's active public key.
+   (tab-profile/remove-open-profile-state! (:active-key @*state))
+   (tab-profile/maybe-add-open-profile-state! public-key)
    (swap! *state assoc
           :active-key public-key)))
 

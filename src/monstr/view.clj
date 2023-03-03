@@ -202,7 +202,6 @@
                             (VBox/setVgrow Priority/ALWAYS))}])})
 
 (defn tab*
-  "PUBKEY is only given for closable profile tabs."
   [{:keys [label content closable pubkey]}]
   {:fx/type :tab
    :closable closable
@@ -364,11 +363,15 @@
                                             :metadata-cache metadata-cache}
                                 false]
                                ;; Profile tab for the active identity.
-                               ["Profile" {:fx/type tab-profile/profile
-                                           :pubkey active-key
-                                           :identities identities
-                                           :metadata (get identity-metadata active-key)}
-                                false]]
+                               #_["Profile" {:fx/type tab-profile/profile
+                                             :pubkey active-key
+                                             :views views
+                                             :open-profile-states open-profile-states                                           
+                                             :identities identities
+                                             :identity-metadata identity-metadata
+                                             :metadata (get identity-metadata active-key)}
+                                  false
+                                  active-key]]
                               ;; Profile tabs for authors.
                               (map (fn [pubkey]
                                      (let [metadata (metadata/get* metadata-cache pubkey)]
@@ -381,7 +384,7 @@
                                          :identities identities
                                          :identity-metadata identity-metadata
                                          :metadata metadata}
-                                        true
+                                        (not= pubkey active-key) ; not closable for active account
                                         pubkey
                                         ]))
                                    (keys open-profile-states)))]

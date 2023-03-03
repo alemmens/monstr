@@ -5,6 +5,7 @@
    [clojure.string :as str]
    [monstr.avatar :as avatar]
    [monstr.domain :as domain]
+   [monstr.file-sys :as file-sys]
    [monstr.util :as util])
   (:import (javafx.geometry Insets)))
 
@@ -108,7 +109,7 @@
                           (if (get following-views view-name)
                             (disj following-views view-name)
                             (conj following-views view-name)))))]
-        (log/debugf "Following views: %s" (pr-str following-views))
+    (log/debugf "Following views: %s" (pr-str following-views))
     {:fx/type :scroll-pane
      :padding 20
      :hbar-policy :never
@@ -139,12 +140,19 @@
                                                                              (if (following-views v)
                                                                                (conj follow-set pubkey)
                                                                                (disj follow-set pubkey)))))
+                                                    ;; TODO: Update relevant columns here.
+                                                    (file-sys/save-views (:views @domain/*state))
                                                     (log/debugf "Views are now %s" (pr-str (:views @domain/*state)))
                                                     (swap! domain/*state assoc-in
                                                            [:open-profile-states pubkey :following-views-changed?]
                                                            false))
                                        :text "Save"}]}]}}))
 
+    #_(status-bar/message! (format "Saved view '%s'" new-name))
+    #_(let [column (domain/find-column-with-view-name new-name)]
+          (assert column)
+          (hydrate/refresh-column! column))
+  
 (defn follows
   [{:keys [pubkey open-profile-states identities identity-metadata views]}]
   {:fx/type :h-box
@@ -162,7 +170,18 @@
                :identities identities
                :views views}]})
               
-               
+
+(defn remove-open-profile-state! [pubkey]
+  (swap! domain/*state util/dissoc-in
+         [:open-profile-states pubkey]))
+
+(defn maybe-add-open-profile-state! [pubkey]
+  (when-not (get (:open-profile-states @domain/*state) pubkey)
+    (log/debugf "Adding open-profile-state for %s" pubkey)    
+    (swap! domain/*state assoc-in
+           [:open-profile-states pubkey]
+           (domain/new-profile-state pubkey))))
+
 (defn profile
   [{:keys [pubkey identities views metadata identity-metadata open-profile-states]}]
   (let [identity (first (filter (fn [id] (= (:public-key id) pubkey))
@@ -173,29 +192,28 @@
       {:fx/type :v-box
        :padding 10
        :spacing 10
-       :children [{:fx/type :h-box
-                   :children [{:fx/type keycard
-                               :fx/key pubkey
-                               :public-key pubkey
-                               :active? false
-                               :profile? true
-                               :identity_ identity
-                               :metadata metadata}
-                              ;; Placeholder for posts by this user.
-                              {:fx/type :h-box :h-box/hgrow :always}]}
-                  {:fx/type :h-box
-                   :padding 10
-                   :children [(if identity
-                                {:fx/type :button
-                                 :text "Delete identity"
-                                 :disable true ; TODO: fix this
-                                 :on-action {:event/type :delete-keycard :identity_ identity}}
-                                {:fx/type follows
-                                 :pubkey pubkey
-                                 :open-profile-states open-profile-states
-                                 :identity-metadata identity-metadata
-                                 :identities identities
-                                 :views views})]}]}
+       :children (remove nil?
+                         [{:fx/type :h-box
+                           :children [{:fx/type keycard
+                                       :fx/key pubkey
+                                       :public-key pubkey
+                                       :active? false
+                                       :profile? true
+                                       :identity_ identity
+                                       :metadata metadata}
+                                      ;; Placeholder for posts by this user.
+                                      {:fx/type :h-box :h-box/hgrow :always}]}
+                          (when identity
+                            {:fx/type :button
+                             :text "Delete account"
+                             :disable true ; TODO: fix this
+                             :on-action {:event/type :delete-keycard :identity_ identity}})
+                          {:fx/type follows
+                           :pubkey pubkey
+                           :open-profile-states open-profile-states
+                           :identity-metadata identity-metadata
+                           :identities identities
+                           :views views}])}
       {:fx/type :label
        :text "No pubkey found for profile"})))
 

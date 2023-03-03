@@ -10,7 +10,8 @@
    [monstr.hydrate :as hydrate]
    [monstr.status-bar :as status-bar]
    [monstr.util :as util]
-   ))
+   )
+  (:import (javafx.geometry Insets)))
 
 (defn- field-row
   [label content]
@@ -62,40 +63,52 @@
     :use-identity "contacts of active account"
     :use-list "user list"})
 
-(defn- radio-group [{:keys [options value]}]
-  {:fx/type fx/ext-let-refs
-   :refs {::toggle-group {:fx/type :toggle-group}}
-   :desc {:fx/type :v-box
-          :spacing 5
-          :children (for [option options]
-                      {:fx/type :radio-button
-                       :toggle-group {:fx/type fx/ext-get-ref
-                                      :ref ::toggle-group}
-                       :selected (= option value)
-                       :text (str option)
-                       :on-action (fn [_]
-                                    (update-temp-view! :follow
-                                                       (get (set/map-invert follow-options)
-                                                            option)))})}})
-
-(defn- follow-radiogroup [{:keys [temp-view]}]
-  {:fx/type :h-box
-   :padding 5
-   :children [{:fx/type radio-group
-               :options (vals follow-options)
-               :value (get follow-options (:follow temp-view))}]})
 
 (defn- follow-set-pane [{:keys [temp-view metadata-cache]}]
   {:fx/type :h-box
-   :padding 15
+   :padding (Insets. 5.0 0.0 0.0 25)
    :children [{:fx/type :scroll-pane
-               :padding 10
+               :padding 5
+               :min-width 150
                :hbar-policy :never
                :vbar-policy :as-needed
                :content {:fx/type :v-box
                          :children (for [user (sort (map #(util/name-for-pubkey % metadata-cache)
                                              (:follow-set temp-view)))]
                                      {:fx/type :label :text user})}}]})
+
+(defn- radio-group [{:keys [options value temp-view metadata-cache]}]
+  {:fx/type fx/ext-let-refs
+   :refs {::toggle-group {:fx/type :toggle-group}}
+   :desc {:fx/type :v-box
+          :spacing 10
+          :children (for [option options]
+                      (let [button {:fx/type :radio-button
+                                    :toggle-group {:fx/type fx/ext-get-ref
+                                                   :ref ::toggle-group}
+                                    :selected (= option value)
+                                    :text (str option)
+                                    :on-action (fn [_]
+                                                 (update-temp-view! :follow
+                                                                    (get (set/map-invert follow-options)
+                                                                         option)))}]
+                        (if (= option "user list")
+                          {:fx/type :v-box
+                           :children [button
+                                      {:fx/type follow-set-pane
+                                       :temp-view temp-view
+                                       :metadata-cache metadata-cache}]}
+                          button)))}})
+
+(defn- follow-radiogroup [{:keys [temp-view metadata-cache]}]
+  {:fx/type :h-box
+   :padding 5
+   :children [{:fx/type radio-group
+               :options (vals follow-options)
+               :temp-view temp-view
+               :metadata-cache metadata-cache
+               :value (get follow-options (:follow temp-view))}]})
+
 
 (defn- relay-group
   [{:keys [temp-view]}]
@@ -120,34 +133,26 @@
   {:fx/type :v-box
    :padding 30
    :spacing 20
-   :children [;; Name
-              {:fx/type text-input
+   :children [{:fx/type text-input
                :label "Name:"
                :style "monstr-view-name"
                :value name
                :on-text-changed (fn [new-name]
                                   (update-temp-view! :name new-name))}
               {:fx/type :h-box
-               :spacing 40
-               :children [{:fx/type :v-box
-                           :spacing 20
-                           :children [;; Follow
-                                      {:fx/type :h-box
-                                       :children [{:fx/type field-label :text "Follow:"}
-                                                  {:fx/type :v-box
-                                                   :children [{:fx/type follow-radiogroup
-                                                               :temp-view temp-view}
-                                                              {:fx/type follow-set-pane
-                                                               :temp-view temp-view
-                                                               :metadata-cache metadata-cache}]}]}]}
-                          ;; Relays
-                          {:fx/type :h-box
+               :spacing 60
+               :children [{:fx/type :h-box
                            :children [{:fx/type field-label :text "Relays:"}
                                       {:fx/type relay-group
-                                       :temp-view temp-view}]}]}
+                                       :temp-view temp-view}]}
+                          {:fx/type :h-box
+                           :children [{:fx/type field-label :text "Follow:"}
+                                      {:fx/type follow-radiogroup
+                                       :temp-view temp-view
+                                       :metadata-cache metadata-cache}]}]}
               ;; Save and Delete buttons
               {:fx/type :h-box
-               :padding 30
+               :padding 5
                :children [{:fx/type field-label :text ""}
                           {:fx/type :h-box
                            :spacing 100
@@ -163,8 +168,7 @@
                                        :disable (not (domain/find-view selected-view))
                                        :text "Delete"
                                        :padding 5
-                                       :on-mouse-pressed {:event/type :delete-view}}]}]}
-              ]})
+                                       :on-mouse-pressed {:event/type :delete-view}}]}]} ]})
 
 (defn show-tab
   [{:keys [views selected-view temp-view temp-view-changed? metadata-cache]}]
