@@ -31,7 +31,8 @@
 (defn compact
   [m]
   (into {}
-    (filter (fn [[_ v]] (and (some? v) (or (not (coll? v)) (not (empty? v)))))) m))
+    (filter (fn [[_ v]] (and (some? v) (or (not (coll? v)) (not (empty? v))))))
+    m))
 
 (defn dissoc-in
   "dissoc-in is a mixture of assoc-in and dissoc. It lets us remove an entry from a nested

@@ -370,6 +370,36 @@ will be removed when the view is deleted. Continue?"
         (hydrate/add-column-for-view! new-view)))]])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Managing profiles
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- save-following-views
+  [{:keys [views pubkey]}]
+  [[:bg
+    (fn [*state _db _exec _dispatch!]
+      (log/debugf "Saving following views for %s" pubkey)
+      (doseq [v (keys views)]
+        (let [follow-set (:follow-set (domain/find-view v))
+              following-views (:following-views (get (:open-profile-states @*state) pubkey))]
+          ;; Update view's follow set.
+          (domain/update-view! v :follow-set
+                               (if (following-views v)
+                                 (conj follow-set pubkey)
+                                 (disj follow-set pubkey))))
+        ;; Update column if its view has changed.
+        (when (get (:following-views-changed (get (:open-profile-states @*state) pubkey))
+                   v)
+          (let [column (domain/find-column-with-view-name v)]
+            (assert column)
+            (hydrate/refresh-column! column))))
+      ;; Save views.
+      (file-sys/save-views (:views @*state))
+      (log/debugf "Views are now %s" (pr-str (:views @*state)))
+      (swap! *state assoc-in
+             [:open-profile-states pubkey :following-views-changed]
+             #{}))]])
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Event handler
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -393,4 +423,6 @@ will be removed when the view is deleted. Continue?"
     :save-view (save-view event)
     :delete-view (delete-view event)
     :add-view (add-view event)
+    ;; Profile tab
+    :save-following-views (save-following-views event)
     (log/error "no matching clause" type)))

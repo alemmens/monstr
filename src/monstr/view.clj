@@ -88,6 +88,9 @@
   ;; just a note, active-contact-pubkey may refer to a contact that we no longer
   ;; have - this is fine - we just need to handle this case - user will have to
   ;; click on another actual contact in this case
+  (log/debugf "Showing %d contacts for active key %s"
+              (count active-contact-list)
+              active-contact-pubkey)
   (let [{:keys [parsed-contacts]} active-contact-list]
     {:fx/type :v-box
      :children
@@ -453,7 +456,9 @@
                     status-message status-message-timestamp
                     open-profile-states
                     ]}]
-  (log/debugf "Root with column ids=%s" (pr-str visible-column-ids))
+  (log/debugf "Root with column ids=%s and %d contact-lists"
+              (pr-str visible-column-ids)
+              (count contact-lists))
   {:fx/type :border-pane
    :top {:fx/type :h-box
          :children [{:fx/type identity-selector

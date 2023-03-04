@@ -67,6 +67,7 @@
 (defn- follow-set-pane [{:keys [temp-view metadata-cache]}]
   {:fx/type :h-box
    :padding (Insets. 5.0 0.0 0.0 25)
+   :style-class "nuestr-follow-set"
    :children [{:fx/type :scroll-pane
                :padding 5
                :min-width 150

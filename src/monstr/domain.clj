@@ -79,6 +79,13 @@
   (or (:name (get (:identity-metadata @*state) (:public-key id)))
       (:public-key id)))
 
+(defn find-identity-by-pubkey [pubkey]
+  (first (filter #(= (:public-key %) pubkey)
+                 (:identities @*state))))
+
+(defn active-identity []
+  (find-identity-by-pubkey (:active-key @*state)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Executor
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -207,7 +214,7 @@
 (defrecord ProfileState
     [;; If changed? is true, the Save button will be enabled.
      followers-changed?
-     following-views-changed?
+     following-views-changed ; set of (names of) following views that have changed
      ;; A set of pubkeys (normally 0 or 1) of identities for which the profile's author is
      ;; / must be followed.
      followers
@@ -226,7 +233,8 @@
                              (filter (fn [v] (get (:follow-set v) pubkey))
                                      (vals (:views @*state))))]
     (log/debugf "New profile state with following-views %s" (pr-str following-views))
-    (->ProfileState false false
+    (->ProfileState false
+                    #{}
                     (set followers)
                     (set following-views))))
 

@@ -103,7 +103,8 @@
                 ^HashMap item-id->index
                 ^HashSet item-ids]}
         timeline]
-    #_(log/debugf "Flat dispatch of event %s for column %s with view %s"
+    #_
+    (log/debugf "Flat dispatch of event %s for column %s with view %s"
                 id
                 (:id column)
                 (:name (:view column)))
@@ -196,27 +197,35 @@
                   (events-share-etags? event-obj (:thread-focus column)))
           (add-item-to-thread-timeline! timeline (parse/parse-tags event-obj "p") event-obj))))))
 
+(defn- flat-dispatch-for-column [*state event-obj column]
+  ;; TODO: We probably don't need to dispatch for all identities?
+  #_(log/debugf "Dispatching event %s from %s to column %s with view '%s' and relays %s"
+              (:id event-obj)
+              (:relays event-obj)
+              (:id column)
+              (:name (:view column))
+              (:relay-urls (:view column)))
+  (doseq [[identity-pubkey pair] (:identity->timeline-pair column)]
+    (let [timeline (:flat-timeline pair)]
+      (when (event-is-relevant-for-column? event-obj timeline column)
+        (flat-dispatch! *state timeline identity-pubkey event-obj column)))))
+  
 (defn dispatch-text-note!
   "Dispatch a text note to all timelines for which the given event is relevant.
-  If COLUMN-ID is a string, the note is supposed to be for a thread view and
-  it's only dispatched to the specified column."
+  If COLUMN-ID is a string and THREAD? is true, the note is supposed to be for a thread
+  view and it's only thread-dispatched to the specified column. If COLUMN-ID is a string
+  and THREAD? is false, the note is flat-dispatched to the specified column. If COLUMN-ID
+  is not a string, the note is dispatched to all columns."
   [*state column-id event-obj check-relevance? thread?]
   ;; CONSIDER if this is too much usage of on-fx-thread - do we need to batch/debounce?
   (fx/run-later
-   (if (and thread? (string? column-id))
-     (let [column (domain/find-column-by-id column-id)]
-       (thread-dispatch! *state column event-obj check-relevance?))
+   (if (string? column-id)
+     (let [column (domain/find-column-by-id column-id)]     
+       (if thread?
+         (thread-dispatch! *state column event-obj check-relevance?)
+         (flat-dispatch-for-column *state event-obj column)))
      (doseq [column (:all-columns @*state)]
-       #_(log/debugf "Dispatching event %s from %s to column %s with view '%s' and relays %s"
-                   (:id event-obj)
-                   (:relays event-obj)
-                   (:id column)
-                   (:name (:view column))
-                   (:relay-urls (:view column)))
-       (doseq [[identity-pubkey pair] (:identity->timeline-pair column)]
-         (let [timeline (:flat-timeline pair)]
-           (when (event-is-relevant-for-column? event-obj timeline column)
-             (flat-dispatch! *state timeline identity-pubkey event-obj column))))))))
+       (flat-dispatch-for-column *state event-obj column)))))
 
 (defn- update-timeline-pair! [pair]
   (.setItems (:flat-listview pair)

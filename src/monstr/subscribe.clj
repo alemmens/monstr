@@ -4,6 +4,7 @@
    [monstr.domain :as domain]
    [monstr.relay-conn :as relay-conn]
    [monstr.status-bar :as status-bar]
+   [monstr.store :as store]
    [monstr.util :as util])
   (:import (java.time Instant)))
 
@@ -11,47 +12,62 @@
 ;; TODO ultimately may need to partition whale-of-pubkeys.
 (defn whale-of-pubkeys*
   [pubkeys contact-lists]
-  (let [contact-pubkeys (mapcat #(map :public-key (:parsed-contacts %)) (vals contact-lists))]
+  (let [contact-pubkeys (mapcat #(map :public-key (:parsed-contacts %))
+                                (vals contact-lists))]
     (set (concat pubkeys contact-pubkeys))))
 
+
+(defn relevant-pubkeys-for-view
+  "Returns a sequence with pubkeys that must be used for subscribing to relays or loading
+  from the database. If the result is nil, that means we should not filter on event
+  authors at all ('follow all')."
+  [view]
+  (case (:follow view)
+    :all nil
+    :use-identity (let [account-keys [(:public-key (domain/active-identity))]
+                        contact-lists (store/load-contact-lists store/db account-keys)]
+                    (log/debugf "Computing whale for %d contact lists" (count contact-lists))
+                    (whale-of-pubkeys* account-keys contact-lists))
+    :use-list (:follow-set view)))
+
+(defn filters-for-view [view since]
+  ;; 0: set_metadata
+  ;; 1: text note
+  ;; 2: recommend server
+  ;; 3: contact list
+  ;; 4: direct message
+  (let [account-pubkeys (map :public-key (:identities @domain/*state))]
+    [{:kinds [0 1 2 3]
+      :since since
+      :authors (relevant-pubkeys-for-view view)
+      :limit 1000}
+     {:kinds [1 4]
+      :#p account-pubkeys
+      :since since}
+     {:kinds [4]
+      :since since
+      :authors account-pubkeys}]))
+  
 (defn overwrite-subscriptions!
-  
-  ([identities contact-lists column since]
+  ([column since]
    ;; SINCE is a Java Instant.  
-   ;; TODO note: since here is a stop-gap protection .. really we would like to track a
-   ;; durable "watermark" for stable subscriptions
-   (let [use-since (.getEpochSecond since)
-         pubkeys (mapv :public-key identities)]
-     (when-not (empty? pubkeys)
-       ;; 0: set_metadata
-       ;; 1: text note
-       ;; 2: recommend server
-       ;; 3: contact list
-       ;; 4: direct message
-       (let [filters [{:kinds [0 1 2 3]
-                       :since use-since
-                       :authors (if (domain/follows-all? column)
-                                  []
-                                  (whale-of-pubkeys* pubkeys contact-lists))
-                       :limit 1000}
-                      {:kinds [1 4] :#p pubkeys :since use-since}
-                      {:kinds [4]
-                       :since use-since :authors pubkeys}]]
-         (swap! domain/*state assoc :last-refresh (Instant/now))
-         (log/debugf "Subscribing all for '%s'" (:name (:view column)))
-         (relay-conn/subscribe-all! (format "flat:%s" (:id column))
-                                    filters)
-         (log/info "overwrote subscriptions")))))
+   ;; TODO: track a durable "watermark" for stable subscriptions.
+   (when-not (empty? (:identities @domain/*state))
+     (let [view (:view column)
+           filters (filters-for-view view (.getEpochSecond since))]
+       #_(swap! domain/*state assoc :last-refresh (Instant/now))
+       (log/debugf "Subscribing all for '%s'" (:name view))
+       (relay-conn/subscribe-all! (format "flat:%s" (:id column))
+                                  filters)
+       (log/info "overwrote subscriptions"))))
   
-  ([identities contact-lists column]
+  ([column]
    (let [last-refresh (:last-refresh @domain/*state)
          since (or last-refresh (util/days-ago 1))]
-     (overwrite-subscriptions! identities contact-lists column since))))
+     (overwrite-subscriptions! column since))))
 
 (defn refresh! []
   (status-bar/message! "Refreshing subscriptions.")
   (doseq [c (:all-columns @domain/*state)]
-    (overwrite-subscriptions! (:identities @domain/*state)
-                              (:contact-lists @domain/*state)
-                              c)))
+    (overwrite-subscriptions! c)))
 

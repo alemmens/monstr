@@ -144,9 +144,11 @@
   [(format (str "select raw_event_tuple from n_events e"
                 " inner join relay_event_id r on e.id=r.event_id"
                 " where r.relay_url='" relay-url "'"
-                " and e.pubkey in (%s) and e.kind = 1"
+                (when pubkeys
+                  " and e.pubkey in (%s) ")
+                " and e.kind = 1"
                 " order by e.created_at desc"
-                " limit 100")
+                " limit 200")
                (str/join ", " (map #(str "'" % "'") pubkeys)))])
 
 (defn load-relay-events
@@ -223,22 +225,19 @@
 ;; todo make efficient via delete by trigger or gc process
 (defn load-contact-lists
   "Answers {<pubkey> ContactList}."
-  [db identities]
-  (log/debugf "Loading contact lists for %d identities." (count identities))
-  (let [public-keys (mapv :public-key identities)]
-    (into
-      {}
-      (map (juxt :pubkey #(-> % :raw_event_tuple raw-event-tuple->parsed-contact-list)))
-      (jdbc/execute! db
-        (vec
-          (concat
-            [(format
-               (str "select pubkey, raw_event_tuple, max(created_at) as max_ from n_events"
-                 " where pubkey in (%s) and kind = 3 and deleted_ is false"
-                 " group by pubkey")
-               (str/join "," (repeat (count public-keys) "?")))]
-            public-keys))
-        {:builder-fn rs/as-unqualified-lower-maps}))))
+  [db pubkeys]
+  (log/debugf "Loading contact lists for %d pubkeys." (count pubkeys))
+  (into
+   {}
+   (map (juxt :pubkey #(-> % :raw_event_tuple raw-event-tuple->parsed-contact-list)))
+   (jdbc/execute! db
+                  (vec
+                   (concat [(format (str "select pubkey, raw_event_tuple, max(created_at) as max_ from n_events"
+                                         " where pubkey in (%s) and kind = 3 and deleted_ is false"
+                                         " group by pubkey")
+                                    (str/join "," (repeat (count pubkeys) "?")))]
+                           pubkeys))
+                  {:builder-fn rs/as-unqualified-lower-maps})))
 
 (defn replace-relays!
   "Answers provided relays on success."

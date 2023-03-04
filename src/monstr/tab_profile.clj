@@ -98,12 +98,14 @@
   [{:keys [pubkey open-profile-states views]}]
   (let [following-views (:following-views (get open-profile-states pubkey))
         switch (fn [view-name]
-                 (swap! domain/*state assoc-in
-                        [:open-profile-states pubkey :following-views-changed?]
-                        true)
-                 (let [following-views (:following-views (get (:open-profile-states @domain/*state) pubkey))]
+                 (let [profile-state (get (:open-profile-states @domain/*state) pubkey)
+                       following-views (:following-views profile-state)
+                       following-views-changed (:following-views profile-state)]
                    (log/debugf "Switching with following views: %s"
-                               (pr-str following-views))
+                               (pr-str following-views))                   
+                   (swap! domain/*state assoc-in
+                          [:open-profile-states pubkey :following-views-changed]
+                          (conj following-views-changed view-name))
                    (swap! domain/*state assoc-in
                           [:open-profile-states pubkey :following-views]
                           (if (get following-views view-name)
@@ -129,29 +131,12 @@
                           {:fx/type :h-box
                            :padding 10
                            :children [{:fx/type :button
-                                       :disable (not (:following-views-changed?
-                                                      (get (:open-profile-states @domain/*state) pubkey)))
-                                       :on-action (fn [_]
-                                                    (log/debugf "Saving following views %s"
-                                                                (pr-str following-views))
-                                                    (doseq [v (keys views)]
-                                                      (let [follow-set (:follow-set (domain/find-view v))]
-                                                        (domain/update-view! v :follow-set
-                                                                             (if (following-views v)
-                                                                               (conj follow-set pubkey)
-                                                                               (disj follow-set pubkey)))))
-                                                    ;; TODO: Update relevant columns here.
-                                                    (file-sys/save-views (:views @domain/*state))
-                                                    (log/debugf "Views are now %s" (pr-str (:views @domain/*state)))
-                                                    (swap! domain/*state assoc-in
-                                                           [:open-profile-states pubkey :following-views-changed?]
-                                                           false))
+                                       :disable (empty? (:following-views-changed
+                                                         (get (:open-profile-states @domain/*state) pubkey)))
+                                       :on-action {:event/type :save-following-views
+                                                   :views views
+                                                   :pubkey pubkey}
                                        :text "Save"}]}]}}))
-
-    #_(status-bar/message! (format "Saved view '%s'" new-name))
-    #_(let [column (domain/find-column-with-view-name new-name)]
-          (assert column)
-          (hydrate/refresh-column! column))
   
 (defn follows
   [{:keys [pubkey open-profile-states identities identity-metadata views]}]

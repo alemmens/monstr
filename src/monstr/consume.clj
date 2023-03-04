@@ -110,8 +110,7 @@
 
 (defn- consume-notice
   [relay-url message]
-  (log/info "NOTICE (TODO): " relay-url message) ;; todo
-  )
+  (log/info "NOTICE (TODO): " relay-url message))
 
 (defn- consume-eose
   [relay-url subscription-id]

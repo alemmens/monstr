@@ -44,21 +44,28 @@
 
 (defn- hydrate-contact-lists!
   [new-identities]
-  (let [contact-lists (store/load-contact-lists store/db new-identities)]
-    (status-bar/message! "Loading contact lists")
+  (let [contact-lists (store/load-contact-lists store/db (mapv :public-key new-identities))]
+    (status-bar/message! (format "Loaded %d contact lists for %s"
+                                 (count contact-lists)
+                                 new-identities))
     (swap! domain/*state update :contact-lists merge contact-lists)
     contact-lists))
 
 (defn dispatch-text-notes
-  [*state relay-url events]
+  "If COLUMN is a string, the notes are only dispatched to the specified column.
+  Otherwise they are dispatched to all columns."
+  [*state relay-url events column]
   ;; TODO consider transduce iterate over timeline-data and throttling
   ;;      dispatches via yielding of bg thread; this way we'd move
   ;;      on to subscriptions, allowing new stuff to come in sooner
   ;;      as we backfill
-  (status-bar/message! (format "Dispatching %d text notes from %s" (count events) relay-url))
+  (status-bar/message! (format "Dispatching %d text notes from %s to column %s"
+                               (count events) relay-url (:id column)))
   (doseq [event-obj events]
     (timeline/dispatch-text-note! *state
-                                  false
+                                  (if (string? column)
+                                    (:id column)
+                                    false)
                                   (assoc event-obj :relays (list relay-url))
                                   false
                                   false)))
@@ -81,6 +88,8 @@
       (log/debugf "Hydrating with first identity key %s" first-identity-key)
       (timeline/update-active-timelines! *state first-identity-key))    
     (let [contact-lists (hydrate-contact-lists! new-identities)
+          ;; TODO: Make sure that user follow lists for all views are also in
+          ;; this 'closure' list of public keys!
           closure-public-keys (subscribe/whale-of-pubkeys* new-public-keys contact-lists)]
       ;; TODO: also limit timeline events to something, some cardinality?
       ;; TODO: also load watermarks and include in new subscriptions.
@@ -89,9 +98,10 @@
           (status-bar/message! (format "Loaded %d events for %s from database"
                                        (count events)
                                        r))
-          (dispatch-text-notes *state r events))))
+          (fx/run-later (dispatch-text-notes *state r events false)))))
     ;; NOTE: use *all* identities to update subscriptions.
-    (subscribe/refresh!)))
+    (swap! domain/*state assoc :last-refresh false)
+    (fx/run-later (subscribe/refresh!))))
 
 #_
 (defn dehydrate!*
@@ -141,18 +151,17 @@
               (:id column)
               (:name (:view column))
               (:relay-urls (:view column)))
-  (let [identities (:identities @domain/*state)
-        new-public-keys (mapv :public-key identities)
-        contact-lists (hydrate-contact-lists! identities)
-        closure-public-keys (subscribe/whale-of-pubkeys* new-public-keys contact-lists)]
-    (doseq [r (:relay-urls (:view column))]
-      (let [events (store/load-relay-events store/db r closure-public-keys)]
+  (let [view (:view column)
+        relevant-pubkeys (subscribe/relevant-pubkeys-for-view view)]
+    (doseq [r (:relay-urls view)]
+      (let [events (store/load-relay-events store/db r relevant-pubkeys)]
         (status-bar/message! (format "Loaded %d events for %s from database"
                                      (count events)
                                      r))
-        ;; TODO: Optimize by only dispatching to the given column.
-        (dispatch-text-notes domain/*state r events)))
-    (subscribe/overwrite-subscriptions! identities contact-lists column)))
+        (dispatch-text-notes domain/*state r events column)))
+    ;; TODO: pass relevant-pubkeys here so we don't have to recompute it
+    ;; in overwrite-subscriptions!
+    (subscribe/overwrite-subscriptions! column)))
 
 (defn add-column-for-view! [view]
   (let [column (new-column view (:identities @domain/*state))]
