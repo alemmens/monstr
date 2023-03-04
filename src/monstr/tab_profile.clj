@@ -142,7 +142,8 @@
   [{:keys [pubkey open-profile-states identities identity-metadata views]}]
   {:fx/type :h-box
    :spacing 10
-   :children [{:fx/type followers-pane
+   :children [#_ ; TODO: FINISH THIS
+              {:fx/type followers-pane
                :pubkey pubkey
                :open-profile-states open-profile-states
                :identity-metadata identity-metadata

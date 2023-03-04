@@ -63,20 +63,16 @@
     :use-identity "contacts of active account"
     :use-list "user list"})
 
-
 (defn- follow-set-pane [{:keys [temp-view metadata-cache]}]
   {:fx/type :h-box
    :padding (Insets. 5.0 0.0 0.0 25)
    :style-class "nuestr-follow-set"
-   :children [{:fx/type :scroll-pane
-               :padding 5
-               :min-width 150
-               :hbar-policy :never
-               :vbar-policy :as-needed
-               :content {:fx/type :v-box
-                         :children (for [user (sort (map #(util/name-for-pubkey % metadata-cache)
-                                             (:follow-set temp-view)))]
-                                     {:fx/type :label :text user})}}]})
+   :children [{:fx/type :list-view
+               :padding 10
+               :pref-height 220
+               :pref-width 120
+               :items (sort (map #(util/name-for-pubkey % metadata-cache)
+                                 (:follow-set temp-view)))}]})
 
 (defn- radio-group [{:keys [options value temp-view metadata-cache]}]
   {:fx/type fx/ext-let-refs
