@@ -431,6 +431,7 @@
           :focus-traversable false
           :style-class ["monstr-thread-pane-listview"]
           :pref-height 100000  ; trick to make it stretch vertically
+          :pref-width 100000
           :cell-factory {:fx/cell-type :list-cell
                          :describe (fn [note-wrapper]
                                      {:graphic

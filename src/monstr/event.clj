@@ -378,24 +378,28 @@ will be removed when the view is deleted. Continue?"
   [{:keys [views pubkey]}]
   [[:bg
     (fn [*state _db _exec _dispatch!]
-      (log/debugf "Saving following views for %s" pubkey)
-      (doseq [v (keys views)]
-        (let [follow-set (:follow-set (domain/find-view v))
-              following-views (:following-views (get (:open-profile-states @*state) pubkey))]
-          ;; Update view's follow set.
-          (domain/update-view! v :follow-set
-                               (if (following-views v)
+      (let [profile-state (get (:open-profile-states @*state) pubkey)
+            following-views (:following-views profile-state)]
+        #_(log/debugf "Saving following views for %s, changed=%s"
+                      pubkey (:following-views-changed profile-state))
+        (doseq [v (keys views)]
+          ;; Update view's follow set.          
+          (let [follow-set (:follow-set (domain/find-view v))
+                new-follow-set (if (following-views v)
                                  (conj follow-set pubkey)
-                                 (disj follow-set pubkey))))
-        ;; Update column if its view has changed.
-        (when (get (:following-views-changed (get (:open-profile-states @*state) pubkey))
-                   v)
+                                 (disj follow-set pubkey))]
+            (domain/update-view! v :follow-set new-follow-set)))
+        ;; Update the columns that use the views.
+        (let [new-columns (map #(assoc % :view (domain/find-view (:name (:view %))))
+                               (:all-columns @domain/*state))]
+          (swap! *state assoc :all-columns new-columns))
+        (doseq [v (:following-views-changed profile-state)]
+          ;; Refresh column if its view has changed.
           (let [column (domain/find-column-with-view-name v)]
             (assert column)
             (hydrate/refresh-column! column))))
       ;; Save views.
       (file-sys/save-views (:views @*state))
-      (log/debugf "Views are now %s" (pr-str (:views @*state)))
       (swap! *state assoc-in
              [:open-profile-states pubkey :following-views-changed]
              #{}))]])

@@ -126,26 +126,6 @@
      channels     ; a set of (pubkeys of) Nostr channels (defined by kind 40 and 41 events)
      ])
 
-(defn update-view! [name property value]
-  (assert (find-view name))
-  (swap! *state assoc-in
-         [:views name property]
-         value))
-
-(defn make-view
-  [name relay-urls
-   {:keys [follow follow-set friends-of-friends mute-authors words mute-words channels]}]
-  (->View (rand-int 100000000)
-          name
-          relay-urls
-          (or follow :use-identity)
-          (or follow-set #{})
-          (or friends-of-friends 1)
-          (or mute-authors #{})
-          (or words #{})
-          (or mute-words #{})
-          (or channels #{})))
-
 (defrecord TimelinePair
     [flat-timeline
      thread-timeline
@@ -184,6 +164,25 @@
 (defn follows-all? [column]
   (= (:follow (:view column))
      :all))
+
+(defn update-view! [name property value]
+  (swap! *state assoc-in
+         [:views name property]
+         value))
+
+(defn make-view
+  [name relay-urls
+   {:keys [follow follow-set friends-of-friends mute-authors words mute-words channels]}]
+  (->View (rand-int 100000000)
+          name
+          relay-urls
+          (or follow :use-identity)
+          (or follow-set #{})
+          (or friends-of-friends 1)
+          (or mute-authors #{})
+          (or words #{})
+          (or mute-words #{})
+          (or channels #{})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Rest

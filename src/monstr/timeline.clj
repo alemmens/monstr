@@ -148,6 +148,7 @@
                      
   
 (defn clear-column! [column thread?]
+  (log/debugf "Clearing column %s" (:id column))
   (doseq [pair (vals (:identity->timeline-pair column))]
     (clear-timeline-pair! pair thread?)))
                      

@@ -223,11 +223,12 @@
            relays show-add-column-dialog? can-publish?
            active-key active-reply-context active-contact-pubkey
            metadata-cache]}]
-  (log/debugf "Main panes with active key='%s', %d columns=%s and views %s"
+  (log/debugf "Main panes with active key='%s', %d columns=%s and column views %s and views %s"
               active-key
               (count visible-column-ids)
               (pr-str visible-column-ids)
-              (pr-str (map (comp :view domain/find-column-by-id) visible-column-ids)))
+              (pr-str (map (comp :view domain/find-column-by-id) visible-column-ids))
+              (pr-str (vals (:views @domain/*state))))
   {:fx/type :v-box
    :children
    [;; The "what's on your mind?" box.
