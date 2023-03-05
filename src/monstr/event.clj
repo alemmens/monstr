@@ -41,16 +41,16 @@
           (cond-> (assoc curr-state :show-new-identity? show-new-identity?)
             (not show-new-identity?) (assoc :new-identity-error "")))))]])
 
-#_
-(defn delete-keycard
-  [{:keys [identity_]}]
+(defn delete-account
+  [{:keys [identity]}]
   (when (modal/blocking-yes-no-alert "" "Are you sure?")
     [[:bg
       (fn [*state db executor _dispatch!]
-        (store/delete-identity! db (:public-key identity_))
+        (store/delete-identity! db (:public-key identity))
         (let [{curr-identities :identities} @*state]
-          (when (some #(= (:public-key identity_) (:public-key %)) curr-identities)
-            (hydrate/dehydrate! *state db executor [identity_]))))]]))
+          (when (some #(= (:public-key identity) (:public-key %))
+                      curr-identities)
+            (hydrate/dehydrate! *state db executor [identity]))))]]))
 
 (defn maybe-contribute-secret-key*
   [*state public-key maybe-private-key]
@@ -411,7 +411,7 @@ will be removed when the view is deleted. Continue?"
     :click-keycard (click-keycard event)
     :show-new-identity (show-new-identity-effect true)
     :new-identity-close-request (new-identity-close-request event)
-    ; :delete-keycard (delete-keycard event)
+    :delete-account (delete-account event)
     :show-relays (show-relays-effect true)
     :relays-close-request (relays-close-request event)
     :publish! (publish! event)

@@ -201,8 +201,8 @@
                                       (when identity
                                         {:fx/type :button
                                          :text "Delete account"
-                                         :disable true ; TODO: fix this
-                                         :on-action {:event/type :delete-keycard :identity_ identity}})
+                                         :on-action {:event/type :delete-account
+                                                     :identity identity}})
                                       {:fx/type follows
                                        :pubkey pubkey
                                        :open-profile-states open-profile-states

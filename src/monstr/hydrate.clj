@@ -113,9 +113,7 @@
     (swap! domain/*state assoc :last-refresh false)
     (fx/run-later (subscribe/refresh!))))
 
-#_
-(defn dehydrate!*
-  [*state _db ^ScheduledExecutorService _executor dead-identities]
+(defn dehydrate!* [*state _db dead-identities]
   (let [dead-public-keys-set (into #{} (map :public-key) dead-identities)]
     (let [{new-active-key :active-key
            new-identities :identities
@@ -134,20 +132,18 @@
                   true
                   (update :identity-metadata #(apply dissoc % dead-public-keys-set))
                   true
-                  ;; TO DO: FIX THIS!
-                  (update :identity->columns #(apply dissoc % dead-public-keys-set))
+                  (update :open-profile-states #(apply dissoc % dead-public-keys-set))
                   true
                   (update :contact-lists #(apply dissoc % dead-public-keys-set))))))]
       (timeline/update-active-timelines! *state new-active-key)
       ;; TODO note: this means we are resubscribing -- def should optimize w/ some kind of
       ;; watermark strategy.
-      (subscribe/overwrite-subscriptions! new-identities new-contact-lists))))
+      (subscribe/refresh!))))
 
 (defn hydrate! [*state db executor new-identities]
   (util/submit! executor
                 #(hydrate!* *state db new-identities)))
 
-#_
 (defn dehydrate! [*state db executor dead-identities]
   (util/submit! executor
                 #(dehydrate!* *state db dead-identities)))

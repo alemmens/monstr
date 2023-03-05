@@ -94,6 +94,7 @@
 
 (defn delete-identity!
   [db public-key]
+  (log/debugf "Deleting account %s" public-key)
   (jdbc/execute-one! db
     ["delete from identities_ where public_key = ?" public-key]))
 

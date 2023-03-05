@@ -46,7 +46,6 @@
    :new-timeline nil         ; relay url to be added to the visible timelines
    ;; Profiles
    :open-profile-states {}   ; a map from pubkeys (of open profile tabs) to ProfileState
-   ; :open-profile-pairs {}    ; a map from pubkeys to TimelinePair
    ;; Refresh
    :last-refresh nil         ; Java Instant indicating when the most recent refresh started
    ;; Status bar
