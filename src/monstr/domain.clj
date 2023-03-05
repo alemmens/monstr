@@ -1,9 +1,16 @@
 (ns monstr.domain
   (:require
    [clojure.set :as set]
-   [clojure.tools.logging :as log])
+   [clojure.tools.logging :as log]
+   [monstr.util-java :as util-java])
   (:import
-    (java.util.concurrent ThreadFactory Executors ScheduledExecutorService TimeUnit)))
+   (java.time ZonedDateTime Instant)
+   (java.util.concurrent ThreadFactory Executors ScheduledExecutorService TimeUnit)
+   (java.util HashMap HashSet)
+   (javafx.collections FXCollections ObservableList)
+   (javafx.collections.transformation FilteredList)))
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; State
@@ -39,6 +46,7 @@
    :new-timeline nil         ; relay url to be added to the visible timelines
    ;; Profiles
    :open-profile-states {}   ; a map from pubkeys (of open profile tabs) to ProfileState
+   ; :open-profile-pairs {}    ; a map from pubkeys to TimelinePair
    ;; Refresh
    :last-refresh nil         ; Java Instant indicating when the most recent refresh started
    ;; Status bar
@@ -144,7 +152,7 @@
      thread-timeline
      flat-listview
      thread-listview])
-  
+
 (defrecord Column
     [id           ; a random UUID
      view
@@ -181,6 +189,43 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Rest
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defrecord Timeline
+  ;; these field values are only ever mutated on fx thread
+  [^ObservableList adapted-list
+   ^ObservableList observable-list ;; contains UITextNoteWrapper
+   ^HashMap author-pubkey->item-id-set
+   ^HashMap item-id->index
+   ^HashSet item-ids
+   timeline-epoch-vol
+   ])
+
+
+(defn- days-ago
+  ^Instant [n]
+  (-> (ZonedDateTime/now)
+    (.minusDays n)
+    .toInstant))
+
+(defn new-timeline []
+  ;; NOTE: we're querying and subscribing to all of time but for now, for ux
+  ;; experience, we filter underlying data by n days
+  ;; todo we'll really wish to query/subscribe at an epoch and only update it on scroll etc.
+  (let [init-timeline-epoch (-> (days-ago 1) .getEpochSecond)
+        timeline-epoch-vol (volatile! init-timeline-epoch)
+        observable-list (FXCollections/observableArrayList)
+        filtered-list (FilteredList. observable-list
+                        (util-java/->Predicate #(> (:max-timestamp %) init-timeline-epoch)))
+        adapted-list (.sorted filtered-list
+                              ;; latest wrapper entries first:
+                              (comparator #(< (:max-timestamp %2) (:max-timestamp %1))))]
+    (->Timeline
+      adapted-list
+      observable-list
+      (HashMap.)
+      (HashMap.)
+      (HashSet.)
+      timeline-epoch-vol)))
 
 (defrecord Identity
     [public-key secret-key])
@@ -219,9 +264,12 @@
      ;; / must be followed.
      followers
      ;; A set of view names for which the profile's author is / must be in the set of follows.
-     following-views])
+     following-views
+     ;; Timelines
+     timeline-pair
+     show-thread?])
 
-(defn new-profile-state [pubkey]
+(defn new-profile-state [pubkey list-creator thread-creator]
   (let [followers (filter (fn [k]
                             (when-let [contact-list (get (:contact-lists @*state) k)]
                               ;; One of the contacts (i.e. follows) of K is the given
@@ -236,8 +284,10 @@
     (->ProfileState false
                     #{}
                     (set followers)
-                    (set following-views))))
-
+                    (set following-views)
+                    (->TimelinePair (new-timeline) (new-timeline)
+                                    (list-creator) (thread-creator))
+                    false)))
 
 ;; --
 

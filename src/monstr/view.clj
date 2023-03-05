@@ -364,18 +364,8 @@
                                             :active-contact-list active-contact-list
                                             :active-contact-pubkey active-contact-pubkey
                                             :metadata-cache metadata-cache}
-                                false]
-                               ;; Profile tab for the active identity.
-                               #_["Profile" {:fx/type tab-profile/profile
-                                             :pubkey active-key
-                                             :views views
-                                             :open-profile-states open-profile-states                                           
-                                             :identities identities
-                                             :identity-metadata identity-metadata
-                                             :metadata (get identity-metadata active-key)}
-                                  false
-                                  active-key]]
-                              ;; Profile tabs for authors.
+                                false]]
+                              ;; Profile tabs.
                               (map (fn [pubkey]
                                      (let [metadata (metadata/get* metadata-cache pubkey)]
                                        [(format "Profile: %s" (or (:name metadata)

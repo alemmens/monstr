@@ -15,6 +15,7 @@
     [monstr.timeline :as timeline]
     [monstr.util :as util]
     [monstr.util-domain :as util-domain]
+    [monstr.view-home :as view-home]
     [monstr.x.crypt :as crypt]
     [manifold.deferred :as d])
   (:import (javafx.scene.control DialogEvent Dialog Button TextArea)
@@ -398,13 +399,14 @@ will be removed when the view is deleted. Continue?"
       (swap! *state assoc-in
              [:open-profile-states pubkey :following-views-changed]
              #{}))]])
-
+  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Event handler
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn handle
   [{:event/keys [type] :as event}]
+  (log/debugf "Handling %s" type)
   (case type
     :click-keycard (click-keycard event)
     :show-new-identity (show-new-identity-effect true)

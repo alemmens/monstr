@@ -1,32 +1,37 @@
 (ns monstr.hydrate
   (:require
-   [cljfx.api :as fx]   
-   [monstr.timeline :as timeline]
+   [cljfx.api :as fx]
+   [clojure.tools.logging :as log]
    [monstr.domain :as domain]
-   [monstr.util :as util]
-   [monstr.store :as store]
    [monstr.metadata :as metadata]
    [monstr.status-bar :as status-bar]
+   [monstr.store :as store]
    [monstr.subscribe :as subscribe]
-   [monstr.view-home :as view-home]
-   [clojure.tools.logging :as log])
+   [monstr.timeline :as timeline]
+   [monstr.util :as util]   
+   [monstr.view-home :as view-home])
   (:import (java.util.concurrent ScheduledExecutorService)
            (java.util UUID)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Creating new timelines, columns
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn new-timeline-pair [column-id]
-  (let [flat-timeline (timeline/new-timeline)
-        thread-timeline (timeline/new-timeline)
+(defn new-timeline-pair
+  "COLUMN-ID should be nil for timelines that are shown in Profile tabs."
+  [column-id]
+  (let [flat-timeline (domain/new-timeline)
+        thread-timeline (domain/new-timeline)
         flat-listview (view-home/create-list-view column-id
                                                   domain/*state store/db
                                                   metadata/cache
-                                                  domain/daemon-scheduled-executor)                     
-        thread-listview (view-home/create-thread-view column-id
+                                                  domain/daemon-scheduled-executor)                            thread-listview (view-home/create-thread-view column-id
                                                       domain/*state store/db
                                                       metadata/cache
                                                       domain/daemon-scheduled-executor)]
     (domain/->TimelinePair flat-timeline thread-timeline
                            flat-listview thread-listview)))
+
 (defn- new-timelines-map
   [column-id pubkeys]
   (log/debugf "New timelines map with pubkeys=%s" (pr-str pubkeys))
@@ -41,6 +46,11 @@
         column (domain/->Column id view nil false nil)]
     (assoc column
            :identity->timeline-pair (new-timelines-map id (map :public-key identities)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Hydrating and dispatching
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- hydrate-contact-lists!
   [new-identities]

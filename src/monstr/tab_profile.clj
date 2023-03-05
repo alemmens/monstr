@@ -6,8 +6,12 @@
    [monstr.avatar :as avatar]
    [monstr.domain :as domain]
    [monstr.file-sys :as file-sys]
+   [monstr.status-bar :as status-bar]
+   [monstr.store :as store]
+   [monstr.timeline :as timeline]
    [monstr.util :as util])
-  (:import (javafx.geometry Insets)))
+  (:import (javafx.geometry Insets)
+           (javafx.scene.layout VBox HBox Priority)))
 
 
 (defn keycard
@@ -17,7 +21,7 @@
         picture-url (:picture-url metadata)]
     (log/debugf "Keycard for %s with metadata %s" public-key metadata)
     {:fx/type :v-box
-     ; :max-height 400
+     :pref-width 600
      :style-class ["ndesk-keycard"]                   
      :children [{:fx/type :h-box
                  :children
@@ -157,49 +161,57 @@
                :views views}]})
               
 
-(defn remove-open-profile-state! [pubkey]
-  (swap! domain/*state util/dissoc-in
-         [:open-profile-states pubkey]))
-
-(defn maybe-add-open-profile-state! [pubkey]
-  (when-not (get (:open-profile-states @domain/*state) pubkey)
-    (log/debugf "Adding open-profile-state for %s" pubkey)    
-    (swap! domain/*state assoc-in
-           [:open-profile-states pubkey]
-           (domain/new-profile-state pubkey))))
-
+(defn user-posts
+  [{:keys [timeline-pair]}]
+  (let [listview (if (:show-thread? timeline-pair)
+                   (:thread-listview timeline-pair)
+                   (:flat-listview timeline-pair))]
+    (log/debugf "%d user posts" (count (:item-ids (:flat-timeline timeline-pair))))
+    {:fx/type :v-box
+     :padding 10
+     :children (if (nil? listview)
+                 []
+                 [{:fx/type fx/ext-instance-factory
+                   :create #(doto listview
+                              (VBox/setVgrow Priority/ALWAYS))}])}))
+  
 (defn profile
   [{:keys [pubkey identities views metadata identity-metadata open-profile-states]}]
   (let [identity (first (filter (fn [id] (= (:public-key id) pubkey))
                                 identities))]
     (log/debugf "Profile for %s with states %s"
-                pubkey (pr-str open-profile-states))
+                pubkey (pr-str (keys open-profile-states)))
     (if pubkey
-      {:fx/type :v-box
+      {:fx/type :h-box
        :padding 10
        :spacing 10
-       :children (remove nil?
-                         [{:fx/type :h-box
-                           :children [{:fx/type keycard
-                                       :fx/key pubkey
-                                       :public-key pubkey
-                                       :active? false
-                                       :profile? true
-                                       :identity_ identity
-                                       :metadata metadata}
-                                      ;; Placeholder for posts by this user.
-                                      {:fx/type :h-box :h-box/hgrow :always}]}
-                          (when identity
-                            {:fx/type :button
-                             :text "Delete account"
-                             :disable true ; TODO: fix this
-                             :on-action {:event/type :delete-keycard :identity_ identity}})
-                          {:fx/type follows
-                           :pubkey pubkey
-                           :open-profile-states open-profile-states
-                           :identity-metadata identity-metadata
-                           :identities identities
+       :children [{:fx/type :v-box
+                   :padding 10
+                   :spacing 10
+                   :children (remove nil?
+                                     [{:fx/type :h-box
+                                       :children [{:fx/type keycard
+                                                   :fx/key pubkey
+                                                   :public-key pubkey
+                                                   :active? false
+                                                   :profile? true
+                                                   :identity_ identity
+                                                   :metadata metadata}
+                                                  ]}
+                                      (when identity
+                                        {:fx/type :button
+                                         :text "Delete account"
+                                         :disable true ; TODO: fix this
+                                         :on-action {:event/type :delete-keycard :identity_ identity}})
+                                      {:fx/type follows
+                                       :pubkey pubkey
+                                       :open-profile-states open-profile-states
+                                       :identity-metadata identity-metadata
+                                       :identities identities
                            :views views}])}
+                  ;; Posts by this user.
+                  {:fx/type user-posts
+                   :timeline-pair (:timeline-pair (get open-profile-states pubkey))}]}
       {:fx/type :label
        :text "No pubkey found for profile"})))
 

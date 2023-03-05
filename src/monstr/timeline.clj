@@ -3,10 +3,11 @@
             [clojure.set :as set]
             [clojure.tools.logging :as log]
             [monstr.domain :as domain]
+            [monstr.metadata :as metadata]
             [monstr.parse :as parse]
             [monstr.relay-conn :as relay-conn]
+            [monstr.status-bar :as status-bar]
             [monstr.store :as store]
-            [monstr.tab-profile :as tab-profile]
             [monstr.timeline-support :as timeline-support]
             [monstr.util :as util]
             [monstr.util-java :as util-java])
@@ -15,35 +16,6 @@
            (javafx.collections.transformation FilteredList)
            (javafx.scene.control ListView)))
 
-(defrecord Timeline
-  ;; these field values are only ever mutated on fx thread
-  [^ObservableList adapted-list
-   ^ObservableList observable-list ;; contains UITextNoteWrapper
-   ^HashMap author-pubkey->item-id-set
-   ^HashMap item-id->index
-   ^HashSet item-ids
-   timeline-epoch-vol
-   ])
-
-(defn new-timeline []
-  ;; NOTE: we're querying and subscribing to all of time but for now, for ux
-  ;; experience, we filter underlying data by n days
-  ;; todo we'll really wish to query/subscribe at an epoch and only update it on scroll etc.
-  (let [init-timeline-epoch (-> (util/days-ago 1) .getEpochSecond)
-        timeline-epoch-vol (volatile! init-timeline-epoch)
-        observable-list (FXCollections/observableArrayList)
-        filtered-list (FilteredList. observable-list
-                        (util-java/->Predicate #(> (:max-timestamp %) init-timeline-epoch)))
-        adapted-list (.sorted filtered-list
-                              ;; latest wrapper entries first:
-                              (comparator #(< (:max-timestamp %2) (:max-timestamp %1))))]
-    (->Timeline
-      adapted-list
-      observable-list
-      (HashMap.)
-      (HashMap.)
-      (HashSet.)
-      timeline-epoch-vol)))
 
 (defn user-matches-event? [user-pubkey event-pubkey parsed-ptags]
   (or
@@ -54,17 +26,20 @@
 
 
 (defn- accept-text-note?
+  "COLUMN should be nil for timelines in profile tabs instead of columns."
   [*state column identity-pubkey parsed-ptags {:keys [pubkey] :as _event-obj}]
-  (let [view (:view column)]
-    (case (:follow view)
-      :all true
-      :use-list (some #(= % pubkey)  ; only show notes where user is the author
-                      (:follow-set view))
-      :use-identity (or (user-matches-event? identity-pubkey pubkey parsed-ptags)
-                        (let [contacts (:parsed-contacts (get (:contact-lists @domain/*state)
-                                                              identity-pubkey))]
-                          (some #(user-matches-event? % pubkey parsed-ptags)
-                                (map :public-key contacts)))))))
+  (if column
+    (let [view (:view column)]
+      (case (:follow view)
+        :all true
+        :use-list (some #(= % pubkey)  ; only show notes where user is the author
+                        (:follow-set view))
+        :use-identity (or (user-matches-event? identity-pubkey pubkey parsed-ptags)
+                          (let [contacts (:parsed-contacts (get (:contact-lists @domain/*state)
+                                                                identity-pubkey))]
+                            (some #(user-matches-event? % pubkey parsed-ptags)
+                                  (map :public-key contacts))))))
+    true))
 
 (defn dispatch-metadata-update!
   [*state {:keys [pubkey]}]
@@ -96,7 +71,7 @@
 
 
 
-(defn- flat-dispatch!
+(defn flat-dispatch!
   [*state timeline identity-pubkey {:keys [id pubkey created_at content] :as event-obj} column]
   (let [{:keys [^ObservableList observable-list
                 ^HashMap author-pubkey->item-id-set
@@ -239,7 +214,55 @@
   (log/debugf "Updating timelines for column %s with view '%s'" (:id column) (:name (:view column)))
   (doseq [[pubkey pair] (:identity->timeline-pair column)]
     (update-timeline-pair! pair)))
-  
+
+
+(defn add-profile-notes [pubkey]
+  (fx/run-later
+   (log/debugf "Adding profile notes for %s" pubkey)
+   (let [profile-state (get (:open-profile-states @domain/*state) pubkey)]
+     (update-timeline-pair! (:timeline-pair profile-state))
+     (doseq [r (domain/relay-urls @domain/*state)]
+       (let [events (store/load-relay-events store/db r [pubkey])]
+         (status-bar/message! (format "Loaded %d events for %s from database"
+                                      (count events)
+                                      r))
+         (doseq [e events]
+           (flat-dispatch! domain/*state
+                           (:flat-timeline (:timeline-pair profile-state))
+                           pubkey
+                           e
+                           nil)))))))
+
+(defn remove-open-profile-state! [pubkey]
+  (swap! domain/*state util/dissoc-in
+         [:open-profile-states pubkey]))
+
+(defn maybe-add-open-profile-state!
+  [pubkey]
+  (when-not (get (:open-profile-states @domain/*state) pubkey)
+    (log/debugf "Adding open-profile-state for %s" pubkey)
+    ;; Use a trick to be able to refer to monstr.view-home/create-list-view
+    ;; without getting cyclical reference problems.
+    (let [view-home (find-ns 'monstr.view-home)
+          list-creator (ns-resolve view-home (symbol "create-list-view"))
+          thread-creator (ns-resolve view-home (symbol "create-thread-view"))]
+    (swap! domain/*state assoc-in
+           [:open-profile-states pubkey]
+           (domain/new-profile-state pubkey
+                                     (fn []
+                                       (list-creator nil
+                                                     domain/*state
+                                                     store/db
+                                                     metadata/cache
+                                                     domain/daemon-scheduled-executor))
+                                     (fn []
+                                       (thread-creator nil
+                                                       domain/*state
+                                                       store/db
+                                                       metadata/cache
+                                                       domain/daemon-scheduled-executor))))
+    (add-profile-notes pubkey))))
+
 (defn update-active-timelines!
   "Update the active timelines for the identity with the given public key."
   [*state public-key] ;; note public-key may be nil!
@@ -249,26 +272,10 @@
    (doseq [column (:all-columns @*state)]
      (update-column-timelines! column))
    ;; Update the state's active public key.
-   (tab-profile/remove-open-profile-state! (:active-key @*state))
-   (tab-profile/maybe-add-open-profile-state! public-key)
+   (remove-open-profile-state! (:active-key @*state))
+   (maybe-add-open-profile-state! public-key)
    (swap! *state assoc
           :active-key public-key)))
-
-(defn- load-from-store [db event-id]
-  (when-let [event (store/load-event db event-id)]
-    (assoc event :relays (store/load-relays-for-event db event-id))))
-
-(defn async-load-event!
-  "Load the event with the given id from either the database or from the relays."
-  [*state db column-id event-id]
-  (if-let [event-from-store (load-from-store db event-id)]
-    (dispatch-text-note! *state column-id event-from-store false true)
-    ;; Create a unique subscription id to load the event and subscribe to all relays in
-    ;; the hope that we find the event.  We'll unsubscribe automatically when we get an
-    ;; EOSE event.
-    (let [subscription-id (format "thread:%s:%s" column-id (rand-int 1000000000))]
-      (relay-conn/subscribe-all! subscription-id
-                                 [{:ids [event-id] :kinds [1]}]))))
 
 (defn refresh-thread-events!
   [*state column-id]
@@ -308,4 +315,4 @@
                                 :show-thread? false
                                 :thread-focus nil)))
 
-  
+

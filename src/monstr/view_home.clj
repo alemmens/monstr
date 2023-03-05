@@ -7,6 +7,7 @@
             [monstr.domain :as domain]
             [monstr.links :as links]
             [monstr.metadata :as metadata]
+            [monstr.relay-conn :as relay-conn]
             [monstr.rich-text :as rich-text]
             [monstr.store :as store]
             [monstr.style :as style :refer [BORDER|]]
@@ -316,7 +317,7 @@
    :left {:fx/type :h-box
           :cursor :hand
           :style-class "monstr-author-hbox"
-          :on-mouse-pressed (fn [_] (tab-profile/maybe-add-open-profile-state! pubkey))
+          :on-mouse-clicked (fn [_] (timeline/maybe-add-open-profile-state! pubkey))
           :children [{:fx/type :label
                       :style-class "ndesk-timeline-item-name"
                       :text name}
@@ -331,6 +332,22 @@
 ;;; Thread pane
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defn- load-from-store [db event-id]
+  (when-let [event (store/load-event db event-id)]
+    (assoc event :relays (store/load-relays-for-event db event-id))))
+
+(defn- async-load-event!
+  "Load the event with the given id from either the database or from the relays."
+  [*state db column-id event-id]
+  (if-let [event-from-store (load-from-store db event-id)]
+    (timeline/dispatch-text-note! *state column-id event-from-store false true)
+    ;; Create a unique subscription id to load the event and subscribe to all relays in
+    ;; the hope that we find the event.  We'll unsubscribe automatically when we get an
+    ;; EOSE event.
+    (let [subscription-id (format "thread:%s:%s" column-id (rand-int 1000000000))]
+      (relay-conn/subscribe-all! subscription-id
+                                 [{:ids [event-id] :kinds [1]}]))))
+
 (defn thread-timeline-item
   [{:keys [^UITextNote root-data ^UITextNote item-data column-id *state db metadata-cache executor]}]
   (if (:missing? item-data)
@@ -343,7 +360,7 @@
                                   ;; Wait a bit so we don't overload the relays.
                                   ;; TODO: we should use a queue instead of this black magic!
                                   (Thread/sleep 50) ; 50ms
-                                  (timeline/async-load-event! *state db column-id (:id item-data))))
+                                  (async-load-event! *state db column-id (:id item-data))))
                   ;; Show that we're working on it.
                   {:fx/type :hyperlink
                    :h-box/hgrow :always
@@ -489,6 +506,7 @@
    :desc {:fx/type :list-view
           :focus-traversable false
           :pref-height 100000  ; trick to make it stretch vertically
+          :pref-width 100000
           :cell-factory {:fx/cell-type :list-cell
                          :describe (fn [text-note-new]
                                      {:graphic
@@ -503,6 +521,7 @@
 
 (defn create-list-view
   ^ListView [column-id *state db metadata-cache executor]
+  ;; Note that COLUMN-ID is nil for timeline list views in Profile tabs.
   (fx/instance
    (fx/create-component {:fx/type home
                          :column-id column-id
