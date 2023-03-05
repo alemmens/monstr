@@ -154,12 +154,7 @@
                  :create #(doto listview
                             (VBox/setVgrow Priority/ALWAYS))}])})
 
-(defn add-column-button
-  [text]
-  {:fx/type :button
-   :padding 5
-   :on-mouse-pressed {:event/type :show-add-column-dialog}
-   :text text})
+
 
 (defn back-from-thread-button
   [column]
@@ -190,6 +185,14 @@
   "Returns a list of the ids of those columns that are not visible."
   (sort (seq (set/difference (set all-column-ids)
                              visible-column-ids))))
+
+(defn add-column-button
+  [{:keys [text all-column-ids visible-column-ids]}]
+  {:fx/type :button
+   :disable (not (seq (hidden-columns all-column-ids visible-column-ids)))
+   :padding 5
+   :on-mouse-pressed {:event/type :show-add-column-dialog}
+   :text text})
 
 (defn find-column [relay-urls columns]
   (log/debugf "Looking for %s in %d columns" relay-urls (count columns))
@@ -284,11 +287,11 @@
                                                                     :column-id column-id}
                                                  :text "x"}
                                                 {:fx/type :h-box :h-box/hgrow :always}
-                                                (when (and (= column-id (last visible-column-ids))
-                                                           (not (nil?
-                                                                 (hidden-columns (domain/all-column-ids)
-                                                                                 visible-column-ids))))
-                                                  (add-column-button "+"))])}
+                                                (when (= column-id (last visible-column-ids))
+                                                  {:fx/type add-column-button
+                                                   :text "+"
+                                                   :visible-column-ids visible-column-ids
+                                                   :all-column-ids (domain/all-column-ids)})])}
                             {:fx/type main-pane
                              :listview listview}]}))
             visible-column-ids)
@@ -301,19 +304,24 @@
 
 
 (defn new-column-dialog
-  [{:keys [views visible-column-ids new-timeline show-add-column-dialog?]}]
+  [{:keys [views visible-column-ids show-add-column-dialog?]}]
   #_(log/debugf "New column dialog with all-columns=%s visible=%s"
                 (pr-str (map (comp :name :view) all-columns)) (pr-str visible-column-ids))
   (let [column-ids (hidden-columns (domain/all-column-ids) visible-column-ids)
-        view-names (map (comp :name :view domain/find-column-by-id)
-                        column-ids)]
-    {:fx/type :choice-dialog
-     :selected-item (first view-names)
-     :title "New column"
-     :showing show-add-column-dialog?
-     :header-text "Add a column"
-     :on-close-request {:event/type :add-column-close-request}
-     :items view-names}))
+        view-names (sort (remove nil?
+                                 (map (comp :name :view domain/find-column-by-id)
+                                      column-ids)))]
+    #_(log/debugf "New column dialog, view names = %s, first = %s"
+                  (pr-str view-names) (first view-names))
+    (if (seq view-names)
+      {:fx/type :choice-dialog
+       :selected-item (first view-names)
+       :title "New column"
+       :showing show-add-column-dialog?
+       :header-text "Add a column"
+       :on-close-request {:event/type :add-column-close-request}
+       :items view-names}
+      {:fx/type :label :text ""})))
 
 (defn tab-pane
   [{:keys [visible-column-ids all-columns
