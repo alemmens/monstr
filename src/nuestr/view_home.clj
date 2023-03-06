@@ -283,18 +283,20 @@
    :visible false
    :alignment :center
    :max-width Integer/MAX_VALUE
-   :children [(info-button db item-id pubkey)
-              (reply-button *state
-                            (:id (if (nil? root-data) event-obj root-data))
-                            item-id)
-              {:fx/type :button
-               :style-class ["button" "ndesk-thread-button"] ;; used for .lookup
-               :h-box/margin 3
-               :text "thread"
-               :on-action (fn [e]
-                            (let [column (domain/find-column-by-id column-id)]
-                              (log/debugf "Thread button clicked for column %s" (:name (:view column)))
-                              (timeline/show-column-thread! *state column event-obj)))}]})
+   :children (remove nil?
+                     [(info-button db item-id pubkey)
+                      (reply-button *state
+                                    (:id (if (nil? root-data) event-obj root-data))
+                                    item-id)
+                      (when column-id
+                        {:fx/type :button
+                         :style-class ["button" "ndesk-thread-button"] ;; used for .lookup
+                         :h-box/margin 3
+                         :text "thread"
+                         :on-action (fn [e]
+                                      (let [column (domain/find-column-by-id column-id)]
+                                        (log/debugf "Thread button clicked for column %s" (:name (:view column)))
+                                        (timeline/show-column-thread! *state column event-obj)))})])})
 
 (defn- thread-action-button-row
   ;; Like action-button-row but without the 'thread' button.
