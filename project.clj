@@ -1,6 +1,6 @@
-(defproject monstr "0.1.0-SNAPSHOT"
-  :description "Monstr: a Desktop app for Nostr"
-  :url "https://github.com/alemmens/monstr"
+(defproject nuestr "0.1.0-SNAPSHOT"
+  :description "Nuestr: a Desktop app for Nostr"
+  :url "https://github.com/alemmens/nuestr"
   
   :dependencies
   [[org.clojure/clojure "1.10.3"]
@@ -32,7 +32,7 @@
              :uberjar {:aot :all}}
   :repositories {"local" {:url "file:lib" :username "" :password ""}}
   :plugins [[speclj "3.4.1"]]
-  :main monstr.app
+  :main nuestr.app
   :java-source-paths ["java"]
 )
 

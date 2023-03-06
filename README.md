@@ -1,4 +1,4 @@
-# Monstr: Nostr on the desktop (written in Clojure)
+# Nuestr: Nostr on the desktop (written in Clojure)
 
 
 * work-in-progress

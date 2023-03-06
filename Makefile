@@ -16,12 +16,12 @@ test:
 
 .PHONY: run
 run:
-	clj -M -m monstr.app
+	clj -M -m nuestr.app
 
 .PHONY: aot
 aot:
 	mkdir -p classes
-	clj -M -e "(try (compile 'monstr.app) (finally (javafx.application.Platform/exit)))"
+	clj -M -e "(try (compile 'nuestr.app) (finally (javafx.application.Platform/exit)))"
 
 .PHONY: uberjar
 uberjar: aot
@@ -29,4 +29,4 @@ uberjar: aot
 
 .PHONY: run-uberjar
 run-uberjar:
-	java -jar target/monstr.jar
+	java -jar target/nuestr.jar
