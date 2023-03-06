@@ -223,12 +223,10 @@
            relays show-add-column-dialog? can-publish?
            active-key active-reply-context active-contact-pubkey
            metadata-cache]}]
-  (log/debugf "Main panes with active key='%s', %d columns=%s and column views %s and views %s"
+  (log/debugf "Main panes with active key='%s', %d columns=%s"
               active-key
               (count visible-column-ids)
-              (pr-str visible-column-ids)
-              (pr-str (map (comp :view domain/find-column-by-id) visible-column-ids))
-              (pr-str (vals (:views @domain/*state))))
+              (pr-str visible-column-ids))
   {:fx/type :v-box
    :children
    [;; The "what's on your mind?" box.
@@ -264,7 +262,7 @@
                 (if (nil? pair)
                   (log/debugf "No pair found for active key %s and column %s" active-key column-id)
                   (log/debugf "Creating pane for column %s with view %s (show-thread=%s pair=%s listview=%s)"
-                              column-id (pr-str (:view column))
+                              column-id (:name (:view column))
                               show-thread?
                               pair listview))
                 {:fx/type :v-box
@@ -426,7 +424,9 @@
                           :text "Account: "}
                    combo-box (when active-key
                                {:fx/type :combo-box
-                                :value active-key
+                                :value (or (:name (get identity-metadata active-key))
+                                           active-key)
+                                :pref-width 150
                                 :style-class "identity-selector"
                                 :on-value-changed (fn [k]
                                                     (swap! domain/*state assoc :active-key k)

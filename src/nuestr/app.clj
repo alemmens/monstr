@@ -36,6 +36,8 @@
            :views views
            :all-columns all-columns
            :identities identities
+           :active-key (or (file-sys/load-active-key)
+                           (:public-key (first identities)))
            :visible-column-ids (or (file-sys/load-visible-columns)
                                    (map :id (take 3 all-columns))))))
 

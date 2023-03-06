@@ -3,6 +3,7 @@
    [cljfx.api :as fx]
    [clojure.tools.logging :as log]
    [nuestr.domain :as domain]
+   [nuestr.file-sys :as file-sys]
    [nuestr.metadata :as metadata]
    [nuestr.status-bar :as status-bar]
    [nuestr.store :as store]
@@ -82,7 +83,6 @@
                                   false)))
 
 (defn hydrate!*
-  ;; The first of new-identities will become the active identity.
   [*state db new-identities]
   ;; TODO: consider transduce iterate over timeline-data and throttling dispatches via
   ;; yielding of bg thread; this way we'd move on to subscriptions, allowing new stuff to
@@ -95,9 +95,11 @@
            :identities (distinct (concat (:identities @*state) new-identities)))
     (swap! *state update
            :identity-metadata merge identity-metadata)
-    (when-let [first-identity-key (first new-public-keys)]
-      (log/debugf "Hydrating with first identity key %s" first-identity-key)
-      (timeline/update-active-timelines! *state first-identity-key))    
+    (when-let [pubkey (or (:active-key @domain/*state)
+                          (file-sys/load-active-key)
+                          (first new-public-keys))]
+      (log/debugf "Hydrating with key %s" pubkey)
+      (timeline/update-active-timelines! *state pubkey))    
     (let [contact-lists (hydrate-contact-lists! new-identities)
           ;; TODO: Make sure that user follow lists for all views are also in
           ;; this 'closure' list of public keys!
