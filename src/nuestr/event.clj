@@ -1,29 +1,29 @@
-(ns monstr.event
+(ns nuestr.event
   (:require
     [cljfx.api :as fx]
     [clojure.java.io :as io]
     [clojure.tools.logging :as log]
     [clojure.string :as str]
-    [monstr.domain :as domain]
-    [monstr.file-sys :as file-sys]
-    [monstr.hydrate :as hydrate]    
-    [monstr.modal :as modal]
-    [monstr.publish :as publish]
-    [monstr.relay-conn :as relay-conn]
-    [monstr.status-bar :as status-bar]
-    [monstr.store :as store]
-    [monstr.timeline :as timeline]
-    [monstr.util :as util]
-    [monstr.util-domain :as util-domain]
-    [monstr.view-home :as view-home]
-    [monstr.x.crypt :as crypt]
+    [nuestr.domain :as domain]
+    [nuestr.file-sys :as file-sys]
+    [nuestr.hydrate :as hydrate]    
+    [nuestr.modal :as modal]
+    [nuestr.publish :as publish]
+    [nuestr.relay-conn :as relay-conn]
+    [nuestr.status-bar :as status-bar]
+    [nuestr.store :as store]
+    [nuestr.timeline :as timeline]
+    [nuestr.util :as util]
+    [nuestr.util-domain :as util-domain]
+    [nuestr.view-home :as view-home]
+    [nuestr.x.crypt :as crypt]
     [manifold.deferred :as d])
   (:import (javafx.scene.control DialogEvent Dialog Button TextArea)
            (javafx.event Event ActionEvent)))
 
 (defn relay-defaults
   []
-  (read-string (slurp (io/resource "monstr/relay-defaults.edn"))))
+  (read-string (slurp (io/resource "nuestr/relay-defaults.edn"))))
 
 (defn click-keycard
   [{:keys [public-key]}]

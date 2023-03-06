@@ -1,10 +1,10 @@
-(ns monstr.status-bar
+(ns nuestr.status-bar
   (:require
    [cljfx.api :as fx]
    [clojure.tools.logging :as log]
-   [monstr.domain :as domain]
-   [monstr.util :as util]
-   [monstr.view-relays :as view-relays])
+   [nuestr.domain :as domain]
+   [nuestr.util :as util]
+   [nuestr.view-relays :as view-relays])
   (:import (javafx.scene.canvas Canvas)
            (javafx.scene.paint Color)
            (java.time Instant)))

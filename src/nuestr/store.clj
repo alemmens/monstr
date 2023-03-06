@@ -1,11 +1,11 @@
-(ns monstr.store
+(ns nuestr.store
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
-            [monstr.file-sys :as file-sys]            
-            [monstr.domain :as domain]
-            [monstr.json :as json]
-            [monstr.parse :as parse]
+            [nuestr.file-sys :as file-sys]            
+            [nuestr.domain :as domain]
+            [nuestr.json :as json]
+            [nuestr.parse :as parse]
             [next.jdbc :as jdbc]
             [next.jdbc.result-set :as rs]))
 
@@ -18,7 +18,7 @@
   (str/starts-with? line "--"))
 
 (defn parse-schema []
-  (let [resource (io/resource "monstr/schema.sql")]
+  (let [resource (io/resource "nuestr/schema.sql")]
     (with-open [reader (io/reader resource)]
       (loop [lines (line-seq reader) acc []]
         (if (next lines)

@@ -1,8 +1,8 @@
-(ns monstr.file-sys
+(ns nuestr.file-sys
   (:require
    [clojure.java.io :as io]
    [clojure.edn :as edn]
-   [monstr.domain :as domain]
+   [nuestr.domain :as domain]
    )
   (:import (java.io File)))
 
@@ -20,21 +20,21 @@
   ^File []
   (io/file (nostr-desk-dir) "nd.db"))
 
-(defn monstr-file [filename-only]
+(defn nuestr-file [filename-only]
   (io/file (nostr-desk-dir) filename-only))
 
-(defn write-monstr-data
-  "Serializes an object to a monstr file so it can be opened again later."
+(defn write-nuestr-data
+  "Serializes an object to a nuestr file so it can be opened again later."
   [obj filename-only]
-  (with-open [w (io/writer (monstr-file filename-only))]
+  (with-open [w (io/writer (nuestr-file filename-only))]
     (.write w (pr-str obj))))
 
-(defn read-monstr-data
+(defn read-nuestr-data
   [filename-only]
-  (edn/read-string (slurp (monstr-file filename-only))))
+  (edn/read-string (slurp (nuestr-file filename-only))))
 
-(defn monstr-file-exists? [filename-only]
-  (.exists (monstr-file filename-only)))
+(defn nuestr-file-exists? [filename-only]
+  (.exists (nuestr-file filename-only)))
 
 (defn record-to-map [record]
   (into {} record))
@@ -44,13 +44,13 @@
   (let [clean (into {}
                     (for [[name view] views]
                       [name (record-to-map view)]))]
-    (write-monstr-data clean "views.clj")))
+    (write-nuestr-data clean "views.clj")))
 
 (defn load-views
   "Returns nil if there is no view file."
   []
-  (when (monstr-file-exists? "views.clj")
-    (let [raw (read-monstr-data "views.clj")]
+  (when (nuestr-file-exists? "views.clj")
+    (let [raw (read-nuestr-data "views.clj")]
       (into {}
             (for [[name map] raw]
               [name (domain/map->View map)])))))

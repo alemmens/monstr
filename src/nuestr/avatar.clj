@@ -1,6 +1,6 @@
-(ns monstr.avatar
-  (:require [monstr.util :as util]
-            [monstr.cache :as cache]
+(ns nuestr.avatar
+  (:require [nuestr.util :as util]
+            [nuestr.cache :as cache]
             [clojure.tools.logging :as log]
             [clojure.string :as str])
   (:import (javafx.scene.image Image)))

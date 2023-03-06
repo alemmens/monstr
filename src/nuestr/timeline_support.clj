@@ -1,11 +1,11 @@
-(ns monstr.timeline-support
+(ns nuestr.timeline-support
   (:require
    [clojure.tools.logging :as log]
-   [monstr.domain :as domain]
+   [nuestr.domain :as domain]
    [loom.graph :as loom]
    [loom.attr :as loom-attr])
   (:import
-   (monstr.domain UITextNote UITextNoteWrapper)))
+   (nuestr.domain UITextNote UITextNoteWrapper)))
 
 (defn- create-node->num-predecessors
   [graph]

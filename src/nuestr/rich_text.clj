@@ -1,8 +1,8 @@
-(ns monstr.rich-text
+(ns nuestr.rich-text
   (:require
-   [monstr.util-fx :as util-fx]
-   [monstr.util-java :as util-java]
-   [monstr.util :as util]
+   [nuestr.util-fx :as util-fx]
+   [nuestr.util-java :as util-java]
+   [nuestr.util :as util]
    [clojure.tools.logging :as log]
    [clojure.string :as str])
   (:import (org.fxmisc.richtext.model TextOps SegmentOps SegmentOpsBase StyledSegment ReadOnlyStyledDocument)

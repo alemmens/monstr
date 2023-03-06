@@ -1,6 +1,6 @@
-(ns monstr.parse
-  (:require [monstr.domain :as domain]
-            [monstr.json :as json]))
+(ns nuestr.parse
+  (:require [nuestr.domain :as domain]
+            [nuestr.json :as json]))
 
 (defn raw-event-tuple->event-obj
   [raw-event-tuple]

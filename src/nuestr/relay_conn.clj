@@ -1,13 +1,13 @@
-(ns monstr.relay-conn
+(ns nuestr.relay-conn
   (:require
     [aleph.http :as http]
     [clojure.tools.logging :as log]
     [manifold.deferred :as d]
     [manifold.stream :as s]
     [manifold.time :as t]
-    [monstr.json :as json*]
-    [monstr.status-bar :as status-bar]
-    [monstr.util :as util]))
+    [nuestr.json :as json*]
+    [nuestr.status-bar :as status-bar]
+    [nuestr.util :as util]))
 
 (defn- websocket-client*
   [relay-url]

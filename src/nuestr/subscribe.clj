@@ -1,11 +1,11 @@
-(ns monstr.subscribe
+(ns nuestr.subscribe
   (:require
    [clojure.tools.logging :as log]
-   [monstr.domain :as domain]
-   [monstr.relay-conn :as relay-conn]
-   [monstr.status-bar :as status-bar]
-   [monstr.store :as store]
-   [monstr.util :as util])
+   [nuestr.domain :as domain]
+   [nuestr.relay-conn :as relay-conn]
+   [nuestr.status-bar :as status-bar]
+   [nuestr.store :as store]
+   [nuestr.util :as util])
   (:import (java.time Instant)))
 
 

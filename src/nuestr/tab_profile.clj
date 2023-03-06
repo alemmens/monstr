@@ -1,15 +1,15 @@
-(ns monstr.tab-profile
+(ns nuestr.tab-profile
   (:require
    [cljfx.api :as fx]
    [clojure.tools.logging :as log]
    [clojure.string :as str]
-   [monstr.avatar :as avatar]
-   [monstr.domain :as domain]
-   [monstr.file-sys :as file-sys]
-   [monstr.status-bar :as status-bar]
-   [monstr.store :as store]
-   [monstr.timeline :as timeline]
-   [monstr.util :as util])
+   [nuestr.avatar :as avatar]
+   [nuestr.domain :as domain]
+   [nuestr.file-sys :as file-sys]
+   [nuestr.status-bar :as status-bar]
+   [nuestr.store :as store]
+   [nuestr.timeline :as timeline]
+   [nuestr.util :as util])
   (:import (javafx.geometry Insets)
            (javafx.scene.layout VBox HBox Priority)))
 

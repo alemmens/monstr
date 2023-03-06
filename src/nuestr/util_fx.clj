@@ -1,5 +1,5 @@
-(ns monstr.util-fx
-  (:require [monstr.util-java :as util-java])
+(ns nuestr.util-fx
+  (:require [nuestr.util-java :as util-java])
   (:import (javafx.scene Parent Node)))
 
 (defn add-style-class!

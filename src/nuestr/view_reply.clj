@@ -1,9 +1,9 @@
-(ns monstr.view-reply
-  (:require [monstr.style :as style]
+(ns nuestr.view-reply
+  (:require [nuestr.style :as style]
             [cljfx.api :as fx]
             [clojure.tools.logging :as log]
-            [monstr.view-common :as view-common]
-            [monstr.util-java :as util-java])
+            [nuestr.view-common :as view-common]
+            [nuestr.util-java :as util-java])
   (:import (javafx.scene.control ButtonType Dialog ButtonBar$ButtonData DialogPane DialogEvent TextField CheckBox TextArea)
            (javafx.util Callback)))
 

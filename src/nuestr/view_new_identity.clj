@@ -1,5 +1,5 @@
-(ns monstr.view-new-identity
-  (:require [monstr.style :as style]
+(ns nuestr.view-new-identity
+  (:require [nuestr.style :as style]
             [cljfx.api :as fx]
             [clojure.tools.logging :as log])
   (:import (javafx.scene.control ButtonType Dialog ButtonBar$ButtonData DialogPane DialogEvent TextField CheckBox)

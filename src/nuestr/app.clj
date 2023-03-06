@@ -3,20 +3,20 @@
 (System/setProperty "prism.lcdtext" "false")
 (System/setProperty "io.netty.noUnsafe" "true") ;; ...needed w/ latest netty?
 ;(System/setProperty "cljfx.style.mode" "true") ;; todo
-(ns monstr.app
+(ns nuestr.app
   (:require
    [cljfx.api :as fx]
    [clojure.tools.logging :as log]   
-   [monstr.consume :as consume]
-   [monstr.domain :as domain]
-   [monstr.event :as ev]   
-   [monstr.file-sys :as file-sys]
-   [monstr.hydrate :as hydrate]
-   [monstr.metadata :as metadata]
-   [monstr.relay-conn :as relay-conn]
-   [monstr.store :as store]
-   [monstr.view :as view]
-   [monstr.util :as util])
+   [nuestr.consume :as consume]
+   [nuestr.domain :as domain]
+   [nuestr.event :as ev]   
+   [nuestr.file-sys :as file-sys]
+   [nuestr.hydrate :as hydrate]
+   [nuestr.metadata :as metadata]
+   [nuestr.relay-conn :as relay-conn]
+   [nuestr.store :as store]
+   [nuestr.view :as view]
+   [nuestr.util :as util])
   (:gen-class))
 
 

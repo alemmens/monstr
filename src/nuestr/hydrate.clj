@@ -1,15 +1,15 @@
-(ns monstr.hydrate
+(ns nuestr.hydrate
   (:require
    [cljfx.api :as fx]
    [clojure.tools.logging :as log]
-   [monstr.domain :as domain]
-   [monstr.metadata :as metadata]
-   [monstr.status-bar :as status-bar]
-   [monstr.store :as store]
-   [monstr.subscribe :as subscribe]
-   [monstr.timeline :as timeline]
-   [monstr.util :as util]   
-   [monstr.view-home :as view-home])
+   [nuestr.domain :as domain]
+   [nuestr.metadata :as metadata]
+   [nuestr.status-bar :as status-bar]
+   [nuestr.store :as store]
+   [nuestr.subscribe :as subscribe]
+   [nuestr.timeline :as timeline]
+   [nuestr.util :as util]   
+   [nuestr.view-home :as view-home])
   (:import (java.util.concurrent ScheduledExecutorService)
            (java.util UUID)))
 
@@ -25,7 +25,8 @@
         flat-listview (view-home/create-list-view column-id
                                                   domain/*state store/db
                                                   metadata/cache
-                                                  domain/daemon-scheduled-executor)                            thread-listview (view-home/create-thread-view column-id
+                                                  domain/daemon-scheduled-executor)
+        thread-listview (view-home/create-thread-view column-id
                                                       domain/*state store/db
                                                       metadata/cache
                                                       domain/daemon-scheduled-executor)]

@@ -1,16 +1,16 @@
-(ns monstr.timeline
+(ns nuestr.timeline
   (:require [cljfx.api :as fx]
             [clojure.set :as set]
             [clojure.tools.logging :as log]
-            [monstr.domain :as domain]
-            [monstr.metadata :as metadata]
-            [monstr.parse :as parse]
-            [monstr.relay-conn :as relay-conn]
-            [monstr.status-bar :as status-bar]
-            [monstr.store :as store]
-            [monstr.timeline-support :as timeline-support]
-            [monstr.util :as util]
-            [monstr.util-java :as util-java])
+            [nuestr.domain :as domain]
+            [nuestr.metadata :as metadata]
+            [nuestr.parse :as parse]
+            [nuestr.relay-conn :as relay-conn]
+            [nuestr.status-bar :as status-bar]
+            [nuestr.store :as store]
+            [nuestr.timeline-support :as timeline-support]
+            [nuestr.util :as util]
+            [nuestr.util-java :as util-java])
   (:import (java.util HashMap HashSet)
            (javafx.collections FXCollections ObservableList)
            (javafx.collections.transformation FilteredList)
@@ -242,9 +242,9 @@
   [pubkey]
   (when-not (get (:open-profile-states @domain/*state) pubkey)
     (log/debugf "Adding open-profile-state for %s" pubkey)
-    ;; Use a trick to be able to refer to monstr.view-home/create-list-view
+    ;; Use a trick to be able to refer to nuestr.view-home/create-list-view
     ;; without getting cyclical reference problems.
-    (let [view-home (find-ns 'monstr.view-home)
+    (let [view-home (find-ns 'nuestr.view-home)
           list-creator (ns-resolve view-home (symbol "create-list-view"))
           thread-creator (ns-resolve view-home (symbol "create-thread-view"))]
     (swap! domain/*state assoc-in

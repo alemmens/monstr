@@ -1,11 +1,11 @@
 @font-face {
     font-family: 'Roboto';
-    src: url('/monstr/font/Roboto-Regular.ttf');
+    src: url('/nuestr/font/Roboto-Regular.ttf');
 }
 
 @font-face {
     font-family: 'Roboto Bold';
-    src: url('/monstr/font/Roboto-Bold.ttf');
+    src: url('/nuestr/font/Roboto-Bold.ttf');
 }
 
 * {
@@ -17,14 +17,14 @@
     -nd-publish-button-color: #2262ba;
 }
 
-.monstr-tooltip {
+.nuestr-tooltip {
     -fx-font-family: "Roboto";
     -fx-font-size: 10pt;
     -fx-font-weight: normal;
     -fx-background-color: lightyellow;
 }
 
-.monstr-view-name {
+.nuestr-view-name {
     -fx-font-weight: bold;
 }
 
@@ -32,7 +32,7 @@
     -fx-fill: blue;
 }
 
-.monstr-author-hbox: hover {
+.nuestr-author-hbox: hover {
     -fx-border-color: lightblue;
 }
 
@@ -159,7 +159,7 @@
     /*-fx-font-weight: bold; ...negates the boldness somehow*/
 }
 
-.monstr-refresh-button {
+.nuestr-refresh-button {
     -fx-font-family: "Roboto Bold";
     -fx-pref-width: 2em;
     -fx-pref-height: 1.3em;

@@ -1,15 +1,15 @@
-(ns monstr.tab-views
+(ns nuestr.tab-views
   (:require
    [cljfx.api :as fx]
    [cljfx.ext.list-view :as fx.ext.list-view]
    [clojure.java.io :as io]
    [clojure.tools.logging :as log]
    [clojure.set :as set]
-   [monstr.domain :as domain]
-   [monstr.file-sys :as file-sys]
-   [monstr.hydrate :as hydrate]
-   [monstr.status-bar :as status-bar]
-   [monstr.util :as util]
+   [nuestr.domain :as domain]
+   [nuestr.file-sys :as file-sys]
+   [nuestr.hydrate :as hydrate]
+   [nuestr.status-bar :as status-bar]
+   [nuestr.util :as util]
    )
   (:import (javafx.geometry Insets)))
 
@@ -38,7 +38,7 @@
               {:fx/type :text-field
                :pref-column-count 20
                :text value
-               :style-class ["text-input" "monstr-view-name"]
+               :style-class ["text-input" "nuestr-view-name"]
                :on-text-changed on-text-changed}]})
 
 (defn update-temp-view!
@@ -132,7 +132,7 @@
    :spacing 20
    :children [{:fx/type text-input
                :label "Name:"
-               :style "monstr-view-name"
+               :style "nuestr-view-name"
                :value name
                :on-text-changed (fn [new-name]
                                   (update-temp-view! :name new-name))}

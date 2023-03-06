@@ -1,18 +1,18 @@
-(ns monstr.consume
+(ns nuestr.consume
   (:require
     [clojure.string :as str]
     [clojure.tools.logging :as log]
     [manifold.stream :as s]
-    [monstr.cache :as cache]
-    [monstr.consume-verify :refer [verify-maybe-persist-event!]]
-    [monstr.domain :as domain]    
-    [monstr.json :as json]
-    [monstr.metadata :as metadata]
-    [monstr.parse :as parse]    
-    [monstr.relay-conn :as relay-conn]
-    [monstr.status-bar :as status-bar]
-    [monstr.subscribe :as subscribe]
-    [monstr.timeline :as timeline])
+    [nuestr.cache :as cache]
+    [nuestr.consume-verify :refer [verify-maybe-persist-event!]]
+    [nuestr.domain :as domain]    
+    [nuestr.json :as json]
+    [nuestr.metadata :as metadata]
+    [nuestr.parse :as parse]    
+    [nuestr.relay-conn :as relay-conn]
+    [nuestr.status-bar :as status-bar]
+    [nuestr.subscribe :as subscribe]
+    [nuestr.timeline :as timeline])
   (:import (java.util.concurrent ScheduledExecutorService ScheduledFuture TimeUnit)))
 
 ;; todo where do we have stream buffers?

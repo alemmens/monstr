@@ -1,10 +1,10 @@
-(ns monstr.consume-verify
+(ns nuestr.consume-verify
   (:require
     [clojure.tools.logging :as log]
-    [monstr.cache :as cache]
-    [monstr.store :as store]
-    [monstr.x.crypt :as crypt]
-    [monstr.json :as json]
+    [nuestr.cache :as cache]
+    [nuestr.store :as store]
+    [nuestr.x.crypt :as crypt]
+    [nuestr.json :as json]
     [next.jdbc :as jdbc])
   (:import (com.google.common.cache Cache)
            (java.nio.charset StandardCharsets)))

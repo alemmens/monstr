@@ -1,4 +1,4 @@
-(ns monstr.style
+(ns nuestr.style
   (:require [clojure.java.io :as io]))
 
 (defn style-mode?
@@ -7,7 +7,7 @@
 
 (defn css
   []
-  [(cond-> (str (io/resource "monstr/style.css"))
+  [(cond-> (str (io/resource "nuestr/style.css"))
      (style-mode?) (str "?q=" (rand-int 1000000)))])
 
 (defn BORDER|

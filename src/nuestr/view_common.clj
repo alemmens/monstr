@@ -1,4 +1,4 @@
-(ns monstr.view-common
+(ns nuestr.view-common
   (:import (javafx.scene.control TextFormatter$Change)))
 
 ;; defonce so we don't replace it on ns reload (cljfx fails if we try to)

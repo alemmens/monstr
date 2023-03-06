@@ -1,4 +1,4 @@
-(ns monstr.modal
+(ns nuestr.modal
   (:import (javafx.scene.control Alert Alert$AlertType ButtonType Button ButtonBar$ButtonData)))
 
 (defn blocking-yes-no-alert

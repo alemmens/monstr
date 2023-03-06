@@ -1,23 +1,23 @@
-(ns monstr.view-home
+(ns nuestr.view-home
   (:require [cljfx.api :as fx]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
-            [monstr.avatar :as avatar]
-            [monstr.cache :as cache]
-            [monstr.domain :as domain]
-            [monstr.links :as links]
-            [monstr.metadata :as metadata]
-            [monstr.relay-conn :as relay-conn]
-            [monstr.rich-text :as rich-text]
-            [monstr.store :as store]
-            [monstr.style :as style :refer [BORDER|]]
-            [monstr.tab-profile :as tab-profile]
-            [monstr.timeline :as timeline]
-            [monstr.util :as util]
-            [monstr.util-domain :as util-domain]
-            [monstr.util-fx :as util-fx]
-            [monstr.util-fx-more :as util-fx-more]
-            [monstr.util-java :as util-java]
+            [nuestr.avatar :as avatar]
+            [nuestr.cache :as cache]
+            [nuestr.domain :as domain]
+            [nuestr.links :as links]
+            [nuestr.metadata :as metadata]
+            [nuestr.relay-conn :as relay-conn]
+            [nuestr.rich-text :as rich-text]
+            [nuestr.store :as store]
+            [nuestr.style :as style :refer [BORDER|]]
+            [nuestr.tab-profile :as tab-profile]
+            [nuestr.timeline :as timeline]
+            [nuestr.util :as util]
+            [nuestr.util-domain :as util-domain]
+            [nuestr.util-fx :as util-fx]
+            [nuestr.util-fx-more :as util-fx-more]
+            [nuestr.util-java :as util-java]
             )
   (:import (javafx.event ActionEvent Event)
            (javafx.geometry Insets)
@@ -26,7 +26,7 @@
            (javafx.scene.input MouseEvent ScrollEvent)
            (javafx.scene.layout HBox Priority VBox)
            (javafx.stage Popup)
-           (monstr.domain UITextNoteNew UITextNote UITextNoteWrapper)
+           (nuestr.domain UITextNoteNew UITextNote UITextNoteWrapper)
            (org.fxmisc.richtext GenericStyledArea)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -316,7 +316,7 @@
    :border-pane/margin (Insets. 0.0 5.0 0.0 5.0)
    :left {:fx/type :h-box
           :cursor :hand
-          :style-class "monstr-author-hbox"
+          :style-class "nuestr-author-hbox"
           :on-mouse-clicked (fn [_] (timeline/maybe-add-open-profile-state! pubkey))
           :children [{:fx/type :label
                       :style-class "ndesk-timeline-item-name"
@@ -429,7 +429,7 @@
    :on-created #(.setSelectionModel % util-fx-more/no-selection-model)
    :desc {:fx/type :list-view
           :focus-traversable false
-          :style-class ["monstr-thread-pane-listview"]
+          :style-class ["nuestr-thread-pane-listview"]
           :pref-height 100000  ; trick to make it stretch vertically
           :pref-width 100000
           :cell-factory {:fx/cell-type :list-cell

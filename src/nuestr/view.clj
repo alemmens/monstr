@@ -1,28 +1,28 @@
-(ns monstr.view
+(ns nuestr.view
   (:require
    [cljfx.api :as fx]
    [cljfx.ext.list-view :as fx.ext.list-view]
    [clojure.set :as set]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [monstr.avatar :as avatar]
-   [monstr.cache :as cache]
-   [monstr.domain :as domain]
-   [monstr.event :as ev]
-   [monstr.metadata :as metadata]   
-   [monstr.status-bar :as status-bar]
-   [monstr.style :as style :refer [BORDER|]]
-   [monstr.subscribe :as subscribe]
-   [monstr.tab-views :as tab-views]
-   [monstr.tab-profile :as tab-profile]
-   [monstr.timeline :as timeline]   
-   [monstr.util :as util]
-   [monstr.util-domain :as util-domain]
-   [monstr.util-java :as util-java]
-   [monstr.util-fx :as util-fx]
-   [monstr.view-common :as view-common]
-   [monstr.view-new-identity :as view-new-identity]
-   [monstr.view-reply :as view-reply])
+   [nuestr.avatar :as avatar]
+   [nuestr.cache :as cache]
+   [nuestr.domain :as domain]
+   [nuestr.event :as ev]
+   [nuestr.metadata :as metadata]   
+   [nuestr.status-bar :as status-bar]
+   [nuestr.style :as style :refer [BORDER|]]
+   [nuestr.subscribe :as subscribe]
+   [nuestr.tab-views :as tab-views]
+   [nuestr.tab-profile :as tab-profile]
+   [nuestr.timeline :as timeline]   
+   [nuestr.util :as util]
+   [nuestr.util-domain :as util-domain]
+   [nuestr.util-java :as util-java]
+   [nuestr.util-fx :as util-fx]
+   [nuestr.view-common :as view-common]
+   [nuestr.view-new-identity :as view-new-identity]
+   [nuestr.view-reply :as view-reply])
   (:import (javafx.geometry Pos)
            (javafx.scene.layout VBox Priority)
            (javafx.scene.control TextFormatter$Change TextArea)
@@ -172,9 +172,9 @@
               {:fx/type :button
                :padding 5
                :tooltip {:fx/type :tooltip
-                         :style-class "monstr-tooltip"
+                         :style-class "nuestr-tooltip"
                          :text "refresh all subscriptions"}
-               :style-class ["button" "monstr-refresh-button"]
+               :style-class ["button" "nuestr-refresh-button"]
                :on-mouse-pressed (fn [_] (subscribe/refresh!))
                :text (str (char 0x21bb)) ; clockwise open-circle arrow
                }

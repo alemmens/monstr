@@ -1,11 +1,11 @@
-(ns monstr.view-relays
+(ns nuestr.view-relays
   (:require
     [cljfx.api :as fx]
     [clojure.tools.logging :as log]
-    [monstr.style :as style]
-    [monstr.domain :as domain]
-    [monstr.style :as style :refer [BORDER|]]
-    [monstr.store :as store]
+    [nuestr.style :as style]
+    [nuestr.domain :as domain]
+    [nuestr.style :as style :refer [BORDER|]]
+    [nuestr.store :as store]
     [clojure.string :as str])
   (:import
     (javafx.scene.control ButtonType ButtonBar$ButtonData DialogEvent Dialog DialogPane TableView TextField CheckBox)

@@ -1,5 +1,5 @@
-(ns monstr.x.crypt
-  (:require [monstr.x.curve :as c])
+(ns nuestr.x.crypt
+  (:require [nuestr.x.curve :as c])
   (:import (java.util Arrays)
            (java.security MessageDigest SecureRandom)
            (java.nio.charset StandardCharsets)
