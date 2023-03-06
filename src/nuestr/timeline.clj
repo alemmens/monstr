@@ -3,6 +3,7 @@
             [clojure.set :as set]
             [clojure.tools.logging :as log]
             [nuestr.domain :as domain]
+            [nuestr.file-sys :as file-sys]
             [nuestr.metadata :as metadata]
             [nuestr.parse :as parse]
             [nuestr.relay-conn :as relay-conn]
@@ -276,7 +277,8 @@
    (remove-open-profile-state! (:active-key @*state))
    (maybe-add-open-profile-state! public-key)
    (swap! *state assoc
-          :active-key public-key)))
+          :active-key public-key)
+   (file-sys/save-active-key)))
 
 (defn refresh-thread-events!
   [*state column-id]

@@ -36,7 +36,8 @@
            :views views
            :all-columns all-columns
            :identities identities
-           :visible-column-ids (map :id (take 3 all-columns)))))
+           :visible-column-ids (or (file-sys/load-visible-columns)
+                                   (map :id (take 3 all-columns))))))
 
 (defn- load-relays!
   []

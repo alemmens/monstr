@@ -239,7 +239,8 @@
     (fn [*state _db _exec _dispatch!]
       (log/debugf "Removing column %s, active key = %s" column-id (:active-key @*state))
       (swap! *state assoc
-             :visible-column-ids (remove #{column-id} (:visible-column-ids @*state))))]])
+             :visible-column-ids (remove #{column-id} (:visible-column-ids @*state)))
+      (file-sys/save-visible-columns))]])
 
 (defn- show-add-column-effect
   [show?]
@@ -258,6 +259,7 @@
                       new-column-id view-name)
           (swap! *state update
                  :visible-column-ids #(conj % new-column-id))))
+      (file-sys/save-visible-columns)
       (swap! *state assoc :show-add-column-dialog? false))]])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -54,3 +54,33 @@
       (into {}
             (for [[name map] raw]
               [name (domain/map->View map)])))))
+
+(defn save-visible-columns []
+  ;; Save the names of the views of the visible columns.
+  (write-nuestr-data (map (comp :name :view domain/find-column-by-id)
+                          (:visible-column-ids @domain/*state))
+                     "visible-columns.clj"))
+
+(defn load-visible-columns
+  "Returns true if loaded succesfully, otherwise nil."
+  []
+  (when (nuestr-file-exists? "visible-columns.clj")
+    (let [view-names (read-nuestr-data "visible-columns.clj")
+          ids (map (comp :id domain/find-column-with-view-name)
+                   view-names)]
+      (when (seq view-names)
+        (swap! domain/*state assoc :visible-column-ids ids)
+        ids))))
+
+(defn save-active-key []
+  (write-nuestr-data (:active-key @domain/*state)
+                     "active-key.clj"))
+
+(defn load-active-key []
+  (when (nuestr-file-exists? "active-key.clj")
+    (let [key (read-nuestr-data "active-key.clj")]
+      (when key
+        (swap! domain/*state assoc :active-key key)
+        key))))
+  
+  
