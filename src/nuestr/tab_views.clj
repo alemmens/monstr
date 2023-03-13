@@ -175,6 +175,8 @@
    :padding 10
    :children (let [items (sort (keys views))
                    value (or selected-view (first items))]
+               (swap! domain/*state assoc
+                      :selected-view value)
                [{:fx/type :v-box
                  :padding 20
                  :spacing 20

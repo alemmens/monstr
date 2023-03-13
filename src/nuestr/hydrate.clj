@@ -71,8 +71,9 @@
   ;;      dispatches via yielding of bg thread; this way we'd move
   ;;      on to subscriptions, allowing new stuff to come in sooner
   ;;      as we backfill
-  (status-bar/message! (format "Dispatching %d text notes from %s to column %s"
-                               (count events) relay-url (:id column)))
+  (status-bar/message! (format "Dispatching %d text notes from %s to %s."
+                               (count events) relay-url
+                               (if (string? column) (str "column " column) "all columns")))
   (doseq [event-obj events]
     (timeline/dispatch-text-note! *state
                                   (if (string? column)

@@ -325,6 +325,7 @@ will be removed when the view is deleted. Continue?"
       (let [views (:views @*state)
             selected-view (:selected-view @*state)
             using-columns (domain/columns-using-view selected-view)]
+        (log/debugf "Deleting view %s" selected-view)
         ;; TODO: Check if the view is in use. If so, ask for confirmation first.
         (when (> (count views) 1)
           ;; Move listview focus to the first view in the list.
