@@ -6,7 +6,7 @@
   (:import
    (java.time ZonedDateTime Instant)
    (java.util.concurrent ThreadFactory Executors ScheduledExecutorService TimeUnit)
-   (java.util HashMap HashSet)
+   (java.util HashMap HashSet UUID)
    (javafx.collections FXCollections ObservableList)
    (javafx.collections.transformation FilteredList)))
 
@@ -132,6 +132,10 @@
      flat-listview
      thread-listview])
 
+(defn timeline [pair show-thread?]
+  ((if show-thread? :thread-timeline :flat-timeline)
+   pair))
+
 (defrecord Column
     [id           ; a random UUID
      view
@@ -255,7 +259,8 @@
     [root-event-id event-id])
 
 (defrecord ProfileState
-    [;; If changed? is true, the Save button will be enabled.
+    [id
+     ;; If changed? is true, the Save button will be enabled.
      followers-changed?
      following-views-changed ; set of (names of) following views that have changed
      ;; A set of pubkeys (normally 0 or 1) of identities for which the profile's author is
@@ -265,7 +270,9 @@
      following-views
      ;; Timelines
      timeline-pair
-     show-thread?])
+     show-thread?
+     thread-focus  ; The note (event-obj) that is the focus of the thread. Only relevant when showing a thread.
+     ])
 
 (defn new-profile-state [pubkey list-creator thread-creator]
   (let [followers (filter (fn [k]
@@ -279,13 +286,20 @@
                              (filter (fn [v] (get (:follow-set v) pubkey))
                                      (vals (:views @*state))))]
     (log/debugf "New profile state with following-views %s" (pr-str following-views))
-    (->ProfileState false
+    (->ProfileState (.toString (UUID/randomUUID))
+                    false
                     #{}
                     (set followers)
                     (set following-views)
                     (->TimelinePair (new-timeline) (new-timeline)
                                     (list-creator) (thread-creator))
-                    false)))
+                    false
+                    nil)))
+
+(defn find-profile-state-by-id [id]
+  (first (filter #(= (:id %) id)
+                 (vals (:open-profile-states @*state)))))
+
 
 ;; --
 

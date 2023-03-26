@@ -27,7 +27,7 @@
                                                   domain/*state store/db
                                                   metadata/cache
                                                   domain/daemon-scheduled-executor)
-        thread-listview (view-home/create-thread-view column-id
+        thread-listview (view-home/create-thread-view column-id nil
                                                       domain/*state store/db
                                                       metadata/cache
                                                       domain/daemon-scheduled-executor)]

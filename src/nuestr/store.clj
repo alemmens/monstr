@@ -163,7 +163,7 @@
                               {:builder-fn rs/as-unqualified-lower-maps})))))
 
 (defn load-events-since
-  "Loads (at most 1000) events since the given timestamp."
+  "Loads (at most 10000) events since the given timestamp."
   [db since]
   (mapv (comp raw-event-tuple->event-obj :raw_event_tuple)
         (jdbc/execute! db
@@ -171,6 +171,16 @@
                                 since)]
                        {:builder-fn rs/as-unqualified-lower-maps})))
 
+(defn load-events-with-etag
+  [db etag-id]
+  (mapv (comp raw-event-tuple->event-obj :raw_event_tuple)
+        (jdbc/execute! db
+                       [(str "select raw_event_tuple from n_events e"
+                                     " inner join e_tags t on t.source_event_id=e.id"
+                                     " where t.tagged_event_id='" etag-id "'"
+                                     " limit 1000")]
+                       {:builder-fn rs/as-unqualified-lower-maps})))
+  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Loading everything else
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -38,7 +38,9 @@
     1 5000
     2 10000
     3 20000
-    60000))
+    4 60000
+    300000
+    ))
 
 (defn- send-subscribe-req!*
   [conn-vol subscriptions-snapshot new-raw-conn]

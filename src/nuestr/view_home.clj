@@ -78,7 +78,7 @@
         (let [[resolved-tag-letter resolved-tag-val] (resolve-tag* tag-idx tags)
               p-tag? (= "p" resolved-tag-letter)
               e-tag? (= "e" resolved-tag-letter)
-              ;; todo and we need to use metadata names instead of pubkeys when possible
+              ;; TODO: we need to use metadata names instead of pubkeys when possible.
               tag-link-text (cond
                               p-tag? (format "@%s"
                                        (or
@@ -135,8 +135,8 @@
             (recur b (next found)))
           (append-content-with-nostr-tags!*
             x (subs use-content cursor (count use-content)) tags metadata-cache))))
-    ;; shall we not argue with this? there mere presence of this listener seems
-    ;; to fix height being left rendered too short:
+    ;; Shall we not argue with this? The mere presence of this listener seems
+    ;; to fix height being left rendered too short.
     (.addListener (.totalHeightEstimateProperty x)
       (util-java/->ChangeListener
         (fn [_])))
@@ -288,15 +288,14 @@
                       (reply-button *state
                                     (:id (if (nil? root-data) event-obj root-data))
                                     item-id)
-                      (when column-id
-                        {:fx/type :button
-                         :style-class ["button" "ndesk-thread-button"] ;; used for .lookup
-                         :h-box/margin 3
-                         :text "thread"
-                         :on-action (fn [e]
-                                      (let [column (domain/find-column-by-id column-id)]
-                                        (log/debugf "Thread button clicked for column %s" (:name (:view column)))
-                                        (timeline/show-column-thread! *state column event-obj)))})])})
+                      {:fx/type :button
+                       :style-class ["button" "ndesk-thread-button"] ;; used for .lookup
+                       :h-box/margin 3
+                       :text "thread"
+                       :on-action (fn [e]
+                                    (let [column (and column-id (domain/find-column-by-id column-id))]
+                                      #_(log/debugf "Thread button clicked for column %s" (:name (:view column)))
+                                      (timeline/show-column-thread! *state column pubkey event-obj)))}])})
 
 (defn- thread-action-button-row
   ;; Like action-button-row but without the 'thread' button.
@@ -340,18 +339,31 @@
 
 (defn- async-load-event!
   "Load the event with the given id from either the database or from the relays."
-  [*state db column-id event-id]
+  [*state db column-id pubkey event-id]
+  #_(log/debugf "Async load event with column-id=%s and pubkey=%s"
+              column-id pubkey)
   (if-let [event-from-store (load-from-store db event-id)]
-    (timeline/dispatch-text-note! *state column-id event-from-store false true)
+    (fx/run-later
+     (timeline/thread-dispatch! *state
+                                (if column-id
+                                  (domain/find-column-by-id column-id)
+                                  nil)
+                                (get (:open-profile-states @*state) pubkey )
+                                event-from-store
+                                false))
     ;; Create a unique subscription id to load the event and subscribe to all relays in
     ;; the hope that we find the event.  We'll unsubscribe automatically when we get an
     ;; EOSE event.
-    (let [subscription-id (format "thread:%s:%s" column-id (rand-int 1000000000))]
+    (let [profile-state (get (:open-profile-states @*state) pubkey)
+          subscription-id (format "%s:%s:%s"
+                                  (if column-id "thread" "profile")
+                                  (or column-id (:id profile-state))
+                                  (rand-int 1000000000))]
       (relay-conn/subscribe-all! subscription-id
                                  [{:ids [event-id] :kinds [1]}]))))
 
 (defn thread-timeline-item
-  [{:keys [^UITextNote root-data ^UITextNote item-data column-id *state db metadata-cache executor]}]
+  [{:keys [^UITextNote root-data ^UITextNote item-data column-id pubkey *state db metadata-cache executor]}]
   (if (:missing? item-data)
     {:fx/type :h-box
      :style-class ["ndesk-timeline-item-missing"]
@@ -362,7 +374,7 @@
                                   ;; Wait a bit so we don't overload the relays.
                                   ;; TODO: we should use a queue instead of this black magic!
                                   (Thread/sleep 50) ; 50ms
-                                  (async-load-event! *state db column-id (:id item-data))))
+                                  (async-load-event! *state db column-id pubkey (:id item-data))))
                   ;; Show that we're working on it.
                   {:fx/type :hyperlink
                    :h-box/hgrow :always
@@ -390,7 +402,7 @@
      :bottom (thread-action-button-row *state db root-data item-id pubkey column-id)})))
 
 (defn- tree-rows*
-  [indent ^UITextNote root-data ^UITextNote item-data column-id *state db metadata-cache executor]
+  [indent ^UITextNote root-data ^UITextNote item-data column-id pubkey *state db metadata-cache executor]
   (let [spacer-width (* indent 10)]
     (cons
       {:fx/type :h-box
@@ -404,18 +416,19 @@
                    :item-data item-data
                    :root-data root-data
                    :column-id column-id
+                   :pubkey pubkey
                    :*state *state
                    :db store/db
                    :metadata-cache metadata/cache
                    :executor executor}]}
-      (mapcat #(tree-rows* (inc indent) root-data % column-id *state db metadata-cache executor)
+      (mapcat #(tree-rows* (inc indent) root-data % column-id pubkey *state db metadata-cache executor)
               (:children item-data)))))
 
 (defn- find-note
   [^UITextNote note pred]
   (if (pred note) note (first (map #(find-note % pred) (:children note)))))
 
-(defn- tree* [{:keys [^UITextNoteWrapper note-wrapper column-id *state db metadata-cache executor]}]
+(defn- tree* [{:keys [^UITextNoteWrapper note-wrapper column-id pubkey *state db metadata-cache executor]}]
   ;; NOTE: we get nil note-wrapper sometimes when the list-cell is advancing
   ;; in some ways. For now just render label w/ err which we'll see if
   ;; this matters.
@@ -423,10 +436,10 @@
     {:fx/type :label :text "err"}
     (let [root (:root note-wrapper)]
       {:fx/type :v-box
-       :children (vec (tree-rows* 0 root root column-id
+       :children (vec (tree-rows* 0 root root column-id pubkey
                                   *state db metadata-cache executor))})))
 
-(defn thread-home [{:keys [column-id *state db metadata-cache executor]}]
+(defn thread-home [{:keys [column-id pubkey *state db metadata-cache executor]}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created #(.setSelectionModel % util-fx-more/no-selection-model)
    :desc {:fx/type :list-view
@@ -439,6 +452,7 @@
                                      {:graphic
                                       {:fx/type tree*
                                        :column-id column-id
+                                       :pubkey pubkey
                                        :note-wrapper note-wrapper
                                        :*state *state
                                        :db db
@@ -446,10 +460,11 @@
                                        :executor executor}})}}})
 
 (defn create-thread-view
-  ^ListView [column-id *state db metadata-cache executor]
+  ^ListView [column-id pubkey *state db metadata-cache executor]
   (fx/instance
    (fx/create-component {:fx/type thread-home
                          :column-id column-id
+                         :pubkey pubkey
                          :*state *state
                          :db db
                          :metadata-cache metadata-cache
