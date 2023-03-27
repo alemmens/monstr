@@ -106,29 +106,33 @@
                 ^HashMap item-id->index
                 ^HashSet item-ids]}
         timeline]
-    (.add item-ids id)
-    (.merge author-pubkey->item-id-set pubkey (HashSet. [id])
-            (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
-    (let [etag-ids (parse/parse-tags event-obj "e") ;; order matters
-          id-closure (cons id etag-ids)
-          existing-index (first (keep #(.get item-id->index %) id-closure))]
-      (if (some? existing-index)
-        ;; We have a wrapper already. Update it with the new data about 'e' and 'p' tags.
-        (let [curr-wrapper (.get observable-list existing-index)
-              new-wrapper (timeline-support/contribute!
-                           curr-wrapper event-obj etag-ids ptag-ids)]
-          #_(log/debugf "Updating wrapper to %s" (pr-str new-wrapper))
-          (doseq [x id-closure]
-            (.put item-id->index x existing-index))
-          (.set observable-list existing-index new-wrapper))
-        ;; We don't have a wrapper yet. Create one and add it to the end of the observable
-        ;; list.
-        (let [init-index (.size observable-list)
-              init-wrapper (timeline-support/init! event-obj etag-ids ptag-ids)]
-          #_(log/debugf "Created wrapper %s" (pr-str init-wrapper))
-          (doseq [x id-closure]
-            (.put item-id->index x init-index))
-          (.add observable-list init-wrapper))))))
+    (when-not (get item-ids id)
+      #_(log/debugf "Adding %s to thread with %d items"
+                    id
+                    (count item-ids))
+      (.add item-ids id)
+      (.merge author-pubkey->item-id-set pubkey (HashSet. [id])
+              (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
+      (let [etag-ids (parse/parse-tags event-obj "e") ;; order matters
+            id-closure (cons id etag-ids)
+            existing-index (first (keep #(.get item-id->index %) id-closure))]
+        (if (some? existing-index)
+          ;; We have a wrapper already. Update it with the new data about 'e' and 'p' tags.
+          (let [curr-wrapper (.get observable-list existing-index)
+                new-wrapper (timeline-support/contribute!
+                             curr-wrapper event-obj etag-ids ptag-ids)]
+            #_(log/debugf "Updating wrapper at index %d" existing-index)
+            (doseq [id id-closure]
+              (.put item-id->index id existing-index))
+            (.set observable-list existing-index new-wrapper))
+          ;; We don't have a wrapper yet. Create one and add it to the end of the observable
+          ;; list.
+          (let [init-index (.size observable-list)
+                init-wrapper (timeline-support/init! event-obj etag-ids ptag-ids)]
+            #_(log/debugf "Created wrapper at index %s" init-index)
+            (doseq [id id-closure]
+              (.put item-id->index id init-index))
+            (.add observable-list init-wrapper)))))))
 
 (defn- update-column!
   [*state new-column]
@@ -140,7 +144,7 @@
 
 (defn- update-profile-state!
   [*state pubkey new-profile-state]
-  (log/debugf "Updating profile state for %s" pubkey)
+  #_(log/debugf "Updating profile state for %s" pubkey)
   (swap! *state assoc-in
          [:open-profile-states pubkey]
          new-profile-state))
@@ -181,9 +185,6 @@
                   (:id column)
                   (:id profile-state))
       (when-not (.contains (:item-ids timeline) (:id event-obj))
-        #_(log/debugf "Maybe adding thread event %s for focus %s"
-                    (:content event-obj)
-                    (:thread-focus (or column profile-state)))
         (when (or (not check-relevance?)
                   ;; TODO: Try to find a more precise way to check if an event should be
                   ;; added to a thread.
@@ -239,7 +240,7 @@
 
 (defn add-profile-notes [pubkey]
   (fx/run-later
-   (log/debugf "Adding profile notes for %s" pubkey)
+   #_(log/debugf "Adding profile notes for %s" pubkey)
    (let [profile-state (get (:open-profile-states @domain/*state) pubkey)]
      (update-timeline-pair! (:timeline-pair profile-state))
      (doseq [r (domain/relay-urls @domain/*state)]
@@ -261,7 +262,7 @@
 (defn maybe-add-open-profile-state!
   [pubkey]
   (when-not (get (:open-profile-states @domain/*state) pubkey)
-    (log/debugf "Adding open-profile-state for %s" pubkey)
+    #_(log/debugf "Adding open-profile-state for %s" pubkey)
     ;; Use a trick to be able to refer to nuestr.view-home/create-list-view
     ;; without getting cyclical reference problems.
     (let [view-home (find-ns 'nuestr.view-home)
@@ -307,7 +308,7 @@
    (let [column-id (:id column)
          profile-state (get (:open-profile-states @*state) pubkey)
          root (parse/event-root event-obj)]
-     (log/debugf "Show thread for event %s with root %s" event-obj root)
+     #_(log/debugf "Show thread for event %s with root %s" event-obj root)
      ;; Clear the thread and update the :show-thread? and :thread-focus properties.
      (if column
        (do (clear-column-thread! *state column)
@@ -320,20 +321,13 @@
                                   (assoc profile-state
                                          :show-thread? true
                                          :thread-focus event-obj))))
-     ;; Add the given event-obj.
-     (let [pairs (if column-id
-                   (vals (:identity->timeline-pair (domain/find-column-by-id column-id)))
-                   (list (:timeline-pair (get (:open-profile-states @*state) pubkey))))
-           ptag-ids (parse/parse-tags event-obj "p")]
-       (doseq [pair pairs]
-         (add-item-to-thread-timeline! (:thread-timeline pair)
-                                       ptag-ids
-                                       event-obj)))
-     ;; Refresh events to find any children.
-     (let [events (store/load-events-with-etag store/db root)]
-       (log/debugf "Loaded %d thread events for root %s" (count events) root)
-       (doseq [e events]
-         (thread-dispatch! *state column (get (:open-profile-states @*state) pubkey) e false))
+     ;; Load and dispatch all events for the thread.
+     (let [events (cons (store/load-event store/db root) ; can be nil if root is not in db
+                        (store/load-events-with-etag store/db root))]
+       #_(log/debugf "Loaded %d thread events for root %s" (count events) root)
+       (doseq [e (sort-by :created_at events)]
+         (when e
+           (thread-dispatch! *state column (get (:open-profile-states @*state) pubkey) e false)))
        ;; NOTE: we don't need to load recent events from relays here, because
        ;; that will be done by async-load-event! in view_home.clj.
        ))))

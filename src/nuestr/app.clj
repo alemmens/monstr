@@ -89,9 +89,7 @@
   [& _]
   (load-relays!)
   (init-homes!)
-  (log/debugf "Loaded %d identities %s"
-              (count (:identities @domain/*state))
-              (:identities @domain/*state))
+  (log/debugf "Loaded %d identities" (count (:identities @domain/*state)))
   (fx/mount-renderer domain/*state renderer)
   (consume/start! store/db domain/*state metadata/cache domain/daemon-scheduled-executor)
   (util/schedule! domain/daemon-scheduled-executor load-identities! 1000)
