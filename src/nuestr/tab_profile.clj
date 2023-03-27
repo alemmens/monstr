@@ -162,16 +162,27 @@
               
 
 (defn user-posts
-  [{:keys [timeline-pair]}]
-  (let [listview (if (:show-thread? timeline-pair)
+  [{:keys [profile-state pubkey]}]
+  (let [timeline-pair (:timeline-pair profile-state)
+        thread? (:show-thread? profile-state)
+        listview (if thread?
                    (:thread-listview timeline-pair)
                    (:flat-listview timeline-pair))]
-    (log/debugf "%d user posts" (count (:item-ids (:flat-timeline timeline-pair))))
+    (log/debugf "%d user posts" (count (:item-ids (domain/timeline timeline-pair thread?))))
     {:fx/type :v-box
      :padding 10
      :children (if (nil? listview)
                  []
-                 [{:fx/type fx/ext-instance-factory
+                 [{:fx/type :h-box
+                   :padding (if thread? 10 0)
+                   :style-class "relay-timeline-label"                   
+                   :children (if thread?
+                               [{:fx/type :h-box :h-box/hgrow :always}
+                                (timeline/back-from-thread-button nil pubkey)
+                                {:fx/type :label :text "thread" :padding 5}
+                                {:fx/type :h-box :h-box/hgrow :always}]
+                               [])}
+                  {:fx/type fx/ext-instance-factory
                    :create #(doto listview
                               (VBox/setVgrow Priority/ALWAYS))}])}))
   
@@ -211,7 +222,8 @@
                            :views views}])}
                   ;; Posts by this user.
                   {:fx/type user-posts
-                   :timeline-pair (:timeline-pair (get open-profile-states pubkey))}]}
+                   :pubkey pubkey
+                   :profile-state (get open-profile-states pubkey)}]}
       {:fx/type :label
        :text "No pubkey found for profile"})))
 

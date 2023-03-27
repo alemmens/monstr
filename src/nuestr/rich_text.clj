@@ -110,8 +110,8 @@
   [^GenericStyledArea n text url]
   (when (not-empty url)
     (.append n
-      (ReadOnlyStyledDocument/fromSegment
-        (->HyperlinkSeg text url)
-        nil ;; paragraph style
-        nil ;; text style
-        seg-ops*))))
+             (ReadOnlyStyledDocument/fromSegment
+              (->HyperlinkSeg text url)
+              nil ;; paragraph style
+              nil ;; text style
+              seg-ops*))))

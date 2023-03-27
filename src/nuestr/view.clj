@@ -156,13 +156,6 @@
 
 
 
-(defn back-from-thread-button
-  [column]
-  {:fx/type :button
-   :padding 5
-   :on-mouse-pressed (fn [e] (timeline/unshow-column-thread! domain/*state column))
-   :text (str " " (char 0x2190) " ") ; left arrow
-   })
 
 (defn refresh-button
   [last-refresh]
@@ -274,7 +267,7 @@
                              :children (remove nil?
                                                [{:fx/type :h-box :h-box/hgrow :always}
                                                 (when show-thread?
-                                                  (back-from-thread-button column))
+                                                  (timeline/back-from-thread-button column nil))
                                                 {:fx/type :label
                                                  :text (if show-thread?
                                                          (format "thread: %s" name)
@@ -298,8 +291,6 @@
        [{:fx/type :h-box :h-box/hgrow :always}
         (add-column-button "Add timeline")
         {:fx/type :h-box :h-box/hgrow :always}])}]})
-
-
 
 
 (defn new-column-dialog

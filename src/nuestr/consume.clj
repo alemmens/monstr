@@ -1,18 +1,18 @@
 (ns nuestr.consume
-  (:require
-    [clojure.string :as str]
-    [clojure.tools.logging :as log]
-    [manifold.stream :as s]
-    [nuestr.cache :as cache]
-    [nuestr.consume-verify :refer [verify-maybe-persist-event!]]
-    [nuestr.domain :as domain]    
-    [nuestr.json :as json]
-    [nuestr.metadata :as metadata]
-    [nuestr.parse :as parse]    
-    [nuestr.relay-conn :as relay-conn]
-    [nuestr.status-bar :as status-bar]
-    [nuestr.subscribe :as subscribe]
-    [nuestr.timeline :as timeline])
+  (:require [cljfx.api :as fx]   
+            [clojure.string :as str]
+            [clojure.tools.logging :as log]
+            [manifold.stream :as s]
+            [nuestr.cache :as cache]
+            [nuestr.consume-verify :refer [verify-maybe-persist-event!]]
+            [nuestr.domain :as domain]    
+            [nuestr.json :as json]
+            [nuestr.metadata :as metadata]
+            [nuestr.parse :as parse]    
+            [nuestr.relay-conn :as relay-conn]
+            [nuestr.status-bar :as status-bar]
+            [nuestr.subscribe :as subscribe]
+            [nuestr.timeline :as timeline])
   (:import (java.util.concurrent ScheduledExecutorService ScheduledFuture TimeUnit)))
 
 ;; todo where do we have stream buffers?
@@ -37,17 +37,6 @@
       (timeline/dispatch-metadata-update! *state event-obj))
     (catch Exception e
       (log/warn e "while handling metadata event"))))
-
-(defn consume-text-note [_db *state relay-url event-obj column-id thread?]
-  #_(log/debugf "Text note with id %s from %s for column %s"
-                (:id event-obj)
-                relay-url
-                (:name (:view (domain/find-column-by-id column-id))))
-  (timeline/dispatch-text-note! *state
-                                column-id ; can be nil
-                                (assoc event-obj :relays (list relay-url))
-                                false
-                                thread?))
 
 (defn consume-recommend-server [db relay-url event-obj]
   #_(log/info "recommend server (TODO): " relay-url (:id event-obj))
@@ -82,20 +71,32 @@
 
 (defn- consume-verified-event
   [db *state metadata-cache executor resubscribe-future-vol relay-url subscription-id {:keys [kind] :as verified-event}]
-  (let [force-acceptance? (str/starts-with? subscription-id "load-event:")]
-    ;; If the subscription id starts with "thread:", the event is caused by async-load-event!,
-    ;; and it's for a thread view. That means we consider the event to be relevant for
-    ;; any thread-timeline.
     (case kind
       0 (consume-set-metadata-event db *state metadata-cache relay-url verified-event)
       1 (let [parts (str/split subscription-id #":")
               thread? (= (first parts) "thread:")
-              column-id (second parts)]
-          (consume-text-note db *state relay-url verified-event column-id thread?))
+              profile? (= (first parts) "profile:")
+              column-or-profile-id (second parts)
+              event (assoc verified-event :relays (list relay-url))]
+          ;; If the subscription id starts with "thread:" or "profile:", the event is
+          ;; caused by async-load-event!, and it's for a thread view. That means we
+          ;; consider the event to be relevant for any thread-timeline.
+          (if (or thread? profile?)
+            (fx/run-later
+             (timeline/thread-dispatch! *state
+                                        (when thread? (domain/find-column-by-id column-or-profile-id))
+                                        (when profile? (domain/find-profile-state-by-id column-or-profile-id))
+                                        event
+                                        false))
+            (timeline/dispatch-text-note! *state
+                                          column-or-profile-id ; can be nil
+                                          event
+                                          false
+                                          false)))
       2 (consume-recommend-server db relay-url verified-event)
       3 (consume-contact-list db *state executor resubscribe-future-vol relay-url verified-event)
       4 (consume-direct-message db relay-url verified-event)
-      (log/warn "skipping kind" kind relay-url))))
+      (log/warn "skipping kind" kind relay-url)))
 
 (defn- consume-event
   [db *state metadata-cache executor resubscribe-future-vol cache relay-url subscription-id {:keys [id kind] :as event-obj} raw-event-tuple]
