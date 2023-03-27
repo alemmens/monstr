@@ -7,17 +7,17 @@
   #"(https?)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]")
 
 (defn detect
+  "Returns a vector of links, where each link is a `[start end]` vector."
   [^String content]
-  (try
-    (let [m (re-matcher http-basic-regex-str content)
-          result-vol (volatile! [])]
-      (while (.find m)
-        (let [m-start (.start m) m-end (.end m)]
-          (when (or (empty? @result-vol)
-                  ;; no overlapping--
-                  (>= m-start (second (peek @result-vol))))
-            (vswap! result-vol conj [m-start m-end]))))
-      @result-vol)
+  (try (let [m (re-matcher http-basic-regex-str content)
+             result-vol (volatile! [])]
+         (while (.find m)
+           (let [m-start (.start m) m-end (.end m)]
+             (when (or (empty? @result-vol)
+                       ;; no overlapping--
+                       (>= m-start (second (peek @result-vol))))
+               (vswap! result-vol conj [m-start m-end]))))
+         @result-vol)
     (catch Exception e
       [])))
 
@@ -31,7 +31,9 @@
     (let [m (re-matcher nostr-tag-regex-str content)
           result-vol (volatile! [])]
       (while (.find m)
-        (let [m-start (.start m) m-end (.end m) m-group (Integer/parseInt (.group m 1))]
+        (let [m-start (.start m)
+              m-end (.end m)
+              m-group (Integer/parseInt (.group m 1))]
           (when (or (empty? @result-vol)
                   ;; no overlapping--
                   (>= m-start (second (peek @result-vol))))

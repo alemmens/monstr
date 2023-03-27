@@ -27,8 +27,8 @@
 (defn- field-label [{:keys [text]}]
   {:fx/type :label
    :padding 5
-   :min-width 60
-   :max-width 60
+   :min-width 100
+   :max-width 100
    :text text})
 
 (defn- text-input [{:keys [label value on-text-changed]}]
@@ -125,6 +125,17 @@
                              {:fx/type :label
                               :text r}]}))})
 
+(defn- show-pictures-checkbox
+  [{:keys [temp-view]}]
+  {:fx/type :h-box
+   :padding 5
+   :spacing 5
+   :children [{:fx/type :check-box
+               :selected (boolean (:show-pictures temp-view))
+               :on-selected-changed (fn [e]
+                                      (update-temp-view! :show-pictures (boolean e)))}]})
+
+  
 (defn- right-hand-side
   [{:keys [views selected-view temp-view temp-view-changed? name metadata-cache]}]
   {:fx/type :v-box
@@ -136,6 +147,10 @@
                :value name
                :on-text-changed (fn [new-name]
                                   (update-temp-view! :name new-name))}
+              {:fx/type :h-box
+               :children [{:fx/type field-label :text "Show pictures:"}
+                          {:fx/type show-pictures-checkbox
+                           :temp-view temp-view}]}
               {:fx/type :h-box
                :spacing 60
                :children [{:fx/type :h-box

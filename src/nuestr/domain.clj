@@ -111,19 +111,20 @@
 
 (defrecord View
     ;; A view defines what is shown in a column.
-    [id           ; a random number
-     name         ; a string
-     relay-urls   ; a set of relay urls
-     follow       ; Either :use-identity \(i.e. follow the contacts of the active
-                  ; identity) or :all \(i.e. global) or :use-list.
-     follow-set   ; A set of (pubkeys of) authors the user wants to follow for this view.
-                  ; Applicable if FOLLOW is :use-list.
+    [id            ; a random number
+     name          ; a string
+     show-pictures ; a boolean that indicates if pictures must be shown
+     relay-urls    ; a set of relay urls
+     follow        ; Either :use-identity \(i.e. follow the contacts of the active
+                   ; identity) or :all \(i.e. global) or :use-list.
+     follow-set    ; A set of (pubkeys of) authors the user wants to follow for this view.
+                   ; Applicable if FOLLOW is :use-list.
      friends-of-friends ; Integer that indicates to which degree follows of follows must
                         ; also be followed. Default is 1, meaning only follows themselves.
-     mute-authors ; a set of (pubkeys of) authors to be muted
-     words        ; a set of words, at least one of which must occur in the text note
-     mute-words   ; a set of words to be muted
-     channels     ; a set of (pubkeys of) Nostr channels (defined by kind 40 and 41 events)
+     mute-authors  ; a set of (pubkeys of) authors to be muted
+     words         ; a set of words, at least one of which must occur in the text note
+     mute-words    ; a set of words to be muted
+     channels      ; a set of (pubkeys of) Nostr channels (defined by kind 40 and 41 events)
      ])
 
 (defrecord TimelinePair
@@ -176,9 +177,11 @@
 
 (defn make-view
   [name relay-urls
-   {:keys [follow follow-set friends-of-friends mute-authors words mute-words channels]}]
+   {:keys [show-pictures follow follow-set friends-of-friends
+           mute-authors words mute-words channels]}]
   (->View (rand-int 100000000)
           name
+          (boolean show-pictures)
           relay-urls
           (or follow :use-identity)
           (or follow-set #{})

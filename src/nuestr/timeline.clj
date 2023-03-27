@@ -324,7 +324,7 @@
      ;; Load and dispatch all events for the thread.
      (let [events (cons (store/load-event store/db root) ; can be nil if root is not in db
                         (store/load-events-with-etag store/db root))]
-       #_(log/debugf "Loaded %d thread events for root %s" (count events) root)
+       (log/debugf "Loaded %d thread events for root %s" (count events) root)
        (doseq [e (sort-by :created_at events)]
          (when e
            (thread-dispatch! *state column (get (:open-profile-states @*state) pubkey) e false)))

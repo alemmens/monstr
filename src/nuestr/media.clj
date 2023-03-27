@@ -1,4 +1,4 @@
-(ns nuestr.avatar
+(ns nuestr.media
   (:require [nuestr.util :as util]
             [nuestr.cache :as cache]
             [clojure.tools.logging :as log]
@@ -13,7 +13,7 @@
 (defonce image-cache
   (cache/build-loading
    "initialCapacity=500,maximumSize=1000"
-   (fn [[picture-url avatar-dim]]
+   (fn [[picture-url width height]]
      (when (string? picture-url)
        (let [url (if (str/starts-with? picture-url "<iframe src=")
                    ;; For some reason we have lots of picture urls that look like
@@ -23,7 +23,7 @@
                    (second (re-find #"\"(http[^\"]+)" picture-url))
                    picture-url)]
          (when-not (str/blank? url)
-           (try (Image. url ^double avatar-dim ^double avatar-dim true true true)
+           (try (Image. url ^double width ^double height true true true)
                 (catch Exception e
                   (log/debugf "Image cache exception for %s: %s"
                               url
@@ -31,7 +31,7 @@
 
 (defn show-picture [{:keys [url width height]}]
   (if-let [image (when-not (str/blank? url)
-                   (try (cache/get* image-cache [url width])
+                   (try (cache/get* image-cache [url width (or height width)])
                         (catch Exception e
                           (log/debugf "Can't find %s in image cache: %s"
                                       url
@@ -44,8 +44,30 @@
      :max-width width
      :max-height height
      :text url}))
-  
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Avatars
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defn avatar [{:keys [width picture-url]}]
   (show-picture {:url picture-url
                  :width width
                  :height width}))
+
+(def avatar-dim 40)
+
+(defn avatar-or-empty-space
+  [picture-url avatar-color pubkey-for-avatar]
+  (if (str/blank? picture-url)
+    {:fx/type :label
+     :min-width avatar-dim
+     :min-height avatar-dim
+     :max-width avatar-dim
+     :max-height avatar-dim
+     :style {:-fx-background-color avatar-color}
+     :style-class "ndesk-timeline-item-photo"
+     :text pubkey-for-avatar}
+    {:fx/type avatar
+     :width avatar-dim
+     :picture-url picture-url}))
+

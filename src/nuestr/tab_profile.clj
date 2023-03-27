@@ -3,9 +3,9 @@
    [cljfx.api :as fx]
    [clojure.tools.logging :as log]
    [clojure.string :as str]
-   [nuestr.avatar :as avatar]
    [nuestr.domain :as domain]
    [nuestr.file-sys :as file-sys]
+   [nuestr.media :as media]
    [nuestr.status-bar :as status-bar]
    [nuestr.store :as store]
    [nuestr.timeline :as timeline]
@@ -17,7 +17,7 @@
 (defn keycard
   [{:keys [active? profile? public-key metadata identity_]}]
   (let [avatar-dim 75.0
-        avatar-color (avatar/color public-key)
+        avatar-color (media/color public-key)
         picture-url (:picture-url metadata)]
     (log/debugf "Keycard for %s with metadata %s" public-key metadata)
     {:fx/type :v-box
@@ -34,7 +34,7 @@
                      :style {:-fx-background-color avatar-color}
                      :style-class "ndesk-keycard-photo"
                      :text (subs public-key 0 3)}
-                    {:fx/type avatar/avatar
+                    {:fx/type media/avatar
                      :picture-url picture-url
                      :width avatar-dim})
                   {:fx/type :v-box
