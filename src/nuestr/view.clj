@@ -5,10 +5,10 @@
    [clojure.set :as set]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
-   [nuestr.avatar :as avatar]
    [nuestr.cache :as cache]
    [nuestr.domain :as domain]
    [nuestr.event :as ev]
+   [nuestr.media :as media]
    [nuestr.metadata :as metadata]   
    [nuestr.status-bar :as status-bar]
    [nuestr.style :as style :refer [BORDER|]]
@@ -49,7 +49,7 @@
   (let [{:keys [public-key main-relay-url petname]} parsed-contact
         {:keys [name about picture-url nip05-id created-at]} parsed-metadata
         pubkey-short (util/format-pubkey-short public-key)
-        avatar-color (avatar/color public-key)
+        avatar-color (media/color public-key)
         avatar-dim 50.0]
     {:fx/type :v-box
      :style (if active? {:-fx-border-color avatar-color} {})
@@ -67,7 +67,7 @@
            :style {:-fx-background-color avatar-color}
            :style-class "ndesk-contact-photo"
            :text (subs public-key 0 3)}
-          {:fx/type avatar/avatar
+          {:fx/type media/avatar
            :picture-url picture-url
            :width avatar-dim})
         {:fx/type :v-box

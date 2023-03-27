@@ -2,10 +2,10 @@
   (:require [cljfx.api :as fx]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
-            [nuestr.avatar :as avatar]
             [nuestr.cache :as cache]
             [nuestr.domain :as domain]
             [nuestr.links :as links]
+            [nuestr.media :as media]
             [nuestr.metadata :as metadata]
             [nuestr.relay-conn :as relay-conn]
             [nuestr.rich-text :as rich-text]
@@ -29,33 +29,15 @@
            (nuestr.domain UITextNoteNew UITextNote UITextNoteWrapper)
            (org.fxmisc.richtext GenericStyledArea)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Avatars
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def avatar-dim 40)
 
-(defn url-summarize [url]
-  url)
-
-(defn avatar-or-empty-space
-  [picture-url avatar-color pubkey-for-avatar]
-  (if (str/blank? picture-url)
-    {:fx/type :label
-     :min-width avatar-dim
-     :min-height avatar-dim
-     :max-width avatar-dim
-     :max-height avatar-dim
-     :style {:-fx-background-color avatar-color}
-     :style-class "ndesk-timeline-item-photo"
-     :text pubkey-for-avatar}
-    {:fx/type avatar/avatar
-     :width avatar-dim
-     :picture-url picture-url}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Content
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn url-summarize [url]
+  url)
 
 (defn- hex-str? [s]
   (and (string? s) (re-matches #"[a-f0-9]{32,}" s)))
@@ -103,13 +85,8 @@
           (recur j (next more-found-nostr-tags)))
         (rich-text/append-text! x (subs content cursor (count content)))))))
 
-(defn create-content-node*
-  [content tags metadata-cache]
-  (let [use-content (-> content
-                      (str/replace #"(\r\n){2,}" "\r\n")
-                      (str/replace #"\n{2,}" "\n")
-                      (str/replace #"\r{2,}" "\r"))
-        ^GenericStyledArea x (rich-text/create*)]
+(defn create-content-node* [content links tags metadata-cache]
+  (let [^GenericStyledArea x (rich-text/create*)]
     (util-fx/add-style-class! x "ndesk-timeline-item-content")
     (HBox/setHgrow x Priority/ALWAYS)
     (.setWrapText x true)
@@ -124,17 +101,18 @@
           (.consume e)
           (when-let [p (.getParent x)]
             (.fireEvent p (.copyFor e (.getSource e) p))))))
-    (let [found (links/detect use-content)]
-      (loop [cursor 0 [[a b] :as found] found]
-        (if a
-          (let [sub-content (subs use-content cursor a)
-                link-url (subs use-content a b)]
-            (append-content-with-nostr-tags!* x sub-content tags metadata-cache)
-            (rich-text/append-hyperlink! x
-              (url-summarize link-url) link-url)
-            (recur b (next found)))
-          (append-content-with-nostr-tags!*
-            x (subs use-content cursor (count use-content)) tags metadata-cache))))
+    (loop [cursor 0
+           [[a b] :as found] links]
+      (if a
+        (let [sub-content (subs content cursor a)
+              link-url (subs content a b)]
+          (append-content-with-nostr-tags!* x sub-content tags metadata-cache)
+          (rich-text/append-hyperlink! x
+                                       (url-summarize link-url)
+                                       link-url)
+          (recur b (next found)))
+        (append-content-with-nostr-tags!*
+         x (subs content cursor (count content)) tags metadata-cache)))
     ;; Shall we not argue with this? The mere presence of this listener seems
     ;; to fix height being left rendered too short.
     (.addListener (.totalHeightEstimateProperty x)
@@ -143,13 +121,38 @@
     x))
 
 (defn timeline-item-content
-  [{:keys [content tags metadata-cache]}]
-  {:fx/type :h-box
-   :style-class ["ndesk-timeline-item-content-outer"]
-   :children [{:fx/type fx/ext-instance-factory
-               :create #(create-content-node* content tags metadata-cache)}]})
-
-
+  [{:keys [column-id content tags metadata-cache]}]
+  (let [column (domain/find-column-by-id column-id)
+        view (:view column)
+        clean-content (-> content
+                          (str/replace #"(\r\n){2,}" "\r\n")
+                          (str/replace #"\n{2,}" "\n")
+                          (str/replace #"\r{2,}" "\r"))
+        links (links/detect clean-content)
+        link-strings (map (fn [[start end]] (subs content start end))
+                          links)
+        image-links (keep #(when (or (str/ends-with? % ".bmp")
+                                     (str/ends-with? % ".gif")
+                                     (str/ends-with? % ".jpg")
+                                     (str/ends-with? % ".jpeg")
+                                     (str/ends-with? % ".png"))
+                             %)
+                          link-strings)
+        content-node {:fx/type :h-box
+                      :style-class ["ndesk-timeline-item-content-outer"]
+                      :children [{:fx/type fx/ext-instance-factory
+                                  :create #(create-content-node* clean-content links tags metadata-cache)}]}]
+    (if (and (:show-pictures view)
+             (seq image-links))
+      {:fx/type :v-box
+       :spacing 5
+       :children (cons content-node
+                       (map (fn [url]
+                              {:fx/type :h-box
+                               :padding 10
+                               :children [(media/show-picture {:url url :width 300})]})
+                            image-links))}
+      content-node)))
 
 (defonce ^Popup singleton-popup
   (fx/instance
@@ -385,16 +388,18 @@
           pubkey-for-avatar (or (some-> pubkey (subs 0 3)) "?")
           timestamp (:timestamp item-data)
           {:keys [name about picture-url nip05-id created-at]} (some->> pubkey (metadata/get* metadata-cache))
-          avatar-color (or (some-> pubkey avatar/color) :lightgray)]
+          avatar-color (or (some-> pubkey media/color) :lightgray)]
       {:fx/type :border-pane
        :on-mouse-entered (partial show-action-row! *state true)
        :on-mouse-exited (partial show-action-row! *state false)
-       :left (avatar-or-empty-space picture-url avatar-color pubkey-for-avatar)
+       :left (media/avatar-or-empty-space picture-url avatar-color pubkey-for-avatar)
        :center {:fx/type :border-pane
                 :top (author-pane name pubkey timestamp)
                 :bottom {:fx/type :h-box
                          :children [{:fx/type timeline-item-content
                                      :h-box/hgrow :always
+                                     :column-id column-id
+                                     :pubkey pubkey
                                      :content (:content item-data)
                                      :tags (:tags item-data)
                                      :metadata-cache metadata-cache}]}}
@@ -481,11 +486,11 @@
         pubkey (:pubkey event-obj)
         pubkey-for-avatar (or (some-> pubkey (subs 0 3)) "?")
         {:keys [name about picture-url nip05-id created-at]} (some->> pubkey (metadata/get* metadata-cache))
-        avatar-color (or (some-> pubkey avatar/color) :lightgray)]
+        avatar-color (or (some-> pubkey media/color) :lightgray)]
     {:fx/type :border-pane
      :on-mouse-entered (partial show-action-row! *state true)
      :on-mouse-exited (partial show-action-row! *state false)
-     :left (avatar-or-empty-space picture-url avatar-color pubkey-for-avatar)
+     :left (media/avatar-or-empty-space picture-url avatar-color pubkey-for-avatar)
      :center {:fx/type :border-pane
               :style (BORDER| :white)
               ;; Show name, pubkey and timestamp.              
@@ -493,6 +498,7 @@
               ;; Show the actual content.
               :bottom {:fx/type :h-box
                        :children [{:fx/type timeline-item-content
+                                   :column-id column-id
                                    :h-box/hgrow :always
                                    :content (:content event-obj)
                                    :tags (:tags event-obj)
