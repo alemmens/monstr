@@ -98,6 +98,32 @@
   (jdbc/execute-one! db
     ["delete from identities_ where public_key = ?" public-key]))
 
+(defn insert-channel!
+  [db channel]
+  (log/debugf "Inserting channel %s" (:name channel))
+  (let [{:keys [id pubkey name about picture-url recommended-relay-url]} channel
+        query (str "insert or ignore into channels"
+                   " (id, pubkey, name, about, picture_url, relay_url) "
+                   " values (?, ?, ?, ?, ?, ?)")]
+    (jdbc/execute-one! db
+                       [query
+                        id pubkey name about picture-url recommended-relay-url])))
+
+(defn update-channel!
+  [db channel]
+  (log/debugf "Updating channel %s" (:name channel))
+  (let [{:keys [id pubkey name about picture-url recommended-relay-url]} channel
+        query (str "update channels"
+                   " set pubkey=?, name=?, about=?, picture_url=?, relay_url=? "
+                   " where id=?")]
+    (jdbc/execute-one! db
+                       [query
+                        pubkey name about picture-url recommended-relay-url id])))
+
+(defn delete-all-channels! [db]
+  (jdbc/execute-one! db
+                     ["delete from channels"]))
+  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Loading events
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -200,6 +226,12 @@
       (domain/->Identity public_key secret_key))
     (jdbc/execute! db ["select * from identities_"]
       {:builder-fn rs/as-unqualified-lower-maps})))
+
+(defn load-channels [db]
+  (mapv (fn [{:keys [id pubkey name about picture_url relay_url]}]
+          (domain/->Channel id pubkey name about picture_url relay_url))
+        (jdbc/execute! db ["select * from channels"]
+                       {:builder-fn rs/as-unqualified-lower-maps})))
 
 (defn- raw-event-tuple->parsed-metadata
   [raw-event-tuple]

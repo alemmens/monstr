@@ -4,6 +4,7 @@
             [clojure.tools.logging :as log]
             [manifold.stream :as s]
             [nuestr.cache :as cache]
+            [nuestr.channels :as channels]
             [nuestr.consume-verify :refer [verify-maybe-persist-event!]]
             [nuestr.domain :as domain]    
             [nuestr.json :as json]
@@ -11,6 +12,7 @@
             [nuestr.parse :as parse]    
             [nuestr.relay-conn :as relay-conn]
             [nuestr.status-bar :as status-bar]
+            [nuestr.store :as store]
             [nuestr.subscribe :as subscribe]
             [nuestr.timeline :as timeline])
   (:import (java.util.concurrent ScheduledExecutorService ScheduledFuture TimeUnit)))
@@ -69,34 +71,101 @@
   #_(log/info "direct message (TODO): " relay-url (:id event-obj))
   )
 
+(defn consume-reaction [db relay-url verified-event]
+  #_(log/info "reaction (TODO): " (:id event-obj)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Channel events (NIP-28)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn insert-or-update-channel [db channel]
+  (let [id (:id channel)]
+    (if (channels/get* id)
+      (store/update-channel! db channel)
+      (store/insert-channel! db channel))
+    (channels/update! id channel)))
+
+(defn consume-channel-create [db relay-url event]
+  (try
+    (let [{:keys [pubkey id]} event
+          {:keys [name about picture]} (json/parse (:content event))
+          channel (domain/->Channel id pubkey name about picture relay-url)]
+      (log/debugf "Creating or updating channel %s with id %s" name id)
+      (insert-or-update-channel store/db channel))
+    (catch Exception e
+      (log/warn e "while handling channel-create event"))))
+
+(defn consume-channel-metadata [db relay-url event]
+  (try
+    (let [{:keys [pubkey]} event
+          e-tag (first (parse/parse-tags event "e"))
+          [_ id recommended-relay-url] e-tag]
+      (if-let [channel (channels/get* id)]
+        (when (= (:pubkey channel) pubkey) ; only update if same pubkey (see NIP-28)
+          (let [{:keys [name about picture]} (json/parse (:content event))
+                channel (domain/->Channel id pubkey name about picture recommended-relay-url)]
+            (log/info "Updating channel %s with id %s" name id)
+            (insert-or-update-channel store/db channel)))
+        ;; TODO: Maybe we should just create a channel if it doesn't exist yet?
+        (log/warn "Channel %s not found, so not updating." id)))
+    (catch Exception e
+      (log/warn e "while handling channel-metadata event"))))
+
+
+(defn consume-channel-message [db relay-url verified-event]
+  )
+
+(defn consume-hide-message [db relay-url verified-event]
+  )
+
+(defn consume-mute-user [db relay-url verified-event]
+  )
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; General
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defn- consume-verified-event
   [db *state metadata-cache executor resubscribe-future-vol relay-url subscription-id {:keys [kind] :as verified-event}]
-    (case kind
-      0 (consume-set-metadata-event db *state metadata-cache relay-url verified-event)
-      1 (let [parts (str/split subscription-id #":")
-              thread? (= (first parts) "thread:")
-              profile? (= (first parts) "profile:")
-              column-or-profile-id (second parts)
-              event (assoc verified-event :relays (list relay-url))]
-          ;; If the subscription id starts with "thread:" or "profile:", the event is
-          ;; caused by async-load-event!, and it's for a thread view. That means we
-          ;; consider the event to be relevant for any thread-timeline.
-          (if (or thread? profile?)
-            (fx/run-later
-             (timeline/thread-dispatch! *state
-                                        (when thread? (domain/find-column-by-id column-or-profile-id))
-                                        (when profile? (domain/find-profile-state-by-id column-or-profile-id))
+  (case kind
+    ;; NIP-01
+    0 (consume-set-metadata-event db *state metadata-cache relay-url verified-event)
+    1 (let [parts (str/split subscription-id #":")
+            thread? (= (first parts) "thread:")
+            profile? (= (first parts) "profile:")
+            column-or-profile-id (second parts)
+            event (assoc verified-event :relays (list relay-url))]
+        ;; If the subscription id starts with "thread:" or "profile:", the event is
+        ;; caused by async-load-event!, and it's for a thread view. That means we
+        ;; consider the event to be relevant for any thread-timeline.
+        (if (or thread? profile?)
+          (fx/run-later
+           (timeline/thread-dispatch! *state
+                                      (when thread? (domain/find-column-by-id column-or-profile-id))
+                                      (when profile? (domain/find-profile-state-by-id column-or-profile-id))
+                                      event
+                                      false))
+          (timeline/dispatch-text-note! *state
+                                        column-or-profile-id ; can be nil
                                         event
-                                        false))
-            (timeline/dispatch-text-note! *state
-                                          column-or-profile-id ; can be nil
-                                          event
-                                          false
-                                          false)))
-      2 (consume-recommend-server db relay-url verified-event)
-      3 (consume-contact-list db *state executor resubscribe-future-vol relay-url verified-event)
-      4 (consume-direct-message db relay-url verified-event)
-      (log/warn "skipping kind" kind relay-url)))
+                                        false
+                                        false)))
+    2 (consume-recommend-server db relay-url verified-event)
+    ;; NIP-02
+    3 (consume-contact-list db *state executor resubscribe-future-vol relay-url verified-event)
+    ;; NIP-04
+    4 (consume-direct-message db relay-url verified-event)
+    ;; NIP-25
+    7 (consume-reaction db relay-url verified-event)
+    ;; NIP-28: Channels
+    40 (consume-channel-create db relay-url verified-event)
+    41 (consume-channel-metadata db relay-url verified-event)
+    42 (consume-channel-message db relay-url verified-event)
+    43 (consume-hide-message db relay-url verified-event)
+    44 (consume-mute-user db relay-url verified-event)
+    ;; Everything else
+    (log/warn "skipping kind" kind relay-url)))
 
 (defn- consume-event
   [db *state metadata-cache executor resubscribe-future-vol cache relay-url subscription-id {:keys [id kind] :as event-obj} raw-event-tuple]

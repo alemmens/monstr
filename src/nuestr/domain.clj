@@ -249,6 +249,9 @@
 (defrecord ParsedMetadata
     [name about picture-url nip05-id created-at])
 
+(defrecord Channel
+    [id pubkey name about picture-url recommended-relay-url])
+
 (defrecord UITextNote
     [id pubkey content timestamp tags e-tags p-tags children missing?])
 
