@@ -15,6 +15,7 @@
    [nuestr.metadata :as metadata]
    [nuestr.relay-conn :as relay-conn]
    [nuestr.store :as store]
+   [nuestr.timeline :as timeline]
    [nuestr.view :as view]
    [nuestr.util :as util])
   (:gen-class))
@@ -56,7 +57,8 @@
   []
   (let [identities (store/load-identities store/db)]
     (log/debugf "Loaded %d identities." (count identities))
-    (hydrate/hydrate! domain/*state store/db domain/daemon-scheduled-executor identities)))
+    (hydrate/hydrate! domain/*state store/db domain/daemon-scheduled-executor identities)
+    (timeline/maybe-add-open-profile-state! (:active-key @domain/*state))))
 
 (defn- update-connected-info!
   []

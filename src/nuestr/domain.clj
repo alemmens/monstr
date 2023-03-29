@@ -216,7 +216,7 @@
   ;; NOTE: we're querying and subscribing to all of time but for now, for ux
   ;; experience, we filter underlying data by n days
   ;; todo we'll really wish to query/subscribe at an epoch and only update it on scroll etc.
-  (let [init-timeline-epoch (-> (days-ago 1) .getEpochSecond)
+  (let [init-timeline-epoch (-> (days-ago 365) .getEpochSecond)
         timeline-epoch-vol (volatile! init-timeline-epoch)
         observable-list (FXCollections/observableArrayList)
         filtered-list (FilteredList. observable-list

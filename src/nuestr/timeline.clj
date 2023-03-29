@@ -87,7 +87,7 @@
     (when-not (.contains item-ids id)
       (let [ptag-ids (parse/parse-tags event-obj "p")]
         (when (accept-text-note? *state column identity-pubkey ptag-ids event-obj)
-          #_(log/debugf "Adding event %s" id)
+          #_(log/debugf "Adding event %s '%s'" id content)
           (.add item-ids id)
           (.merge author-pubkey->item-id-set
                   pubkey
@@ -153,7 +153,7 @@
   (let [listview ((if thread? :thread-listview :flat-listview) pair)
         timeline ((if thread? :thread-timeline :flat-timeline) pair)]
     ;; Clear the pair's timeline and listview    
-    (log/debugf "Clearing listview %s and timeline %s" listview timeline)    
+    #_(log/debugf "Clearing listview %s and timeline %s" listview timeline)    
     (doseq [property [:observable-list :adapted-list :author-pubkey->item-id-set :item-id->index :item-ids]]
       (.clear (property timeline)))
     (.setItems listview (:adapted-list timeline))))
@@ -240,15 +240,19 @@
 
 (defn add-profile-notes [pubkey]
   (fx/run-later
-   #_(log/debugf "Adding profile notes for %s" pubkey)
-   (let [profile-state (get (:open-profile-states @domain/*state) pubkey)]
+   #_(log/debugf "Adding profile notes for %s, relays=%s"
+                 pubkey
+                 (pr-str (domain/relay-urls @domain/*state)))
+   (when-let [profile-state (get (:open-profile-states @domain/*state) pubkey)]
      (update-timeline-pair! (:timeline-pair profile-state))
      (doseq [r (domain/relay-urls @domain/*state)]
        (let [events (store/load-relay-events store/db r [pubkey])]
-         (status-bar/message! (format "Loaded %d events for %s from database"
+         (status-bar/message! (format "Loaded %d events for %s from %s from database"
                                       (count events)
+                                      pubkey
                                       r))
          (doseq [e events]
+           #_(log/debugf "Dispatching '%s' for %s" (:content e) pubkey)
            (flat-dispatch! domain/*state
                            (:flat-timeline (:timeline-pair profile-state))
                            pubkey
