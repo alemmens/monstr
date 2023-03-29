@@ -36,6 +36,11 @@
   ;; 2: recommend server
   ;; 3: contact list
   ;; 4: direct message
+  ;; 40: channel create
+  ;; 41: channel metadata
+  ;; 42: channel message
+  ;; 43: hide message
+  ;; 44: mute user
   (let [account-pubkeys (map :public-key (:identities @domain/*state))]
     [{:kinds [0 1 2 3]
       :since since
@@ -46,7 +51,14 @@
       :since since}
      {:kinds [4]
       :since since
-      :authors account-pubkeys}]))
+      :authors account-pubkeys}
+     {:kinds [40 41]
+      :limit 1000}
+     #_
+     {:kinds [42] ; channel messages
+      :since since
+      :limit 5000}
+     ]))
   
 (defn overwrite-subscriptions!
   ([column since]

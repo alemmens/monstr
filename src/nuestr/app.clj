@@ -2,11 +2,13 @@
 ;; @see https://docs.oracle.com/javafx/2/api/javafx/scene/text/FontSmoothingType.html
 (System/setProperty "prism.lcdtext" "false")
 (System/setProperty "io.netty.noUnsafe" "true") ;; ...needed w/ latest netty?
-;(System/setProperty "cljfx.style.mode" "true") ;; todo
+#_(System/setProperty "cljfx.style.mode" "true") ; todo
+
 (ns nuestr.app
   (:require
    [cljfx.api :as fx]
-   [clojure.tools.logging :as log]   
+   [clojure.tools.logging :as log]
+   [nuestr.channels :as channels]
    [nuestr.consume :as consume]
    [nuestr.domain :as domain]
    [nuestr.event :as ev]   
@@ -53,15 +55,19 @@
 (defn- update-relays! []
   (relay-conn/update-relays! (:relays @domain/*state)))
 
-(defn- load-identities!
-  []
+(defn- load-identities! []
   (let [identities (store/load-identities store/db)]
     (log/debugf "Loaded %d identities." (count identities))
     (hydrate/hydrate! domain/*state store/db domain/daemon-scheduled-executor identities)
     (timeline/maybe-add-open-profile-state! (:active-key @domain/*state))))
 
-(defn- update-connected-info!
-  []
+(defn- load-channels! []
+  (let [channels (store/load-channels store/db)]
+    (log/debugf "Loaded %d channels." (count channels))
+    (dorun (map #(channels/update! (:id %) %)
+                channels))))
+
+(defn- update-connected-info! []
   (let [connected-info (relay-conn/connected-info)]
     (swap! domain/*state assoc :connected-info connected-info)))
 
@@ -91,6 +97,7 @@
   [& _]
   (load-relays!)
   (init-homes!)
+  (load-channels!)
   (log/debugf "Loaded %d identities" (count (:identities @domain/*state)))
   (fx/mount-renderer domain/*state renderer)
   (consume/start! store/db domain/*state metadata/cache domain/daemon-scheduled-executor)

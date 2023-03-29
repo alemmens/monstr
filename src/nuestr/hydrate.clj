@@ -57,9 +57,7 @@
 (defn- hydrate-contact-lists!
   [new-identities]
   (let [contact-lists (store/load-contact-lists store/db (mapv :public-key new-identities))]
-    (status-bar/message! (format "Loaded %d contact lists for %s"
-                                 (count contact-lists)
-                                 new-identities))
+    (status-bar/message! (format "Loaded %d contact lists" (count contact-lists)))
     (swap! domain/*state update :contact-lists merge contact-lists)
     contact-lists))
 

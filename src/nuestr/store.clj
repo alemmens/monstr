@@ -32,10 +32,36 @@
   (doseq [statement (parse-schema)]
     (jdbc/execute-one! db [statement])))
 
+(defn- try-sql
+  "Returns true if no SQL error, otherwise false."
+  [db query]
+  (try (do (jdbc/execute-one! db [query])
+           true)
+       (catch org.sqlite.SQLiteException e
+         false)))
+
+(defn column-exists? [db table column]
+  (try-sql db
+           (format "select %s from %s limit 1" column table)))
+
+(defn maybe-add-column! [db table column type]
+  (when-not (column-exists? db table column)
+    (let [query (format "alter table %s add column %s %s"
+                        table column type)]
+      (jdbc/execute-one! db [query]))))
+
+(defn migrate! [db]
+  ;; 2023-03-29
+  ;; Marker is "root" or "reply" or "mention" or empty (NIP-10).
+  (maybe-add-column! db "e_tags" "relay_url" "varchar(64)")
+  (maybe-add-column! db "e_tags" "marker" "varchar(8)")
+  (maybe-add-column! db "p_tags" "relay_url" "varchar(64)"))
+
 (defn init!
   [path]
   (doto (get-datasource* path)
-    apply-schema!))
+    apply-schema!
+    migrate!))
 
 (defonce db (init! (file-sys/db-path)))
 
@@ -60,22 +86,22 @@
   (:rowid (insert-event!* db id pubkey created-at kind content raw-event-tuple)))
 
 (defn insert-e-tag!
-  [db source-event-id tagged-event-id]
+  [db source-event-id tagged-event-id relay-url marker]
   (jdbc/execute-one! db
     [(str
        "insert or ignore into e_tags"
-       " (source_event_id, tagged_event_id)"
-       " values (?, ?)")
-     source-event-id tagged-event-id]))
+       " (source_event_id, tagged_event_id, relay_url, marker)"
+       " values (?, ?, ?, ?)")
+     source-event-id tagged-event-id relay-url marker]))
 
 (defn insert-p-tag!
-  [db source-event-id tagged-pubkey]
+  [db source-event-id tagged-pubkey relay-url]
   (jdbc/execute-one! db
     [(str
        "insert or ignore into p_tags"
-       " (source_event_id, tagged_pubkey)"
-       " values (?, ?)")
-     source-event-id tagged-pubkey]))
+       " (source_event_id, tagged_pubkey, relay_url)"
+       " values (?, ?, ?)")
+     source-event-id tagged-pubkey relay-url]))
 
 (defn event-signature!
   [db event-id sig]
@@ -98,6 +124,32 @@
   (jdbc/execute-one! db
     ["delete from identities_ where public_key = ?" public-key]))
 
+(defn insert-channel!
+  [db channel]
+  #_(log/debugf "Inserting channel %s" (:name channel))
+  (let [{:keys [id pubkey name about picture-url recommended-relay-url]} channel
+        query (str "insert or ignore into channels"
+                   " (id, pubkey, name, about, picture_url, relay_url) "
+                   " values (?, ?, ?, ?, ?, ?)")]
+    (jdbc/execute-one! db
+                       [query
+                        id pubkey name about picture-url recommended-relay-url])))
+
+(defn update-channel!
+  [db channel]
+  #_(log/debugf "Updating channel %s" (:name channel))
+  (let [{:keys [id pubkey name about picture-url recommended-relay-url]} channel
+        query (str "update channels"
+                   " set pubkey=?, name=?, about=?, picture_url=?, relay_url=? "
+                   " where id=?")]
+    (jdbc/execute-one! db
+                       [query
+                        pubkey name about picture-url recommended-relay-url id])))
+
+(defn delete-all-channels! [db]
+  (jdbc/execute-one! db
+                     ["delete from channels"]))
+  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Loading events
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -200,6 +252,12 @@
       (domain/->Identity public_key secret_key))
     (jdbc/execute! db ["select * from identities_"]
       {:builder-fn rs/as-unqualified-lower-maps})))
+
+(defn load-channels [db]
+  (mapv (fn [{:keys [id pubkey name about picture_url relay_url]}]
+          (domain/->Channel id pubkey name about picture_url relay_url))
+        (jdbc/execute! db ["select * from channels"]
+                       {:builder-fn rs/as-unqualified-lower-maps})))
 
 (defn- raw-event-tuple->parsed-metadata
   [raw-event-tuple]

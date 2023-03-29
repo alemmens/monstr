@@ -1,6 +1,6 @@
 -- Careful with edits here. Our poor-man's parser expects each ddl statement
 -- to be separated by one or more full comment lines.
---
+-- Also note that store/migrate! adds more columns to some tables.
 pragma encoding = 'UTF-8';
 --
 pragma journal_mode = WAL;
@@ -79,8 +79,29 @@ create table if not exists relay_event_id
 --
 create table if not exists signature_event_id
 (
-    event_id   varchar(64) not null unique,
+    event_id   varchar(64) not null,
     signature_ varchar(64) not null,
     unique (event_id)
 );
 --
+create table if not exists channels
+(
+    id          varchar(64)  not null,
+    pubkey      varchar(64)  not null,
+    name        varchar(64)  not null,
+    about       varchar(512) not null,
+    picture_url varchar(128) not null,
+    relay_url   varchar(64),
+    unique (id)
+);
+--
+create index if not exists idx_channel_id on channels (id);
+--
+create table if not exists channel_messages
+(
+    channel_id  varchar(64)  not null,
+    event_id    varchar(64)  not null,
+    unique (channel_id, event_id)
+);
+--
+create index if not exists idx_channel_event on channel_messages (channel_id, event_id)
