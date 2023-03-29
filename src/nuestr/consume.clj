@@ -86,33 +86,37 @@
     (channels/update! id channel)))
 
 (defn consume-channel-create [db relay-url event]
-  (try
-    (let [{:keys [pubkey id]} event
-          {:keys [name about picture]} (json/parse (:content event))
-          channel (domain/->Channel id pubkey name about picture relay-url)]
-      (log/debugf "Creating or updating channel %s with id %s" name id)
-      (insert-or-update-channel store/db channel))
+  (try (let [{:keys [pubkey id]} event
+             {:keys [name about picture]} (json/parse (:content event))
+             channel (domain/->Channel id pubkey name about picture relay-url)]
+         (log/debugf "Creating channel %s, found on %s." name relay-url)
+         (insert-or-update-channel store/db channel))
     (catch Exception e
-      (log/warn e "while handling channel-create event"))))
+      (log/debugf "%s while handling channel-create event."
+                  (str e)))))
 
 (defn consume-channel-metadata [db relay-url event]
-  (try
-    (let [{:keys [pubkey]} event
-          e-tag (first (parse/parse-tags event "e"))
-          [_ id recommended-relay-url] e-tag]
-      (if-let [channel (channels/get* id)]
-        (when (= (:pubkey channel) pubkey) ; only update if same pubkey (see NIP-28)
-          (let [{:keys [name about picture]} (json/parse (:content event))
-                channel (domain/->Channel id pubkey name about picture recommended-relay-url)]
-            (log/info "Updating channel %s with id %s" name id)
-            (insert-or-update-channel store/db channel)))
-        ;; TODO: Maybe we should just create a channel if it doesn't exist yet?
-        (log/warn "Channel %s not found, so not updating." id)))
+  (try (let [{:keys [pubkey]} event
+             e-tag (first (parse/parse-tags event "e"))
+             [_ id recommended-relay-url] (if (string? e-tag)
+                                            ;; Old-style e-tag has only the channel id.
+                                            ["e" e-tag relay-url]
+                                            ;; NIP-10 e-tag.
+                                            e-tag)]
+         (if-let [channel (channels/get* id)]
+           (when (= (:pubkey channel) pubkey) ; only update if same pubkey (see NIP-28)
+             (let [{:keys [name about picture]} (json/parse (:content event))
+                   channel (domain/->Channel id pubkey name about picture recommended-relay-url)]
+               #_(log/info "Updating channel %s" name)
+               (insert-or-update-channel store/db channel)))
+           ;; TODO: Maybe we should just create a channel if it doesn't exist yet?
+           (log/debugf "Channel '%s' not found, so not updating." id)))
     (catch Exception e
-      (log/warn e "while handling channel-metadata event"))))
-
+      (log/debugf "%s while handling channel-metadata event."
+                  (str e)))))
 
 (defn consume-channel-message [db relay-url verified-event]
+  
   )
 
 (defn consume-hide-message [db relay-url verified-event]
@@ -161,9 +165,9 @@
     ;; NIP-28: Channels
     40 (consume-channel-create db relay-url verified-event)
     41 (consume-channel-metadata db relay-url verified-event)
-    42 (consume-channel-message db relay-url verified-event)
-    43 (consume-hide-message db relay-url verified-event)
-    44 (consume-mute-user db relay-url verified-event)
+    ; 42 (consume-channel-message db relay-url verified-event)
+    ; 43 (consume-hide-message db relay-url verified-event)
+    ; 44 (consume-mute-user db relay-url verified-event)
     ;; Everything else
     (log/warn "skipping kind" kind relay-url)))
 

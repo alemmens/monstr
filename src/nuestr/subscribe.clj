@@ -54,8 +54,10 @@
       :authors account-pubkeys}
      {:kinds [40 41]
       :limit 1000}
+     #_
      {:kinds [42] ; channel messages
-      :since since}
+      :since since
+      :limit 5000}
      ]))
   
 (defn overwrite-subscriptions!

@@ -1,6 +1,6 @@
 -- Careful with edits here. Our poor-man's parser expects each ddl statement
 -- to be separated by one or more full comment lines.
---
+-- Also note that store/migrate! adds more columns to some tables.
 pragma encoding = 'UTF-8';
 --
 pragma journal_mode = WAL;

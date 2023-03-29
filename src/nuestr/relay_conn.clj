@@ -1,13 +1,14 @@
 (ns nuestr.relay-conn
   (:require
-    [aleph.http :as http]
-    [clojure.tools.logging :as log]
-    [manifold.deferred :as d]
-    [manifold.stream :as s]
-    [manifold.time :as t]
-    [nuestr.json :as json*]
-    [nuestr.status-bar :as status-bar]
-    [nuestr.util :as util]))
+   [aleph.http :as http]
+   [clojure.string :as str]
+   [clojure.tools.logging :as log]
+   [manifold.deferred :as d]
+   [manifold.stream :as s]
+   [manifold.time :as t]
+   [nuestr.json :as json*]
+   [nuestr.status-bar :as status-bar]
+   [nuestr.util :as util]))
 
 (defn- websocket-client*
   [relay-url]
@@ -47,22 +48,23 @@
   (locking conn-vol
     (let [{:keys [relay-url]} @conn-vol]
       (doseq [[id filters] subscriptions-snapshot]
+        #_(log/debugf "subscribing %s to %s" id relay-url)
         (s/put! new-raw-conn
           (json*/write-str* (vec (concat ["REQ" id] filters))))
-        (status-bar/message! (format "subscribed %s to %s" id relay-url))))))
+        (status-bar/message! (format "subscribed %s on %s" id relay-url))))))
 
 (defn on-failure
   [conn-vol err]
   (locking conn-vol
     (let [{:keys [relay-url num-successive-failures destroyed?]} @conn-vol]
       (when-not destroyed?
-        ;; note: we should never see a deferred-conn here that
-        ;; isn't yet realized; so any listeners of prior deferred
-        ;; connection should have had their chance to fire
+        ;; Note: we should never see a deferred-conn here that isn't yet realized; so any
+        ;; listeners of prior deferred connection should have had their chance to fire.
         (vswap! conn-vol assoc :deferred-conn (d/deferred))
         ;; could be a connection failure or abrupt closure
         (let [delay-ms (retry-delay-ms num-successive-failures)]
-          (log/warnf "connection failure '%s'; reconnecting in %d ms; %s" relay-url delay-ms err)
+          (log/warnf "connection failure '%s'; reconnecting in %d ms; %s" relay-url delay-ms
+                     (pr-str (take 2 (str/split-lines (str err)))))
           (t/in delay-ms #(connect!* conn-vol)))
         (vswap! conn-vol update :num-successive-failures inc)))))
 
@@ -73,11 +75,11 @@
            subscriptions-snapshot :subscriptions} @conn-vol]
       (when-not destroyed?
         (log/debugf "connect attempt %s" relay-url)
-        ;; we contrive here for our deferred-conn to for-sure get an error or success
+        ;; We contrive here for our deferred-conn to for-sure get an error or success.
         (->
           (websocket-client* relay-url)
-          ;; timeout without a timeout-val produces an d/error! that is handled
-          ;; by the d/catch below
+          ;; Timeout without a timeout-val produces an d/error! that is handled
+          ;; by the d/catch below.
           (d/timeout! (* connect-timeout-secs 1000))
           (d/chain
             (util/wrap-exc-fn

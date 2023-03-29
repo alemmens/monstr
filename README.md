@@ -10,21 +10,9 @@
   view). So it's probably best to create your identity (public key and/or secret key) and
   build your contact list (follow list) on another client for now.
   
-* The database schema is subject to change. So, as long as Nuestr doesn't do database
-  migrations, you may need to delete the database after upgrading to a new release.
-  There are two ways to do this:
+* All Nuestr data is kept in the ~/.nostr-desk directory.  If, for some reason, you want
+  to start Nuestr complete from scratch again, you can just delete this directory.
   
-    - `$ rm ~/.nostr-desk` will delete the SQLite database and also user settings like the
-    views, visible columns, active account, etcetera. This means you will start completely
-    from scratch.
-    
-    - `$ rm ~/.nostr-desk/nd.db` will only delete the SQLite database. If you're lucky,
-    this will keep your user settings intact. If not, you'll have to delete everything
-    (as described above).
-   
-  I will add a release note whenever there's a change that breaks the database schema.
-  Since I started working on Nuestr (February 2023) there have been no such changes yet.
-   
 * There's a Telegram group for Nuestr at https://t.me/nuestr_clj
 
 * You can follow the main developer (aasaa) on Nostr: 
