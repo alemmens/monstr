@@ -34,7 +34,8 @@
    :identity-active-contact {}   
    :contact-lists {}          ; pubkey -> ContactList
    ;; Relays
-   :relays []                 ; list of Relay
+   :relays []                ; list of Relay
+   :relays-sort-by :read?    ; for the Relays tab (one of :url, :read?, :write?)        
    :connected-info {}
    ;; Views and columns
    :views {}                 ; map from view names to views
@@ -60,6 +61,9 @@
   (doall (map :url
               (filter #(or (:write? %) (:read? %))
                       (:relays state)))))
+
+(defn all-relay-urls [state]
+  (sort (map :url (:relays state))))
 
 (defn columns [state]
   (:all-columns state))

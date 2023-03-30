@@ -13,8 +13,9 @@
    [nuestr.status-bar :as status-bar]
    [nuestr.style :as style :refer [BORDER|]]
    [nuestr.subscribe :as subscribe]
-   [nuestr.tab-views :as tab-views]
    [nuestr.tab-profile :as tab-profile]
+   [nuestr.tab-relays :as tab-relays]
+   [nuestr.tab-views :as tab-views]
    [nuestr.timeline :as timeline]   
    [nuestr.util :as util]
    [nuestr.util-domain :as util-domain]
@@ -153,9 +154,6 @@
                [{:fx/type fx/ext-instance-factory
                  :create #(doto listview
                             (VBox/setVgrow Priority/ALWAYS))}])})
-
-
-
 
 (defn refresh-button
   [last-refresh]
@@ -317,7 +315,8 @@
   [{:keys [visible-column-ids all-columns
            open-profile-states
            views selected-view temp-view temp-view-changed?
-           relays show-add-column-dialog? new-timeline
+           relays relays-sort-by
+           show-add-column-dialog? new-timeline
            can-publish? active-reply-context active-contact-list
            active-key active-contact-pubkey identities
            identity-metadata metadata-cache
@@ -362,6 +361,11 @@
                                             :active-contact-list active-contact-list
                                             :active-contact-pubkey active-contact-pubkey
                                             :metadata-cache metadata-cache}
+                                false]
+                               ;; Relays
+                               ["Relays"{:fx/type tab-relays/relays
+                                         :relays relays
+                                         :relays-sort-by relays-sort-by}
                                 false]]
                               ;; Profile tabs.
                               (map (fn [pubkey]
@@ -438,7 +442,7 @@
 (defn root [{:keys [visible-column-ids all-columns
                     views selected-view temp-view temp-view-changed?
                     show-relays? active-key identities identity-metadata
-                    relays refresh-relays-ts connected-info
+                    relays relays-sort-by refresh-relays-ts connected-info
                     show-add-column-dialog? new-timeline
                     show-new-identity? new-identity-error active-reply-context contact-lists
                     identity-active-contact metadata-cache
@@ -466,6 +470,7 @@
             :temp-view temp-view
             :temp-view-changed? temp-view-changed?
             :relays relays
+            :relays-sort-by relays-sort-by            
             :show-add-column-dialog? show-add-column-dialog?
             :new-timeline new-timeline
             :can-publish? (util-domain/can-publish? active-key identities)
@@ -492,7 +497,7 @@
 
 (defn stage [{:keys [visible-column-ids all-columns
                      show-relays? active-key identities identity-metadata
-                     relays refresh-relays-ts connected-info
+                     relays relays-sort-by refresh-relays-ts connected-info
                      show-add-column-dialog? new-timeline
                      show-new-identity? new-identity-error active-reply-context
                      contact-lists identity-active-contact metadata-cache
@@ -520,6 +525,7 @@
            :contact-lists contact-lists
            :identity-active-contact identity-active-contact
            :relays relays
+           :relays-sort-by relays-sort-by
            :last-refresh last-refresh
            :refresh-relays-ts refresh-relays-ts
            :connected-info connected-info

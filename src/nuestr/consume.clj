@@ -41,11 +41,11 @@
       (log/warn e "while handling metadata event"))))
 
 (defn consume-recommend-server [db relay-url event]
-  (let [url (:content event)]
-    (log/debugf "Relay recommendation for %s on %s." url relay-url)
+  (let [url (str/trim (:content event))]
+    #_(log/debugf "Relay recommendation for %s on %s." url relay-url)
     (let [r (domain/->Relay url false false)
-          existing-relays (:relays @domain/*state)]
-      (when-not (some #{r} existing-relays)
+          existing-relay-urls (map :url (:relays @domain/*state))]
+      (when-not (some #{url} existing-relay-urls)
         (store/insert-relay! db r)
         (swap! domain/*state assoc
                :relays (conj (:relays @domain/*state) r))))))
@@ -95,7 +95,7 @@
   (try (let [{:keys [pubkey id]} event
              {:keys [name about picture]} (json/parse (:content event))
              channel (domain/->Channel id pubkey name about picture relay-url)]
-         (log/debugf "Creating channel %s, found on %s." name relay-url)
+         #_(log/debugf "Creating channel %s, found on %s." name relay-url)
          (insert-or-update-channel store/db channel))
     (catch Exception e
       (log/debugf "%s while handling channel-create event."

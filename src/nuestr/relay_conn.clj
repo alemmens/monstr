@@ -176,7 +176,7 @@
 (defn update-relays! [relays]
   (let [read-url? (into #{} (comp (filter :read?) (map :url)) relays)
         write-url? (into #{} (comp (filter :write?) (map :url)) relays)]
-    (log/debugf "Updating relays %s" relays)
+    (log/debugf "Updating %d relays" (count relays))
     (locking conn-registry
       ;; Close all removed write connections AND write connections that we'll promote to
       ;; read connections.

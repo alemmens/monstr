@@ -237,13 +237,6 @@
 ;;; Loading everything else
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn load-relays
-  [db]
-  (mapv
-    (fn [{:keys [url read_ write_]}]
-      (domain/->Relay url (pos? read_) (pos? write_)))
-    (jdbc/execute! db ["select * from relays_"]
-      {:builder-fn rs/as-unqualified-lower-maps})))
 
 (defn load-identities
   [db]
@@ -312,6 +305,14 @@
 ;;; Relays
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defn load-relays
+  [db]
+  (mapv
+    (fn [{:keys [url read_ write_]}]
+      (domain/->Relay url (pos? read_) (pos? write_)))
+    (jdbc/execute! db ["select * from relays_"]
+                   {:builder-fn rs/as-unqualified-lower-maps})))
+
 (defn replace-relays!
   "Answers provided relays on success."
   [db relays]
@@ -323,6 +324,10 @@
       {}))
   relays)
 
+(defn delete-non-active-relays! [db]
+  (jdbc/execute-one! db
+                     ["delete from relays_ where read_ is 0 and write_ is 0"]))
+  
 (defn insert-relay! [db relay]
   (let [{:keys [url read? write?]} relay]
     (jdbc/execute-one! db
@@ -330,6 +335,14 @@
                          "insert or ignore into relays_ (url,read_,write_)"
                          " values (?, ?, ?)")
                         url read? write?])))
+
+(defn update-relay! [db relay]
+  (let [{:keys [url read? write?]} relay]
+    (jdbc/execute-one! db
+                       [(str "update relays_ set read_=?, write_=?"
+                             " where url=?")
+                        read? write? url])))
+  
 
 (defn contains-event-from-relay!
   [db relay-url event-id]
