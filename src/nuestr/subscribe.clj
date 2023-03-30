@@ -42,9 +42,11 @@
   ;; 43: hide message
   ;; 44: mute user
   (let [account-pubkeys (map :public-key (:identities @domain/*state))]
-    [{:kinds [0 1 2 3]
+    [{:kinds [0 1 3]
       :since since
       :authors (relevant-pubkeys-for-view view)
+      :limit 1000}
+     {:kinds [2]
       :limit 1000}
      {:kinds [1 4]
       :#p account-pubkeys
@@ -54,8 +56,9 @@
       :authors account-pubkeys}
      {:kinds [40 41]
       :limit 1000}
+     
      #_
-     {:kinds [42] ; channel messages
+     {:kinds [42] ; TODO: channel messages
       :since since
       :limit 5000}
      ]))

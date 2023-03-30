@@ -173,14 +173,13 @@
   []
   (:sink-stream conn-registry))
 
-(defn update-relays!
-  [relays]
+(defn update-relays! [relays]
   (let [read-url? (into #{} (comp (filter :read?) (map :url)) relays)
         write-url? (into #{} (comp (filter :write?) (map :url)) relays)]
     (log/debugf "Updating relays %s" relays)
     (locking conn-registry
-      ;; close all removed write connections AND write connections that we'll promote to
-      ;; read connections
+      ;; Close all removed write connections AND write connections that we'll promote to
+      ;; read connections.
       (doseq [[relay-url deferred-conn] @(:write-connections-vol conn-registry)]
         (when (or (not (write-url? relay-url)) (read-url? relay-url))
           (d/chain deferred-conn
@@ -189,20 +188,20 @@
                                 (log/debugf "closing write conn %s" relay-url)
                                 (s/close! raw-conn))))
           (vswap! (:write-connections-vol conn-registry) dissoc relay-url)))
-      ;; close all removed read connections
+      ;; Close all removed read connections.
       (doseq [[relay-url read-conn-vol] @(:read-connections-vol conn-registry)]
         (when-not (read-url? relay-url)
           (log/debugf "closing read conn %s" relay-url)
           (destroy! read-conn-vol)
           (vswap! (:read-connections-vol conn-registry) dissoc relay-url)))
-      ;; add all reader newbies -- note that writes will be on-demand per upstream sends
+      ;; Add all reader newbies -- note that writes will be on-demand per upstream sends.
       (doseq [{:keys [url read? write?]} relays]
         (when read?
           (when-not (contains? @(:read-connections-vol conn-registry) url)
-            ;; ...new read relay!
+            ;; New read relay!
             (log/debugf "register read relay %s (will add %d subs)"
               url (or (some-> conn-registry :subscriptions deref count) 0))
-            (let [;; arbitrarily use a 100-buffer stream for now; see also s/throttle
+            (let [;; Arbitrarily use a 100-buffer stream for now; see also s/throttle.
                   conn-sink-stream (s/stream 100)
                   read-conn-vol (connect! url conn-sink-stream)]
               (doseq [[id filters] @(:subscriptions conn-registry)]

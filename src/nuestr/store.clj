@@ -154,6 +154,13 @@
 ;;; Loading events
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defn event-signature-by-id
+  [db event-id]
+  (:signature_
+    (jdbc/execute-one! db
+      ["select signature_ from signature_event_id where event_id = ?" event-id]
+      {:builder-fn rs/as-unqualified-lower-maps})))
+
 (defn- raw-event-tuple->event-obj
   [raw-event-tuple]
   (-> raw-event-tuple json/parse (nth 2)))
@@ -166,13 +173,6 @@
     :raw_event_tuple
     raw-event-tuple->event-obj))
 
-(defn load-relays-for-event
-  "Returns a list of relay urls."
-  [db event-id]
-  (map :relay_url
-       (jdbc/execute! db
-                      [(str "select relay_url from relay_event_id where event_id='" event-id "'")]
-                      {:builder-fn rs/as-unqualified-lower-maps})))
 
 (defn timeline-query
   [pubkeys]
@@ -308,6 +308,10 @@
                            pubkeys))
                   {:builder-fn rs/as-unqualified-lower-maps})))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Relays
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defn replace-relays!
   "Answers provided relays on success."
   [db relays]
@@ -318,6 +322,14 @@
       (mapv (fn [{:keys [url read? write?]}] [url read? write?]) relays)
       {}))
   relays)
+
+(defn insert-relay! [db relay]
+  (let [{:keys [url read? write?]} relay]
+    (jdbc/execute-one! db
+                       [(str
+                         "insert or ignore into relays_ (url,read_,write_)"
+                         " values (?, ?, ?)")
+                        url read? write?])))
 
 (defn contains-event-from-relay!
   [db relay-url event-id]
@@ -345,17 +357,20 @@
           {:builder-fn rs/as-unqualified-lower-maps})))))
 
 (defn count-events-on-relays
+  "Returns a map from relay urls to event counts."  
   [db]
   (let [result (jdbc/execute! db
                               ["select relay_url, count(*) from relay_event_id group by relay_url"])]
     (zipmap (map :relay_event_id/relay_url result)
             (map (keyword "count(*)") result))))
              
-  
-(defn event-signature-by-id
-  "Returns a map from relay urls to event counts."
+
+
+(defn load-relays-for-event
+  "Returns a list of relay urls."
   [db event-id]
-  (:signature_
-    (jdbc/execute-one! db
-      ["select signature_ from signature_event_id where event_id = ?" event-id]
-      {:builder-fn rs/as-unqualified-lower-maps})))
+  (map :relay_url
+       (jdbc/execute! db
+                      [(str "select relay_url from relay_event_id where event_id='" event-id "'")]
+                      {:builder-fn rs/as-unqualified-lower-maps})))
+

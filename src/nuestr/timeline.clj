@@ -240,9 +240,9 @@
 
 (defn add-profile-notes [pubkey]
   (fx/run-later
-   #_(log/debugf "Adding profile notes for %s, relays=%s"
-                 pubkey
-                 (pr-str (domain/relay-urls @domain/*state)))
+   (log/debugf "Adding profile notes for %s, relays=%s"
+               pubkey
+               (pr-str (domain/relay-urls @domain/*state)))
    (when-let [profile-state (get (:open-profile-states @domain/*state) pubkey)]
      (update-timeline-pair! (:timeline-pair profile-state))
      (doseq [r (domain/relay-urls @domain/*state)]

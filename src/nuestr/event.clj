@@ -32,6 +32,14 @@
       (log/debugf "Click keycard for public key %s" public-key)
       (timeline/update-active-timelines! *state public-key))]])
 
+(defn click-contact-card
+  [{:keys [contact-pubkey]}]
+  [[:bg
+    (fn [*state _db _exec _dispatch!]
+      (swap! *state
+        (fn [{:keys [active-key] :as curr-state}]
+          (assoc-in curr-state [:identity-active-contact active-key] contact-pubkey))))]])
+
 (defn show-new-identity-effect
   [show-new-identity?]
   [[:bg
@@ -101,7 +109,7 @@
         (cond
           (not= (count val) 64)
           (do
-            (.consume dialog-event) ;; prevents dialog closure
+            (.consume dialog-event) ; prevents dialog closure
             [[:bg (fn [*state _db _exec _dispatch!]
                     (swap! *state assoc
                       :new-identity-error "Key must be 64 characters"))]])
@@ -115,10 +123,14 @@
                      crypt/hex-encode)]
             (add-identity-and-close-dialog-effect corresponding-pubkey val)
             (do
-              (.consume dialog-event) ;; prevents dialog closure
+              (.consume dialog-event) ; prevents dialog closure
               [[:bg (fn [*state _db _exec _dispatch!]
                       (swap! *state assoc
                         :new-identity-error "Bad private key"))]])))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Relays
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn replace-relays-effect
   [new-relays show-relays?]
@@ -137,7 +149,7 @@
     (fn [*state db _]
       (swap! *state assoc
              :show-relays? show-relays?
-             ;; this is especially necessary when user is close-cancelling; they
+             ;; This is especially necessary when user is close-cancelling; they
              ;; may have mutated some text fields; and this forces a complete
              ;; re-render of the text fields, wiping out their mutations.
              :refresh-relays-ts (System/currentTimeMillis)))]])
@@ -155,6 +167,10 @@
       :cancel
       (show-relays-effect false)
       (replace-relays-effect dialog-result false))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Publish
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn publish-effect
   [content reply? success-callback]
@@ -179,10 +195,13 @@
   (let [^Button target (.getTarget event)
         ^TextArea found (.lookup (.getScene target) ".ndesk-publish-box")
         content (.getText found)]
-    ;; the idea here is that we only clear our publish text box if we're
-    ;; successful - otherwise text remains (we still do need better ux feedback
-    ;; in this case tho)
+    ;; The idea here is that we only clear our publish text box if we're successful -
+    ;; otherwise text remains (we still do need better ux feedback in this case tho).
     (publish-effect content false (fn [& _] (fx/run-later (.clear found))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Replies
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn hide-reply-box* [*state]
   (swap! *state dissoc :active-reply-context))
@@ -212,14 +231,6 @@
             ;; ux -- kinda like scuttleb!!!)
             (success-callback)
             (hide-reply-box* *state)))))))
-
-(defn click-contact-card
-  [{:keys [contact-pubkey]}]
-  [[:bg
-    (fn [*state _db _exec _dispatch!]
-      (swap! *state
-        (fn [{:keys [active-key] :as curr-state}]
-          (assoc-in curr-state [:identity-active-contact active-key] contact-pubkey))))]])
 
 (defn click-reply-button
   [event-obj]

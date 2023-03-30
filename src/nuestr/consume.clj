@@ -40,9 +40,15 @@
     (catch Exception e
       (log/warn e "while handling metadata event"))))
 
-(defn consume-recommend-server [db relay-url event-obj]
-  #_(log/info "recommend server (TODO): " relay-url (:id event-obj))
-  )
+(defn consume-recommend-server [db relay-url event]
+  (let [url (:content event)]
+    (log/debugf "Relay recommendation for %s on %s." url relay-url)
+    (let [r (domain/->Relay url false false)
+          existing-relays (:relays @domain/*state)]
+      (when-not (some #{r} existing-relays)
+        (store/insert-relay! db r)
+        (swap! domain/*state assoc
+               :relays (conj (:relays @domain/*state) r))))))
 
 (defn resubscribe!
   [*state ^ScheduledExecutorService executor resubscribe-future-vol]

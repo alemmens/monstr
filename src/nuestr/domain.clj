@@ -57,7 +57,9 @@
   (atom (initial-state)))
 
 (defn relay-urls [state]
-  (doall (map :url (:relays state))))
+  (doall (map :url
+              (filter #(or (:write? %) (:read? %))
+                      (:relays state)))))
 
 (defn columns [state]
   (:all-columns state))

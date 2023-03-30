@@ -38,10 +38,9 @@
    :padding 5
    ; :style {:-fx-padding [0 5 0 0]}
    :children
-   (mapv #(hash-map
-            :fx/type relay-dot
-            :relay %
-            :connected-info connected-info) relays)})
+   (mapv #(hash-map :fx/type relay-dot
+                    :relay %
+                    :connected-info connected-info) relays)})
 
 (defn status-relays
   [{:keys [show-relays? relays refresh-relays-ts connected-info]}]
@@ -57,7 +56,10 @@
           :children [{:fx/type :text :text "Relays: "}
                      (if (nil? relays)
                        {:fx/type :text :text "..."}
-                       {:fx/type relay-dots :relays relays :connected-info connected-info})]
+                       {:fx/type relay-dots
+                        :relays (filter #(or (:write? %) (:read? %))
+                                        relays)
+                        :connected-info connected-info})]
           :cursor :hand
           :on-mouse-clicked {:event/type :show-relays}}})
 

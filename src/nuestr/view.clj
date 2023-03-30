@@ -216,7 +216,7 @@
            relays show-add-column-dialog? can-publish?
            active-key active-reply-context active-contact-pubkey
            metadata-cache]}]
-  (log/debugf "Main panes with active key='%s', %d columns=%s"
+  #_(log/debugf "Main panes with active key='%s', %d columns=%s"
               active-key
               (count visible-column-ids)
               (pr-str visible-column-ids))
@@ -322,7 +322,7 @@
            active-key active-contact-pubkey identities
            identity-metadata metadata-cache
            ]}]
-  (log/debugf "Tab pane with columns=%s and show=%s"
+  #_(log/debugf "Tab pane with columns=%s and show=%s"
               (pr-str visible-column-ids)
               show-add-column-dialog?)
   {:fx/type fx/ext-let-refs
@@ -446,7 +446,7 @@
                     status-message status-message-timestamp
                     open-profile-states
                     ]}]
-  (log/debugf "Root with column ids=%s and %d contact-lists"
+  #_(log/debugf "Root with column ids=%s and %d contact-lists"
               (pr-str visible-column-ids)
               (count contact-lists))
   {:fx/type :border-pane
@@ -500,7 +500,7 @@
                      status-message status-message-timestamp
                      open-profile-states
                      ]}]
-  (log/debugf "Stage with %d identities and active key %s" (count identities) active-key)
+  #_(log/debugf "Stage with %d identities and active key %s" (count identities) active-key)
   {:fx/type :stage
    :showing true
    :title "Nuestr"
