@@ -29,29 +29,23 @@
 }
 
 .hyperlink {
-    -fx-text-fill: blue;
+    -fx-fill: blue;
+}
+
+.header > .hyperlink {
+    -fx-fill: blue;
     -fx-border-width: 0;
 }
 
-.hyperlink:focused {
-    -fx-text-fill: blue;
+.header > .hyperlink:focused {
+    -fx-fill: blue;
     -fx-border-width: 0;
 }
 
-.hyperlink:visited {
-    -fx-text-fill: blue;
+.header > .hyperlink:visited {
+    -fx-fill: blue;
     -fx-border-width: 0;
     -fx-underline: false;
-}
-
-.nuestr-header {
-    -fx-text-fill: blue;
-    -fx-font-weight: normal;
-}
-
-.nuestr-header-selected {
-    -fx-text-fill: blue;
-    -fx-font-weight: bold;
 }
 
 

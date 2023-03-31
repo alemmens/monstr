@@ -35,7 +35,8 @@
    :contact-lists {}          ; pubkey -> ContactList
    ;; Relays
    :relays []                ; list of Relay
-   :relays-sort-by :read?    ; for the Relays tab (one of :url, :read?, :write?)        
+   :relays-sort-by :read?    ; for the Relays tab (one of :url, :read?, :write?)
+   :relay-search-text ""     ; string with search text in the Relays tab
    :connected-info {}
    ;; Views and columns
    :views {}                 ; map from view names to views

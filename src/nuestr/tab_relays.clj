@@ -1,6 +1,7 @@
 (ns nuestr.tab-relays
   (:require
    [cljfx.api :as fx]
+   [clojure.string :as str]
    [clojure.tools.logging :as log]
    [clojure.string :as str]
    [nuestr.domain :as domain]
@@ -11,6 +12,10 @@
    [nuestr.util :as util])
   (:import (javafx.geometry Insets)
            (javafx.scene.layout VBox HBox Priority)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Rows
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- update-relay! [r property value]
   (let [new-relay (assoc r property value)]
@@ -45,14 +50,18 @@
                :on-selected-changed
                (fn [e] (update-relay! r :write? e))}]})
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Header
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defn- header [{:keys [relays relays-sort-by]}]
   (let [up-arrow (char 0x25b2)]
     {:fx/type :h-box
+     :style-class "header"
      :spacing 20
      :children [{:fx/type :hyperlink
                  :min-width url-width
                  :max-width url-width
-                 :disable (= relays-sort-by :url)
                  :style-class ["hyperlink"]
                  :text (str "Relay "
                             (if (= relays-sort-by :url) up-arrow ""))
@@ -62,7 +71,6 @@
                 {:fx/type  :hyperlink
                  :min-width checkbox-width
                  :max-width checkbox-width
-                 :disable (= relays-sort-by :read?)
                  :style-class ["hyperlink"]
                  :text (str "Read "
                             (if (= relays-sort-by :read?) up-arrow ""))
@@ -72,13 +80,16 @@
                 {:fx/type :hyperlink
                  :min-width checkbox-width
                  :max-width checkbox-width
-                 :disable (= relays-sort-by :write?)
                  :style-class ["hyperlink"]
                  :text (str "Write "
                             (if (= relays-sort-by :write?) up-arrow ""))
                  :on-action (fn [_]
                               (swap! domain/*state assoc
                                     :relays-sort-by :write?))}]}))
+
+;;
+;; Sorting
+;;
 
 (defn- compare-for-read [r1 r2]
   (cond (= (:read? r1) (:read? r2)) (if (= (:write? r1) (:write? r2))
@@ -104,22 +115,66 @@
           compare-for-url)
         relays))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Relay input field (for searching)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+#_
+(defn- search-field [{:keys [relays relay-search-text]}]
+  {:fx/type :h-box
+   :padding 20
+   :children [{:fx/type :label
+               :padding 5
+               :text "Search: "}
+              {:fx/type :text-field
+               :pref-column-count 20
+               :text (or relay-search-text "")
+               :style-class ["text-input"]
+               :on-text-changed  (fn [new-text]
+                                   (swap! domain/*state assoc
+                                          :relay-search-text new-text))}]})
+
+(defn- search-field [{:keys [relays relay-search-text]}]
+  {:fx/type :v-box
+   :children [{:fx/type :label :text "Search: "}
+              {:fx/type :text-field
+               :max-width url-width
+               :min-width url-width
+               :padding 5
+               :text (or relay-search-text "")
+               :style-class ["text-input"]
+               :on-text-changed  (fn [new-text]
+                                   (swap! domain/*state assoc
+                                          :relay-search-text new-text))}
+              {:fx/type :h-box :padding 10}]})
+
+(defn filter-relays [relays relay-search-text]
+  (filter #(str/includes? (:url %) relay-search-text)
+          relays))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Entry point
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn relays
-  [{:keys [relays relays-sort-by]}]
+  [{:keys [relays relays-sort-by relay-search-text]}]
   #_(log/debugf "Relays tab sort-by %s with %d relays"
                 relays-sort-by
                 (count (:relays @domain/*state)))
   {:fx/type :scroll-pane
-   :padding 20
+   :padding 15
    :hbar-policy :as-needed
    :vbar-policy :as-needed
    :content {:fx/type :v-box
              :padding 5
-             :children (cons {:fx/type header
-                              :relays relays
-                              :relays-sort-by relays-sort-by}
-                             (map relay-row (sort-relays relays relays-sort-by)))}})
+             :children (concat [{:fx/type search-field
+                                 :relays relays
+                                 :relay-search-text relay-search-text}
+                                {:fx/type header
+                                 :relays relays
+                                 :relays-sort-by relays-sort-by}]
+                               (map relay-row (sort-relays (filter-relays relays relay-search-text)
+                                                           relays-sort-by)))}})
 
 
 

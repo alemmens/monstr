@@ -315,7 +315,7 @@
   [{:keys [visible-column-ids all-columns
            open-profile-states
            views selected-view temp-view temp-view-changed?
-           relays relays-sort-by
+           relays relays-sort-by relay-search-text
            show-add-column-dialog? new-timeline
            can-publish? active-reply-context active-contact-list
            active-key active-contact-pubkey identities
@@ -363,9 +363,11 @@
                                             :metadata-cache metadata-cache}
                                 false]
                                ;; Relays
+                               #_
                                ["Relays"{:fx/type tab-relays/relays
                                          :relays relays
-                                         :relays-sort-by relays-sort-by}
+                                         :relays-sort-by relays-sort-by
+                                         :relay-search-text relay-search-text}
                                 false]]
                               ;; Profile tabs.
                               (map (fn [pubkey]
@@ -442,7 +444,8 @@
 (defn root [{:keys [visible-column-ids all-columns
                     views selected-view temp-view temp-view-changed?
                     show-relays? active-key identities identity-metadata
-                    relays relays-sort-by refresh-relays-ts connected-info
+                    relays relays-sort-by relay-search-text
+                    refresh-relays-ts connected-info
                     show-add-column-dialog? new-timeline
                     show-new-identity? new-identity-error active-reply-context contact-lists
                     identity-active-contact metadata-cache
@@ -470,7 +473,8 @@
             :temp-view temp-view
             :temp-view-changed? temp-view-changed?
             :relays relays
-            :relays-sort-by relays-sort-by            
+            :relays-sort-by relays-sort-by
+            :relay-search-text relay-search-text
             :show-add-column-dialog? show-add-column-dialog?
             :new-timeline new-timeline
             :can-publish? (util-domain/can-publish? active-key identities)
@@ -497,7 +501,8 @@
 
 (defn stage [{:keys [visible-column-ids all-columns
                      show-relays? active-key identities identity-metadata
-                     relays relays-sort-by refresh-relays-ts connected-info
+                     relays relays-sort-by relay-search-text
+                     refresh-relays-ts connected-info
                      show-add-column-dialog? new-timeline
                      show-new-identity? new-identity-error active-reply-context
                      contact-lists identity-active-contact metadata-cache
@@ -526,6 +531,7 @@
            :identity-active-contact identity-active-contact
            :relays relays
            :relays-sort-by relays-sort-by
+           :relay-search-text relay-search-text
            :last-refresh last-refresh
            :refresh-relays-ts refresh-relays-ts
            :connected-info connected-info
