@@ -1,5 +1,6 @@
 (ns nuestr.util
-  (:require [clojure.tools.logging :as log]
+  (:require [clojure.string :as str]
+            [clojure.tools.logging :as log]
             [nuestr.metadata :as metadata])
   (:import (java.util Random Date)
            (java.text SimpleDateFormat)
@@ -45,6 +46,11 @@
         (last ks))) (update-in m (butlast ks) dissoc (last ks))
     (not knext) (dissoc m k)
     :else m))
+
+(defn relay-url-short [url]
+  (cond (str/starts-with? url "wss://") (subs url 6)
+        (str/starts-with? url "ws://")  (subs url 5)
+        :else url))
 
 (defn format-pubkey-short
   [pubkey]

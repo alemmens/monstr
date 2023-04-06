@@ -9,6 +9,7 @@
             [nuestr.metadata :as metadata]
             [nuestr.relay-conn :as relay-conn]
             [nuestr.rich-text :as rich-text]
+            [nuestr.status-bar :as status-bar]
             [nuestr.store :as store]
             [nuestr.style :as style :refer [BORDER|]]
             [nuestr.tab-profile :as tab-profile]
@@ -224,8 +225,6 @@
       (let [stage (-> node .getScene .getWindow)]
         (.show popup stage))))
 
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Action buttons
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -329,6 +328,17 @@
            :style-class "ndesk-timeline-item-timestamp"
            :text (or (some-> timestamp util/format-timestamp) "?")}})
 
+(defn show-timeline-item-info [e event-obj]
+  (show-action-row! domain/*state true e)
+  (let [seen-on (store/get-seen-on-relays store/db (:id event-obj))]
+    (status-bar/message! (format "Seen on %s."
+                                 (str/join " and "
+                                           (map util/relay-url-short seen-on))))))
+
+(defn unshow-timeline-item-info [e]
+  (show-action-row! domain/*state false e)
+  (status-bar/message! ""))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Thread pane
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -387,8 +397,9 @@
           {:keys [name about picture-url nip05-id created-at]} (some->> pubkey (metadata/get* metadata-cache))
           avatar-color (or (some-> pubkey media/color) :lightgray)]
       {:fx/type :border-pane
-       :on-mouse-entered (partial show-action-row! *state true)
-       :on-mouse-exited (partial show-action-row! *state false)
+       :on-mouse-entered (fn [e] (show-timeline-item-info e item-data))
+       :on-mouse-moved (fn [e] (show-timeline-item-info e item-data))
+       :on-mouse-exited unshow-timeline-item-info
        :left (media/avatar-or-empty-space picture-url avatar-color pubkey-for-avatar)
        :center {:fx/type :border-pane
                 :top (author-pane name pubkey timestamp)
@@ -485,8 +496,9 @@
         {:keys [name about picture-url nip05-id created-at]} (some->> pubkey (metadata/get* metadata-cache))
         avatar-color (or (some-> pubkey media/color) :lightgray)]
     {:fx/type :border-pane
-     :on-mouse-entered (partial show-action-row! *state true)
-     :on-mouse-exited (partial show-action-row! *state false)
+     :on-mouse-entered (fn [e] (show-timeline-item-info e event-obj))
+     :on-mouse-moved (fn [e] (show-timeline-item-info e event-obj))
+     :on-mouse-exited unshow-timeline-item-info
      :left (media/avatar-or-empty-space picture-url avatar-color pubkey-for-avatar)
      :center {:fx/type :border-pane
               :style (BORDER| :white)

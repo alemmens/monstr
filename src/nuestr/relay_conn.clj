@@ -68,7 +68,7 @@
         #_(log/debugf "subscribing %s to %s" id relay-url)
         (s/put! new-raw-conn
           (json*/write-str* (vec (concat ["REQ" id] filters))))
-        (status-bar/message! (format "subscribed %s on %s" id relay-url))))))
+        (log/debugf (format "subscribed %s on %s" id relay-url))))))
 
 (defn on-failure [conn-vol err]
   (locking conn-vol
@@ -81,9 +81,10 @@
         (let [delay-ms (if (= err :connection-closed)
                          600000 ; try again in 10 minutes
                          (retry-delay-ms num-successive-failures))]
-          (status-bar/message! (format "connection failure '%s'; reconnecting in %d ms; %s"
-                                       relay-url delay-ms
-                                       (pr-str (take 1 (str/split-lines (str err))))))
+          ;; TODO: Add the connection failure to the relay info.
+          (log/debugf "connection failure '%s'; reconnecting in %d ms; %s"
+                      relay-url delay-ms
+                      (pr-str (take 1 (str/split-lines (str err)))))
           (vswap! conn-vol update :num-successive-failures inc)          
           (t/in delay-ms #(connect!* conn-vol)))))))
 
@@ -141,7 +142,7 @@
 
 (defn subscribe! [conn-vol id filters]
   {:pre [(vector? filters) (every? map? filters)]}
-  (status-bar/message! (format "Subscribing to events from %s" (:relay-url @conn-vol)))
+  (log/debugf  (format "Subscribing to events from %s" (:relay-url @conn-vol)))
   (locking conn-vol
     (vswap! conn-vol update :subscriptions
             assoc id filters)
@@ -163,7 +164,7 @@
         (log/debugf "Closing subscription with id %s (%d left)"
                     id
                     (count (:subscriptions @conn-vol)))
-        (status-bar/message! "")
+        #_(status-bar/message! "")
         (s/put! @deferred-conn
                 (json*/write-str* ["CLOSE" id]))))))
 
@@ -193,15 +194,15 @@
 (defn maybe-add-subscriptions!
   "SUBSCRIPTIONS is a map from subscription id to filters."
   [relay-url subscription-map]
-  (status-bar/message! (format "Maybe adding subscriptions (%s) for %s"
-                               (vals subscription-map)
-                               relay-url))
+  (log/debugf (format "Maybe adding subscriptions (%s) for %s"
+                      (vals subscription-map)
+                      relay-url))
   (when-not (every? (fn [filters]
                       (when-let [connection-vol (get @(:read-connections-vol conn-registry) relay-url)]
                         (connection-has-subscription? @connection-vol filters)))
                     (vals subscription-map))
     ;; New read connection.
-    (status-bar/message! (format "Adding read connection for %s" relay-url))
+    (log/debugf (format "Adding read connection for %s" relay-url))
     (let [;; Arbitrarily use a 100-buffer stream for now; see also s/throttle.
           connection-sink-stream (s/stream 100)
           read-connection-vol (connect! relay-url connection-sink-stream)]
@@ -243,14 +244,16 @@
       ;; Add all reader newbies -- note that writes will be on-demand per upstream sends.
       (doseq [{:keys [url read? write? meta?]} relays]
         (when read?
-          (maybe-add-subscriptions! url @(:subscriptions conn-registry)))
-        (when meta?
-          (maybe-add-subscriptions! url (subscribe/recommend-server-subscription)))))))
+          (maybe-add-subscriptions! url @(:subscriptions conn-registry)))))))
 
-(defn add-recommend-server-subscription! [relay-url]
-  (log/debugf "Adding recommend-server subscription for %s" relay-url)
+(defn add-meta-subscription! [relay-url]
+  (log/debugf "Adding meta subscription for %s" relay-url)
   (locking conn-registry
-    (maybe-add-subscriptions! relay-url (subscribe/recommend-server-subscription))))
+    (maybe-add-subscriptions! relay-url (subscribe/meta-subscription))))
+
+(defn update-meta-info! []
+  (doseq [relay-url (domain/all-relay-urls @domain/*state)]
+    (add-meta-subscription! relay-url)))
 
 (defn subscribe-all!
   "Establish subscription to all relays marked for read. (If `update-relays!` is used

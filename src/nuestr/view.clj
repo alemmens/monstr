@@ -491,8 +491,8 @@
             :status-message (if (> (- (util/now-epoch-second)
                                       (or status-message-timestamp
                                           (util/now-epoch-second)))
-                                   5)
-                              "" ; clear status message after 5 seconds
+                                   30)
+                              "" ; clear status message after 30 seconds
                               status-message)
             :relays relays
             :refresh-relays-ts refresh-relays-ts

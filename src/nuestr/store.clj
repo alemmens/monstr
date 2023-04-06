@@ -259,22 +259,24 @@
           {:keys [name about picture nip05]} (json/parse content)]
       (domain/->ParsedMetadata name about picture nip05 created_at))))
 
-;; todo make efficient via delete by trigger or gc process
-(defn load-metadata
-  [db pubkeys]
-  (into
-    {}
-    (map (juxt :pubkey #(-> % :raw_event_tuple raw-event-tuple->parsed-metadata)))
-    (jdbc/execute! db
-      (vec
-        (concat
-          [(format
-             (str "select pubkey, raw_event_tuple, max(created_at) as max_ from n_events"
-               " where pubkey in (%s) and kind = 0 and deleted_ is false"
-               " group by pubkey")
-             (str/join "," (repeat (count pubkeys) "?")))]
-          pubkeys))
-      {:builder-fn rs/as-unqualified-lower-maps})))
+
+(defn load-metadata [db pubkeys]
+  ;; TODO: make efficient via delete by trigger or gc process
+  (log/debugf "Loading metadata for %s" pubkeys)
+  (try (into
+        {}
+        (map (juxt :pubkey #(-> % :raw_event_tuple raw-event-tuple->parsed-metadata)))
+        (jdbc/execute! db
+                       (vec
+                        (concat
+                         [(format
+                           (str "select pubkey, raw_event_tuple, max(created_at) as max_ from n_events"
+                                " where pubkey in (%s) and kind = 0 and deleted_ is false"
+                                " group by pubkey")
+                           (str/join "," (repeat (count pubkeys) "?")))]
+                         pubkeys))
+                       {:builder-fn rs/as-unqualified-lower-maps}))
+       (catch Throwable t {})))
 
 (defn- raw-event-tuple->parsed-contact-list
   [raw-event-tuple]
@@ -310,7 +312,7 @@
   (mapv (fn [{:keys [url read_ write_]}]
           (let [read? (pos? read_)
                 write? (pos? write_)
-                ;; We use all relays for metadata.
+                ;; We use all relays for meta info.
                 meta? true]
             (domain/->Relay url read? write? meta?)))
         (jdbc/execute! db ["select * from relays_"]

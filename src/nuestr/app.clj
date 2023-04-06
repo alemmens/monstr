@@ -111,7 +111,9 @@
   (util/schedule! domain/daemon-scheduled-executor load-identities! 1000)
   (util/schedule! domain/daemon-scheduled-executor update-relays! 3000)
   (util/schedule-with-fixed-delay!
-    domain/daemon-scheduled-executor update-connected-info! 4000 10000)
+    domain/daemon-scheduled-executor relay-conn/update-meta-info! 5000 30000)
+  (util/schedule-with-fixed-delay!
+   domain/daemon-scheduled-executor update-connected-info! 10000 30000)  
   ;; CONSIDER shutdown hooks, graceful executor shutdown etc
   )
 

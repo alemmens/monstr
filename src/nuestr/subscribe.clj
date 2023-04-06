@@ -47,9 +47,6 @@
       :since since
       :authors (relevant-pubkeys-for-view view)
       :limit 1000}
-     #_
-     {:kinds [2]
-      :limit 1000}
      {:kinds [1 4]
       :#p account-pubkeys
       :since since}
@@ -64,10 +61,10 @@
       :limit 5000}
      ]))
 
-(defn recommend-server-subscription
+(defn meta-subscription
   "Returns a map from subscription id to filters."
   []
-  (let [filter {:kinds [2] :limit 1000}
+  (let [filter {:kinds [0 2 3] :limit 3000}
         subscription-id (format "meta:%s" (.toString (UUID/randomUUID)))]
     {subscription-id [filter]}))
   

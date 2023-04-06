@@ -66,7 +66,7 @@
           (swap! domain/*state assoc
                  :relays (conj (:relays @domain/*state) r))
           ;; And try to get server recommendations from the new relay.
-          (relay-conn/add-recommend-server-subscription! url))))))
+          (relay-conn/add-meta-subscription! url))))))
 
 (defn consume-contact-list [_db *state ^ScheduledExecutorService executor resubscribe-future-vol relay-url
                             {:keys [id pubkey created_at] :as event-obj}]
