@@ -22,7 +22,6 @@
 (defn initial-state
   []
   {;; Dialog related
-   :show-relays? false        ; indicates if the relays dialog must be shown
    :show-new-identity? false
    :show-add-column-dialog? false   
    :new-identity-error ""
@@ -243,7 +242,18 @@
     [public-key secret-key])
 
 (defrecord Relay
-    [url read? write?])
+    [url
+     read?
+     write?
+     ;; A meta relay is a read relay that's only used for getting metadata.  Its websocket
+     ;; connection will be closed as soon as there are no more subscriptions.
+     meta?
+     ])
+
+(defn find-relay
+  "Returns the Relay with the given `url` (or nil if no relay was found)."
+  [url]
+  (first (filter #(= (:url %) url) (:relays @*state))))
 
 (defrecord ParsedContact
     [public-key main-relay-url petname])

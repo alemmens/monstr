@@ -40,23 +40,33 @@
     (catch Exception e
       (log/warn e "while handling metadata event"))))
 
-(defn consume-recommend-server [db relay-url event]
-  (let [url (str/trim (:content event))]
-    #_(log/debugf "Relay recommendation for %s on %s." url relay-url)
-    (let [r (domain/->Relay url false false)
-          existing-relay-urls (map :url (:relays @domain/*state))]
-      (when-not (some #{url} existing-relay-urls)
-        (store/insert-relay! db r)
-        (swap! domain/*state assoc
-               :relays (conj (:relays @domain/*state) r))))))
+
+
+(defn schedule-subscription!
+  [subscription-fn delay-in-ms ^ScheduledExecutorService executor subscribe-future-vol]
+  (vswap! subscribe-future-vol
+          (fn [^ScheduledFuture fut]
+            (when fut
+              (.cancel fut false))
+            (.schedule executor subscription-fn delay-in-ms TimeUnit/MILLISECONDS))))
 
 (defn resubscribe!
-  [*state ^ScheduledExecutorService executor resubscribe-future-vol]
-  (vswap! resubscribe-future-vol
-    (fn [^ScheduledFuture fut]
-      (when fut
-        (.cancel fut false))
-      (.schedule executor subscribe/refresh! 15 TimeUnit/SECONDS))))
+  [^ScheduledExecutorService executor resubscribe-future-vol]
+  (schedule-subscription! relay-conn/refresh! 15000 executor resubscribe-future-vol))
+
+(defn consume-recommend-server [db relay-url event executor subscribe-future-vol]
+  (let [url (str/trim (:content event))]
+    (when (relay-conn/is-relay-url? url)
+      #_(log/debugf "Relay recommendation for %s on %s." url relay-url)
+      (when-not (domain/find-relay url)
+        (let [r (domain/->Relay url false false true)]
+          (log/debugf "Adding recommended relay %s" url)
+          ;; Add the recommended relay.
+          (store/insert-relay! db r)
+          (swap! domain/*state assoc
+                 :relays (conj (:relays @domain/*state) r))
+          ;; And try to get server recommendations from the new relay.
+          (relay-conn/add-recommend-server-subscription! url))))))
 
 (defn consume-contact-list [_db *state ^ScheduledExecutorService executor resubscribe-future-vol relay-url
                             {:keys [id pubkey created_at] :as event-obj}]
@@ -71,7 +81,7 @@
               (fn [curr-state]
                 (assoc-in curr-state [:contact-lists pubkey] new-contact-list)))
             ;; TODO: I don't think this resubscribe is the right way.
-            #_(resubscribe! *state executor resubscribe-future-vol)))))))
+            #_(resubscribe! executor resubscribe-future-vol)))))))
 
 (defn consume-direct-message [db relay-url event-obj]
   #_(log/info "direct message (TODO): " relay-url (:id event-obj))
@@ -161,7 +171,7 @@
                                         event
                                         false
                                         false)))
-    2 (consume-recommend-server db relay-url verified-event)
+    2 (consume-recommend-server db relay-url verified-event executor resubscribe-future-vol)
     ;; NIP-02
     3 (consume-contact-list db *state executor resubscribe-future-vol relay-url verified-event)
     ;; NIP-04
@@ -181,11 +191,11 @@
   [db *state metadata-cache executor resubscribe-future-vol cache relay-url subscription-id {:keys [id kind] :as event-obj} raw-event-tuple]
   (verify-maybe-persist-event! db cache relay-url event-obj raw-event-tuple
     (partial consume-verified-event db *state metadata-cache executor resubscribe-future-vol relay-url subscription-id)
-    (fn [_event-obj] ;; event we already have - but from new relay
+    (fn [_event-obj] ; event we already have - but from new relay
       (log/trace "on-new-relay-seen" relay-url id))
-    (fn [event-obj] ;; an event we've stored but don't have cached
-      ;; for now, we consume all of these assuming that anything not in the cache
-      ;; might not have been yet incorporated into ux data
+    (fn [event-obj] ; an event we've stored but don't have cached
+      ;; For now, we consume all of these assuming that anything not in the cache might
+      ;; not have been yet incorporated into ux data.
       (consume-verified-event db *state metadata-cache executor resubscribe-future-vol relay-url subscription-id event-obj))))
 
 (defn- consume-notice

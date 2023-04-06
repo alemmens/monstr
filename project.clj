@@ -5,7 +5,9 @@
   :dependencies
   [[org.clojure/clojure "1.10.3"]
    [cljfx/cljfx "1.7.19"]
-   [aleph/aleph "0.4.7-alpha10"]
+   #_[aleph/aleph "0.4.7-alpha10"]
+   [aleph/aleph "0.6.1"]
+   
    [aysylu/loom "1.0.2"]
 
    [fr.acinq.secp256k1/secp256k1-kmp "0.6.2"]

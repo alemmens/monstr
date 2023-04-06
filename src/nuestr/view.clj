@@ -9,7 +9,8 @@
    [nuestr.domain :as domain]
    [nuestr.event :as ev]
    [nuestr.media :as media]
-   [nuestr.metadata :as metadata]   
+   [nuestr.metadata :as metadata]
+   [nuestr.relay-conn :as relay-conn]
    [nuestr.status-bar :as status-bar]
    [nuestr.style :as style :refer [BORDER|]]
    [nuestr.subscribe :as subscribe]
@@ -166,7 +167,7 @@
                          :style-class "nuestr-tooltip"
                          :text "refresh all subscriptions"}
                :style-class ["button" "nuestr-refresh-button"]
-               :on-mouse-pressed (fn [_] (subscribe/refresh!))
+               :on-mouse-pressed (fn [_] (relay-conn/refresh!))
                :text (str (char 0x21bb)) ; clockwise open-circle arrow
                }
               {:fx/type :h-box :v-box/vgrow :always}]})
@@ -363,7 +364,6 @@
                                             :metadata-cache metadata-cache}
                                 false]
                                ;; Relays
-                               #_
                                ["Relays"{:fx/type tab-relays/relays
                                          :relays relays
                                          :relays-sort-by relays-sort-by
@@ -443,7 +443,7 @@
 
 (defn root [{:keys [visible-column-ids all-columns
                     views selected-view temp-view temp-view-changed?
-                    show-relays? active-key identities identity-metadata
+                    active-key identities identity-metadata
                     relays relays-sort-by relay-search-text
                     refresh-relays-ts connected-info
                     show-add-column-dialog? new-timeline
@@ -494,13 +494,12 @@
                                    5)
                               "" ; clear status message after 5 seconds
                               status-message)
-            :show-relays? show-relays?
             :relays relays
             :refresh-relays-ts refresh-relays-ts
             :connected-info connected-info}})
 
 (defn stage [{:keys [visible-column-ids all-columns
-                     show-relays? active-key identities identity-metadata
+                     active-key identities identity-metadata
                      relays relays-sort-by relay-search-text
                      refresh-relays-ts connected-info
                      show-add-column-dialog? new-timeline
@@ -520,7 +519,6 @@
    {:fx/type :scene
     :stylesheets (style/css)
     :root {:fx/type root
-           :show-relays? show-relays?
            :show-new-identity? show-new-identity?
            :new-identity-error new-identity-error
            :active-reply-context active-reply-context

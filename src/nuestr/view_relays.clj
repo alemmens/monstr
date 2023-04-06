@@ -31,7 +31,7 @@
                 url (str/trim (.getText tf))]
             (if (str/blank? url)
               acc
-              (conj acc (domain/->Relay url (.isSelected cb0) (.isSelected cb1))))))
+              (conj acc (domain/->Relay url (.isSelected cb0) (.isSelected cb1) false)))))
         []
         (.getChildren v-box)))))
 
@@ -90,7 +90,7 @@
                     :relay (assoc %2 :event-count (get event-counts (:url %2)))})
                 ;; Add 10 more empty rows.
                 (concat relays
-                        (repeatedly 10 #(domain/->Relay "" true true))))}))
+                        (repeatedly 10 #(domain/->Relay "" true true false))))}))
 
 ;; 
 

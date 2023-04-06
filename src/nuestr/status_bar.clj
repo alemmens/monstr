@@ -43,35 +43,30 @@
                     :connected-info connected-info) relays)})
 
 (defn status-relays
-  [{:keys [show-relays? relays refresh-relays-ts connected-info]}]
-  {:fx/type fx/ext-let-refs
-   :refs {:dialog {:fx/type view-relays/dialog
-                   :show-relays? show-relays?
-                   :relays relays
-                   :refresh-relays-ts refresh-relays-ts}}
-   :desc {:fx/type :h-box
-          :style-class ["ndesk-status-relays"]
-          :alignment :center
-          :padding 5
-          :children [{:fx/type :text :text "Relays: "}
-                     (if (nil? relays)
-                       {:fx/type :text :text "..."}
-                       {:fx/type relay-dots
-                        :relays (filter #(or (:write? %) (:read? %))
-                                        relays)
-                        :connected-info connected-info})]
-          :cursor :hand
-          :on-mouse-clicked {:event/type :show-relays}}})
+  [{:keys [relays refresh-relays-ts connected-info]}]
+  {:fx/type :h-box
+   :style-class ["ndesk-status-relays"]
+   :alignment :center
+   :padding 5
+   :children [{:fx/type :text :text "Relays: "}
+              (if (nil? relays)
+                {:fx/type :text :text "..."}
+                {:fx/type relay-dots
+                 :relays (filter #(or (:write? %) (:read? %))
+                                 relays)
+                 :connected-info connected-info})]})
 
-(defn pane [{:keys [show-relays? relays refresh-relays-ts connected-info status-message]}]
+(defn pane [{:keys [relays refresh-relays-ts connected-info status-message]}]
   {:fx/type :border-pane
    :style-class "ndesk-status-bar"
    :left {:fx/type :h-box
           :padding 5
           :children [{:fx/type :label
-                      :text (or status-message "")}]}
+                      :text (or (if (< (count status-message) 120)
+                                  status-message
+                                  (format "%s..." (subs status-message 0 120)))
+                                "")}]}
    :right {:fx/type status-relays
-           :show-relays? show-relays?
            :relays relays
            :refresh-relays-ts refresh-relays-ts
            :connected-info connected-info}})
@@ -80,5 +75,4 @@
   (log/debug message)
   (swap! domain/*state assoc
          :status-message message
-         :status-message-timestamp (util/now-epoch-second)
-         ))
+         :status-message-timestamp (util/now-epoch-second)))

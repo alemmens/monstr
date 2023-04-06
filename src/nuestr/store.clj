@@ -307,11 +307,14 @@
 
 (defn load-relays
   [db]
-  (mapv
-    (fn [{:keys [url read_ write_]}]
-      (domain/->Relay url (pos? read_) (pos? write_)))
-    (jdbc/execute! db ["select * from relays_"]
-                   {:builder-fn rs/as-unqualified-lower-maps})))
+  (mapv (fn [{:keys [url read_ write_]}]
+          (let [read? (pos? read_)
+                write? (pos? write_)
+                ;; We use all relays for metadata.
+                meta? true]
+            (domain/->Relay url read? write? meta?)))
+        (jdbc/execute! db ["select * from relays_"]
+                       {:builder-fn rs/as-unqualified-lower-maps})))
 
 (defn replace-relays!
   "Answers provided relays on success."
@@ -323,6 +326,11 @@
       (mapv (fn [{:keys [url read? write?]}] [url read? write?]) relays)
       {}))
   relays)
+
+
+(defn delete-all-relays! [db]
+  (jdbc/execute-one! db
+                     ["delete from relays_"]))
 
 (defn delete-non-active-relays! [db]
   (jdbc/execute-one! db

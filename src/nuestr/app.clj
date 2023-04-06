@@ -16,6 +16,7 @@
    [nuestr.hydrate :as hydrate]
    [nuestr.metadata :as metadata]
    [nuestr.relay-conn :as relay-conn]
+   [nuestr.status-bar :as status-bar]
    [nuestr.store :as store]
    [nuestr.timeline :as timeline]
    [nuestr.view :as view]
@@ -46,11 +47,17 @@
 
 (defn- load-relays!
   []
-  (let [relays (store/load-relays store/db)]
+  (let [db-relays (seq (store/load-relays store/db))
+        relays (or db-relays
+                   (file-sys/load-relay-defaults))]
+    ;; Add relays to the database if we don't have any yet.
+    (when-not db-relays
+      (store/replace-relays! store/db relays))
+    ;;
     (swap! domain/*state assoc
            :relays relays
            :refresh-relays-ts (System/currentTimeMillis))
-    (log/debugf "Loaded %d relays." (count relays))))
+    (status-bar/message! (format "Loaded %d relays." (count relays)))))
 
 (defn- update-relays! []
   (relay-conn/update-relays! (:relays @domain/*state)))

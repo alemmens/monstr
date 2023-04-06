@@ -119,24 +119,10 @@
 ;;; Relay input field (for searching)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-#_
-(defn- search-field [{:keys [relays relay-search-text]}]
-  {:fx/type :h-box
-   :padding 20
-   :children [{:fx/type :label
-               :padding 5
-               :text "Search: "}
-              {:fx/type :text-field
-               :pref-column-count 20
-               :text (or relay-search-text "")
-               :style-class ["text-input"]
-               :on-text-changed  (fn [new-text]
-                                   (swap! domain/*state assoc
-                                          :relay-search-text new-text))}]})
-
 (defn- search-field [{:keys [relays relay-search-text]}]
   {:fx/type :v-box
-   :children [{:fx/type :label :text "Search: "}
+   :children [{:fx/type :label
+               :text (format "Search (in %d relays): " (count relays))}
               {:fx/type :text-field
                :max-width url-width
                :min-width url-width
@@ -158,9 +144,9 @@
 
 (defn relays
   [{:keys [relays relays-sort-by relay-search-text]}]
-  #_(log/debugf "Relays tab sort-by %s with %d relays"
-                relays-sort-by
-                (count (:relays @domain/*state)))
+  (log/debugf "Relays tab sort-by %s with %d relays"
+              relays-sort-by
+              (count (:relays @domain/*state)))
   {:fx/type :scroll-pane
    :padding 15
    :hbar-policy :as-needed

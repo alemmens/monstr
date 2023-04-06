@@ -21,10 +21,6 @@
   (:import (javafx.scene.control DialogEvent Dialog Button TextArea)
            (javafx.event Event ActionEvent)))
 
-(defn relay-defaults
-  []
-  (read-string (slurp (io/resource "nuestr/relay-defaults.edn"))))
-
 (defn click-keycard
   [{:keys [public-key]}]
   [[:bg
@@ -163,7 +159,7 @@
         (.consume dialog-event) ;; prevents dialog closure
         ;; modal answers nil if 'no' which upstream will interpret as no-op
         (when (modal/blocking-yes-no-alert "" "Are you sure?")
-          (replace-relays-effect (relay-defaults) true)))
+          (replace-relays-effect (file-sys/load-relay-defaults) true)))
       :cancel
       (show-relays-effect false)
       (replace-relays-effect dialog-result false))))

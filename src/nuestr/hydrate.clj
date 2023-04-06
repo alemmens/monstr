@@ -5,6 +5,7 @@
    [nuestr.domain :as domain]
    [nuestr.file-sys :as file-sys]
    [nuestr.metadata :as metadata]
+   [nuestr.relay-conn :as relay-conn]
    [nuestr.status-bar :as status-bar]
    [nuestr.store :as store]
    [nuestr.subscribe :as subscribe]
@@ -113,7 +114,7 @@
           (fx/run-later (dispatch-text-notes *state r events false)))))
     ;; NOTE: use *all* identities to update subscriptions.
     (swap! domain/*state assoc :last-refresh false)
-    (fx/run-later (subscribe/refresh!))))
+    (fx/run-later (relay-conn/refresh!))))
 
 (defn dehydrate!* [*state _db dead-identities]
   (let [dead-public-keys-set (into #{} (map :public-key) dead-identities)]
@@ -140,7 +141,7 @@
       (timeline/update-active-timelines! *state new-active-key)
       ;; TODO note: this means we are resubscribing -- def should optimize w/ some kind of
       ;; watermark strategy.
-      (subscribe/refresh!))))
+      (relay-conn/refresh!))))
 
 (defn hydrate! [*state db executor new-identities]
   (util/submit! executor
@@ -169,7 +170,7 @@
         (dispatch-text-notes domain/*state r events column)))
     ;; TODO: pass relevant-pubkeys here so we don't have to recompute it
     ;; in overwrite-subscriptions!
-    (subscribe/overwrite-subscriptions! column)))
+    (relay-conn/overwrite-subscriptions! column)))
 
 (defn add-column-for-view! [view]
   (let [column (new-column view (:identities @domain/*state))]

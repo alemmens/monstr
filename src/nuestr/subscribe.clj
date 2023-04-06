@@ -1,12 +1,13 @@
 (ns nuestr.subscribe
   (:require
    [clojure.tools.logging :as log]
+   [manifold.stream :as s]
    [nuestr.domain :as domain]
-   [nuestr.relay-conn :as relay-conn]
    [nuestr.status-bar :as status-bar]
    [nuestr.store :as store]
    [nuestr.util :as util])
-  (:import (java.time Instant)))
+  (:import (java.time Instant)
+           (java.util UUID)))
 
 
 ;; TODO ultimately may need to partition whale-of-pubkeys.
@@ -46,6 +47,7 @@
       :since since
       :authors (relevant-pubkeys-for-view view)
       :limit 1000}
+     #_
      {:kinds [2]
       :limit 1000}
      {:kinds [1 4]
@@ -56,33 +58,16 @@
       :authors account-pubkeys}
      {:kinds [40 41]
       :limit 1000}
-     
      #_
      {:kinds [42] ; TODO: channel messages
       :since since
       :limit 5000}
      ]))
-  
-(defn overwrite-subscriptions!
-  ([column since]
-   ;; SINCE is a Java Instant.  
-   ;; TODO: track a durable "watermark" for stable subscriptions.
-   (when-not (empty? (:identities @domain/*state))
-     (let [view (:view column)
-           filters (filters-for-view view (.getEpochSecond since))]
-       #_(swap! domain/*state assoc :last-refresh (Instant/now))
-       (log/debugf "Subscribing all for '%s'" (:name view))
-       (relay-conn/subscribe-all! (format "flat:%s" (:id column))
-                                  filters)
-       (log/info "overwrote subscriptions"))))
-  
-  ([column]
-   (let [last-refresh (:last-refresh @domain/*state)
-         since (or last-refresh (util/days-ago 1))]
-     (overwrite-subscriptions! column since))))
 
-(defn refresh! []
-  (status-bar/message! "Refreshing subscriptions.")
-  (doseq [c (:all-columns @domain/*state)]
-    (overwrite-subscriptions! c)))
-
+(defn recommend-server-subscription
+  "Returns a map from subscription id to filters."
+  []
+  (let [filter {:kinds [2] :limit 1000}
+        subscription-id (format "meta:%s" (.toString (UUID/randomUUID)))]
+    {subscription-id [filter]}))
+  

@@ -83,4 +83,7 @@
         (swap! domain/*state assoc :active-key key)
         key))))
   
-  
+(defn load-relay-defaults
+  []
+  (map #(assoc % :meta? true)
+       (read-string (slurp (io/resource "nuestr/relay-defaults.edn")))))

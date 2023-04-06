@@ -9,5 +9,19 @@
  #nuestr.domain.Relay{:url "wss://relay.n057r.club", :read? true, :write? true}
  #nuestr.domain.Relay{:url "wss://nostr.drss.io", :read? true, :write? true}
  #nuestr.domain.Relay{:url "wss://nostr.bitcoiner.social", :read? true, :write? true}
- #nuestr.domain.Relay{:url "wss://nostr.localhost.re", :read? true, :write? true}
+ #nuestr.domain.Relay{:url "wss://nostr.localhost.re", :read? false, :write? false}
+ #nuestr.domain.Relay{:url "wss://nostrical.com", :read? false, :write? false}
+ #nuestr.domain.Relay{:url "wss://relay.honk.pw", :read? false, :write? false}
+ #nuestr.domain.Relay{:url "wss://relay.taxi", :read? false, :write? false}
+ #nuestr.domain.Relay{:url "wss://no.str.cr", :read? false, :write? false}
+ #nuestr.domain.Relay{:url "wss://nostr.fediverse.jp", :read? false, :write? false}
+ #nuestr.domain.Relay{:url "wss://relay.nostr.au", :read? false, :write? false}
+ #nuestr.domain.Relay{:url "wss://powrelay.xyz", :read? false, :write? false}
+ #nuestr.domain.Relay{:url "wss://relay.nostr.wirednet.jp", :read? false, :write? false}
+ #nuestr.domain.Relay{:url "wss://relay.nostr.or.jp", :read? false, :write? false}
+ #nuestr.domain.Relay{:url "wss://btc-italia.online", :read? false, :write? false}
+ #nuestr.domain.Relay{:url "wss://global.relay.red", :read? false, :write? false} 
+ #nuestr.domain.Relay{:url "wss://nostr.rikmeijer.nl", :read? false, :write? false}
+ #nuestr.domain.Relay{:url "wss://paid.spore.ws", :read? false, :write? false}
+ #nuestr.domain.Relay{:url "wss://relay.nostr.band", :read? false, :write? false}
  ]
