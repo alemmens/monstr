@@ -22,7 +22,7 @@
 (defn- websocket-client* [relay-url]
   (http/websocket-client relay-url
                          {:insecure? true
-                          :max-frame-payload 196608
+                          :max-frame-payload 1966080 #_ 196608
                           :max-frame-size 3145728
                           :heartbeats {:send-after-idle 5000}}))
 
@@ -58,6 +58,9 @@
 (defn connection-has-subscription?
   "Returns true if a ReadConnection has a subscription for the given `filters`."
   [read-connection filters]
+  #_(log/debugf "Checking if connection for %s subscribes to %s"
+              (:relay-url read-connection)
+              filters)
   (some #{filters} (vals (:subscriptions read-connection))))
   
 
@@ -158,15 +161,16 @@
 
 (defn unsubscribe! [conn-vol id]
   (locking conn-vol
-    (vswap! conn-vol update :subscriptions dissoc id)
-    (let [{:keys [deferred-conn]} @conn-vol]
-      (when (d/realized? deferred-conn)
-        (log/debugf "Closing subscription with id %s (%d left)"
-                    id
-                    (count (:subscriptions @conn-vol)))
-        #_(status-bar/message! "")
-        (s/put! @deferred-conn
-                (json*/write-str* ["CLOSE" id]))))))
+    (when (get (:subscriptions @conn-vol) id)
+      (vswap! conn-vol update :subscriptions dissoc id)
+      (let [{:keys [deferred-conn]} @conn-vol]
+        (when (d/realized? deferred-conn)
+          (log/debugf "Closing subscription with id %s (%d left)"
+                      id
+                      (count (:subscriptions @conn-vol)))
+          #_(status-bar/message! "")
+          (s/put! @deferred-conn
+                  (json*/write-str* ["CLOSE" id])))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Registry/pool
@@ -178,45 +182,43 @@
 ;; otherwise reported upstream/to user??
 
 (defrecord Registry
-  [sink-stream
-   write-connections-vol ;; relay-url -> deferred-conn
-   read-connections-vol ;; relay-url -> opaque read conn; ie volatile<ReadConnection>
-   subscriptions ;; vol<id -> [filters]>
+  [sink-stream           ; a stream that will get *all* events for every subscribed read relay
+   write-connections-vol ; relay-url -> deferred-conn
+   read-connections-vol  ; relay-url -> opaque read conn; ie volatile<ReadConnection>
    ])
 
-(defonce conn-registry (->Registry (s/stream) (volatile! {}) (volatile! {}) (volatile! {})))
+(defonce conn-registry (->Registry (s/stream) (volatile! {}) (volatile! {})))
 
-(defn sink-stream
-  "Return back a stream will get *all* events for every subscribed read relay."
-  []
+(defn sink-stream []
   (:sink-stream conn-registry))
 
+(defn new-read-connection-vol [relay-url]
+  ;; Arbitrarily use a 100-buffer stream for now; see also s/throttle.
+  (log/debugf (format "Adding read connection for %s" relay-url))
+  (let [connection-sink-stream (s/stream 100)]
+    (connect! relay-url connection-sink-stream)))
+  
 (defn maybe-add-subscriptions!
   "SUBSCRIPTIONS is a map from subscription id to filters."
   [relay-url subscription-map]
-  (log/debugf (format "Maybe adding subscriptions (%s) for %s"
-                      (vals subscription-map)
-                      relay-url))
-  (when-not (every? (fn [filters]
-                      (when-let [connection-vol (get @(:read-connections-vol conn-registry) relay-url)]
-                        (connection-has-subscription? @connection-vol filters)))
-                    (vals subscription-map))
-    ;; New read connection.
-    (log/debugf (format "Adding read connection for %s" relay-url))
-    (let [;; Arbitrarily use a 100-buffer stream for now; see also s/throttle.
-          connection-sink-stream (s/stream 100)
-          read-connection-vol (connect! relay-url connection-sink-stream)]
+  (log/debugf (format "Maybe adding subscriptions for %s" relay-url))
+  (let [connection-vol (or (get @(:read-connections-vol conn-registry) relay-url)
+                           (new-read-connection-vol relay-url))]
+    (when-not (every? (fn [filters]
+                        (when connection-vol
+                          (connection-has-subscription? @connection-vol filters)))
+                      (vals subscription-map))
       (doseq [[id filters] subscription-map]
-        (subscribe! read-connection-vol id filters))
-      ;; :downstream? false means when conn-sink-stream closes global conn-registry stream will not.
-      (let [{registry-sink-stream :sink-stream} conn-registry]
-        (s/connect-via connection-sink-stream
+        (subscribe! connection-vol id filters))
+      (let [registry-sink-stream (:sink-stream conn-registry)]
+        (s/connect-via (:sink-stream @connection-vol)
                        #(s/put! registry-sink-stream [relay-url %])
                        registry-sink-stream
+                       ;; `:downstream? false` means when conn-sink-stream closes global conn-registry stream will not.                       
                        {:downstream? false}))
       ;; Add the relay-url to the registry.
       (vswap! (:read-connections-vol conn-registry) assoc
-              relay-url read-connection-vol))))
+              relay-url connection-vol))))
 
 (defn update-relays!
   "Change the set of relays and/or their read or write status."
@@ -240,11 +242,7 @@
         (when-not (read-url? relay-url)
           (log/debugf "closing read conn %s" relay-url)
           (destroy! read-conn-vol)
-          (vswap! (:read-connections-vol conn-registry) dissoc relay-url)))
-      ;; Add all reader newbies -- note that writes will be on-demand per upstream sends.
-      (doseq [{:keys [url read? write? meta?]} relays]
-        (when read?
-          (maybe-add-subscriptions! url @(:subscriptions conn-registry)))))))
+          (vswap! (:read-connections-vol conn-registry) dissoc relay-url))))))
 
 (defn add-meta-subscription! [relay-url]
   (log/debugf "Adding meta subscription for %s" relay-url)
@@ -252,27 +250,26 @@
     (maybe-add-subscriptions! relay-url (subscribe/meta-subscription))))
 
 (defn update-meta-info! []
-  (doseq [relay-url (domain/all-relay-urls @domain/*state)]
-    (add-meta-subscription! relay-url)))
+  (doseq [r (domain/relay-urls @domain/*state)]
+    (add-meta-subscription! r)))
 
 (defn subscribe-all!
-  "Establish subscription to all relays marked for read. (If `update-relays!` is used
-  to add new relays, outstanding subscriptions will get automatically and transparently
-  added to these new relays.)"
-  [id filters]
+  "Establish a subscription to all relays for which `relay-test` returns true.
+  Normally `relay-test` is either `read?` or `meta?`."
+  [id filters relay-test]
   {:pre [(vector? filters) (every? map? filters)]}
   (let [filters' (mapv util/compact filters)]
     (locking conn-registry
-      (vswap! (:subscriptions conn-registry) assoc id filters')
-      (doseq [[relay-url read-conn-vol] @(:read-connections-vol conn-registry)]
-        (when (:read? (domain/find-relay relay-url))
-          (subscribe! read-conn-vol id filters'))))))
+      (log/debugf "There are %d read connections"
+                  (count @(:read-connections-vol conn-registry)))
+      (doseq [r (:relays @domain/*state)]
+        (when (relay-test r)
+          (maybe-add-subscriptions! (:url r) {id filters}))))))
 
 (defn unsubscribe-all!
-  "Kill a subscription by id that was previously established via `subscribe-all!`."
+  "Kill a subscription by id, i.e. remove it from all ReadConnections."
   [id]
   (locking conn-registry
-    (vswap! (:subscriptions conn-registry) dissoc id)
     (doseq [[relay-url read-conn-vol] @(:read-connections-vol conn-registry)]
       (when (:read? (domain/find-relay relay-url))     
         (unsubscribe! read-conn-vol id)))))
@@ -353,27 +350,32 @@
             [relay-url (connected?* deferred-conn)])
           @(:write-connections-vol conn-registry))))))
 
+(defn relay-urls-for-view
+  "Returns a set of relay urls."
+  [view]
+  (:relay-urls view))
 
-(defn overwrite-subscriptions!
+(defn add-column-subscriptions!
   ([column since]
    ;; SINCE is a Java Instant.  
    ;; TODO: track a durable "watermark" for stable subscriptions.
    (when-not (empty? (:identities @domain/*state))
      (let [view (:view column)
-           filters (subscribe/filters-for-view view (.getEpochSecond since))]
+           filters (subscribe/filters-for-view view (.getEpochSecond since))
+           relay-urls (relay-urls-for-view view)
+           subscription-id (format "flat:%s" (:id column))]
        #_(swap! domain/*state assoc :last-refresh (Instant/now))
-       (log/debugf "Subscribing all for '%s'" (:name view))
-       (subscribe-all! (format "flat:%s" (:id column))
-                       filters)
-       (log/info "overwrote subscriptions"))))
+       (log/debugf "Adding column subscriptions for '%s'" (:name view))
+       (doseq [r relay-urls]
+         (maybe-add-subscriptions! r {subscription-id filters})))))
   
   ([column]
    (let [last-refresh (:last-refresh @domain/*state)
-         since (or last-refresh (util/days-ago 7))]
-     (overwrite-subscriptions! column since))))
+         since (or last-refresh (util/days-ago 2))]
+     (add-column-subscriptions! column since))))
 
 (defn refresh! []
   (status-bar/message! "Refreshing subscriptions.")
   (doseq [c (:all-columns @domain/*state)]
-    (overwrite-subscriptions! c)))
+    (add-column-subscriptions! c)))
 

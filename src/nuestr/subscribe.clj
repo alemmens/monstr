@@ -43,7 +43,7 @@
   ;; 43: hide message
   ;; 44: mute user
   (let [account-pubkeys (map :public-key (:identities @domain/*state))]
-    [{:kinds [0 1 3]
+    [{:kinds [0 1 2 3]
       :since since
       :authors (relevant-pubkeys-for-view view)
       :limit 1000}

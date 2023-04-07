@@ -370,7 +370,8 @@
                                   (or column-id (:id profile-state))
                                   (rand-int 1000000000))]
       (relay-conn/subscribe-all! subscription-id
-                                 [{:ids [event-id] :kinds [1]}]))))
+                                 [{:ids [event-id] :kinds [1]}]
+                                 #(or (:read? %) (:meta? %))))))
 
 (defn thread-timeline-item
   [{:keys [^UITextNote root-data ^UITextNote item-data column-id pubkey *state db metadata-cache executor]}]

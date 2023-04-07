@@ -262,7 +262,7 @@
 
 (defn load-metadata [db pubkeys]
   ;; TODO: make efficient via delete by trigger or gc process
-  (log/debugf "Loading metadata for %s" pubkeys)
+  #_(log/debugf "Loading metadata for %s" pubkeys)
   (try (into
         {}
         (map (juxt :pubkey #(-> % :raw_event_tuple raw-event-tuple->parsed-metadata)))

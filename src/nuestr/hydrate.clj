@@ -169,8 +169,8 @@
                                      r))
         (dispatch-text-notes domain/*state r events column)))
     ;; TODO: pass relevant-pubkeys here so we don't have to recompute it
-    ;; in overwrite-subscriptions!
-    (relay-conn/overwrite-subscriptions! column)))
+    ;; in `add-column-subscriptions`.
+    (relay-conn/add-column-subscriptions! column)))
 
 (defn add-column-for-view! [view]
   (let [column (new-column view (:identities @domain/*state))]
