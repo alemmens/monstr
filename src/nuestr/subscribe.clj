@@ -64,7 +64,7 @@
 (defn meta-subscription
   "Returns a map from subscription id to filters."
   []
-  (let [filter {:kinds [0 2 3] :limit 3000}
+  (let [filter {:kinds [2] :limit 3000}
         subscription-id (format "meta:%s" (.toString (UUID/randomUUID)))]
     {subscription-id [filter]}))
   
