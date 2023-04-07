@@ -9,7 +9,7 @@
            (javafx.scene.paint Color)
            (java.time Instant)))
 
-(defn- relay-dot
+(defn relay-dot
   [{:keys [connected-info] {:keys [url read? write?] :as _relay} :relay}]
   {:fx/type :label
    :style {:-fx-padding [0 2]}

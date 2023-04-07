@@ -361,8 +361,8 @@
                                 (get (:open-profile-states @*state) pubkey )
                                 event-from-store
                                 false))
-    ;; Create a unique subscription id to load the event and subscribe to all relays in
-    ;; the hope that we find the event.  We'll unsubscribe automatically when we get an
+    ;; Create a unique subscription id to load the event and subscribe to all read relays
+    ;; in the hope that we find the event.  We'll unsubscribe automatically when we get an
     ;; EOSE event.
     (let [profile-state (get (:open-profile-states @*state) pubkey)
           subscription-id (format "%s:%s:%s"

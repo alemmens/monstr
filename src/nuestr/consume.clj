@@ -63,7 +63,7 @@
       #_(log/debugf "Relay recommendation for %s on %s." url relay-url)
       (when-not (domain/find-relay url)
         (let [r (domain/->Relay url false false true)]
-          (log/debugf "Adding recommended relay %s" url)
+          (status-bar/message! (format "Adding recommended relay %s" url))
           ;; Add the recommended relay.
           (store/insert-relay! db r)
           (swap! domain/*state assoc

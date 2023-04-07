@@ -28,9 +28,9 @@
 (def url-width 300)
 (def checkbox-width 80)
 
-(defn- relay-row [r]
+(defn- relay-row [r connected-info]
   {:fx/type :h-box
-   :spacing 20
+   :spacing 7
    :children [{:fx/type :label
                :min-width url-width
                :max-width url-width
@@ -47,7 +47,12 @@
                :max-width checkbox-width
                :padding 5               
                :selected (:write? r)
-               :on-selected-changed (fn [e] (update-relay! r :write? e))}]})
+               :on-selected-changed (fn [e] (update-relay! r :write? e))}
+              {:fx/type :v-box
+               :padding 5
+               :children [{:fx/type status-bar/relay-dot
+                           :relay r
+                           :connected-info connected-info}]}]})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sorting
@@ -85,7 +90,7 @@
   (let [up-arrow (char 0x25b2)]
     {:fx/type :h-box
      :style-class "header"
-     :spacing 20
+     :spacing 7
      :children [{:fx/type :hyperlink
                  :min-width url-width
                  :max-width url-width
@@ -117,7 +122,12 @@
                  :on-action (fn [_]
                               (swap! domain/*state assoc
                                      :relays (sort-relays relays :write?)
-                                     :relays-sorted-by :write?))}]}))
+                                     :relays-sorted-by :write?))}
+                {:fx/type :label
+                 :padding 2
+                 :min-width url-width
+                 :max-width url-width
+                 :text "Status"}]}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Relay input field (for searching)
@@ -147,7 +157,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn relays
-  [{:keys [relays relays-sorted-by relay-search-text]}]
+  [{:keys [relays relays-sorted-by relay-search-text connected-info]}]
   #_(log/debugf "Relays tab sort-by %s with %d relays"
                 relays-sort-by
                 (count (:relays @domain/*state)))
@@ -163,7 +173,7 @@
                                 {:fx/type header
                                  :relays relays
                                  :relays-sorted-by relays-sorted-by}]
-                               (map relay-row
+                               (map #(relay-row % connected-info)
                                     (filter-relays relays relay-search-text)))}})
 
 

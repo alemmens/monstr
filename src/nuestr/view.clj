@@ -316,7 +316,7 @@
   [{:keys [visible-column-ids all-columns
            open-profile-states
            views selected-view temp-view temp-view-changed?
-           relays relays-sorted-by relay-search-text
+           relays relays-sorted-by relay-search-text connected-info
            show-add-column-dialog? new-timeline
            can-publish? active-reply-context active-contact-list
            active-key active-contact-pubkey identities
@@ -367,7 +367,8 @@
                                ["Relays"{:fx/type tab-relays/relays
                                          :relays relays
                                          :relays-sorted-by relays-sorted-by
-                                         :relay-search-text relay-search-text}
+                                         :relay-search-text relay-search-text
+                                         :connected-info connected-info}
                                 false]]
                               ;; Profile tabs.
                               (map (fn [pubkey]
@@ -475,6 +476,7 @@
             :relays relays
             :relays-sorted-by relays-sorted-by
             :relay-search-text relay-search-text
+            :connected-info connected-info
             :show-add-column-dialog? show-add-column-dialog?
             :new-timeline new-timeline
             :can-publish? (util-domain/can-publish? active-key identities)
