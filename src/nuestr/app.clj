@@ -18,6 +18,7 @@
    [nuestr.relay-conn :as relay-conn]
    [nuestr.status-bar :as status-bar]
    [nuestr.store :as store]
+   [nuestr.tab-relays :as tab-relays]
    [nuestr.timeline :as timeline]
    [nuestr.view :as view]
    [nuestr.util :as util])
@@ -55,7 +56,8 @@
       (store/replace-relays! store/db relays))
     ;;
     (swap! domain/*state assoc
-           :relays relays
+           :relays (tab-relays/sort-relays relays :read?)
+           :relays-sorted-by :read?
            :refresh-relays-ts (System/currentTimeMillis))
     (status-bar/message! (format "Loaded %d relays." (count relays)))))
 

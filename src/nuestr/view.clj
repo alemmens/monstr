@@ -316,7 +316,7 @@
   [{:keys [visible-column-ids all-columns
            open-profile-states
            views selected-view temp-view temp-view-changed?
-           relays relays-sort-by relay-search-text
+           relays relays-sorted-by relay-search-text
            show-add-column-dialog? new-timeline
            can-publish? active-reply-context active-contact-list
            active-key active-contact-pubkey identities
@@ -366,7 +366,7 @@
                                ;; Relays
                                ["Relays"{:fx/type tab-relays/relays
                                          :relays relays
-                                         :relays-sort-by relays-sort-by
+                                         :relays-sorted-by relays-sorted-by
                                          :relay-search-text relay-search-text}
                                 false]]
                               ;; Profile tabs.
@@ -444,7 +444,7 @@
 (defn root [{:keys [visible-column-ids all-columns
                     views selected-view temp-view temp-view-changed?
                     active-key identities identity-metadata
-                    relays relays-sort-by relay-search-text
+                    relays relays-sorted-by relay-search-text
                     refresh-relays-ts connected-info
                     show-add-column-dialog? new-timeline
                     show-new-identity? new-identity-error active-reply-context contact-lists
@@ -473,7 +473,7 @@
             :temp-view temp-view
             :temp-view-changed? temp-view-changed?
             :relays relays
-            :relays-sort-by relays-sort-by
+            :relays-sorted-by relays-sorted-by
             :relay-search-text relay-search-text
             :show-add-column-dialog? show-add-column-dialog?
             :new-timeline new-timeline
@@ -500,7 +500,7 @@
 
 (defn stage [{:keys [visible-column-ids all-columns
                      active-key identities identity-metadata
-                     relays relays-sort-by relay-search-text
+                     relays relays-sorted-by relay-search-text
                      refresh-relays-ts connected-info
                      show-add-column-dialog? new-timeline
                      show-new-identity? new-identity-error active-reply-context
@@ -528,7 +528,7 @@
            :contact-lists contact-lists
            :identity-active-contact identity-active-contact
            :relays relays
-           :relays-sort-by relays-sort-by
+           :relays-sorted-by relays-sorted-by
            :relay-search-text relay-search-text
            :last-refresh last-refresh
            :refresh-relays-ts refresh-relays-ts

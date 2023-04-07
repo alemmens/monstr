@@ -19,9 +19,10 @@
 
 (defn- update-relay! [r property value]
   (let [new-relay (assoc r property value)]
+    (status-bar/message! (format "Changed the %s property of %s to %s."
+                                 property (:url r) value))
     (swap! domain/*state assoc
-           :relays (conj (remove #{r} (:relays @domain/*state))
-                         new-relay))
+           :relays (util/update-in-sequence r new-relay (:relays @domain/*state)))
     (store/update-relay! store/db new-relay)))
 
 (def url-width 300)
@@ -40,56 +41,17 @@
                :max-width checkbox-width
                :padding 5
                :selected (:read? r)
-               :on-selected-changed
-               (fn [e] (update-relay! r :read? e))}
+               :on-selected-changed (fn [e] (update-relay! r :read? e))}
               {:fx/type :check-box
                :min-width checkbox-width
                :max-width checkbox-width
                :padding 5               
                :selected (:write? r)
-               :on-selected-changed
-               (fn [e] (update-relay! r :write? e))}]})
+               :on-selected-changed (fn [e] (update-relay! r :write? e))}]})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Header
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defn- header [{:keys [relays relays-sort-by]}]
-  (let [up-arrow (char 0x25b2)]
-    {:fx/type :h-box
-     :style-class "header"
-     :spacing 20
-     :children [{:fx/type :hyperlink
-                 :min-width url-width
-                 :max-width url-width
-                 :style-class ["hyperlink"]
-                 :text (str "Relay "
-                            (if (= relays-sort-by :url) up-arrow ""))
-                 :on-action (fn [_]
-                              (swap! domain/*state assoc
-                                    :relays-sort-by :url))}
-                {:fx/type  :hyperlink
-                 :min-width checkbox-width
-                 :max-width checkbox-width
-                 :style-class ["hyperlink"]
-                 :text (str "Read "
-                            (if (= relays-sort-by :read?) up-arrow ""))
-                 :on-action (fn [_]
-                              (swap! domain/*state assoc
-                                    :relays-sort-by :read?))}
-                {:fx/type :hyperlink
-                 :min-width checkbox-width
-                 :max-width checkbox-width
-                 :style-class ["hyperlink"]
-                 :text (str "Write "
-                            (if (= relays-sort-by :write?) up-arrow ""))
-                 :on-action (fn [_]
-                              (swap! domain/*state assoc
-                                    :relays-sort-by :write?))}]}))
-
-;;
 ;; Sorting
-;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- compare-for-read [r1 r2]
   (cond (= (:read? r1) (:read? r2)) (if (= (:write? r1) (:write? r2))
@@ -108,12 +70,54 @@
 (defn- compare-for-url [r1 r2]
   (compare (:url r1) (:url r2)))
     
-(defn- sort-relays [relays relays-sort-by]
-  (sort (case relays-sort-by
+(defn sort-relays [relays sort-by]
+  (sort (case sort-by
           :read? compare-for-read
           :write? compare-for-write
           compare-for-url)
         relays))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Header
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- header [{:keys [relays relays-sorted-by]}]
+  (let [up-arrow (char 0x25b2)]
+    {:fx/type :h-box
+     :style-class "header"
+     :spacing 20
+     :children [{:fx/type :hyperlink
+                 :min-width url-width
+                 :max-width url-width
+                 :style-class ["hyperlink"]
+                 :text (str "Relay "
+                            (if (= relays-sorted-by :url) up-arrow ""))
+                 :on-action (fn [_]
+                              (swap! domain/*state assoc
+                                     :relays (sort-relays relays :url)
+                                     :relays-sorted-by :url))}
+                {:fx/type  :hyperlink
+                 :min-width checkbox-width
+                 :max-width checkbox-width
+                 :style-class ["hyperlink"]
+                 :text (str "Read "
+                            (if (= relays-sorted-by :read?)
+                              up-arrow
+                              ""))
+                 :on-action (fn [_]
+                              (swap! domain/*state assoc
+                                     :relays (sort-relays relays :read?)
+                                     :relays-sorted-by :read?))}
+                {:fx/type :hyperlink
+                 :min-width checkbox-width
+                 :max-width checkbox-width
+                 :style-class ["hyperlink"]
+                 :text (str "Write "
+                            (if (= relays-sorted-by :write?) up-arrow ""))
+                 :on-action (fn [_]
+                              (swap! domain/*state assoc
+                                     :relays (sort-relays relays :write?)
+                                     :relays-sorted-by :write?))}]}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Relay input field (for searching)
@@ -143,10 +147,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn relays
-  [{:keys [relays relays-sort-by relay-search-text]}]
-  (log/debugf "Relays tab sort-by %s with %d relays"
-              relays-sort-by
-              (count (:relays @domain/*state)))
+  [{:keys [relays relays-sorted-by relay-search-text]}]
+  #_(log/debugf "Relays tab sort-by %s with %d relays"
+                relays-sort-by
+                (count (:relays @domain/*state)))
   {:fx/type :scroll-pane
    :padding 15
    :hbar-policy :as-needed
@@ -158,9 +162,9 @@
                                  :relay-search-text relay-search-text}
                                 {:fx/type header
                                  :relays relays
-                                 :relays-sort-by relays-sort-by}]
-                               (map relay-row (sort-relays (filter-relays relays relay-search-text)
-                                                           relays-sort-by)))}})
+                                 :relays-sorted-by relays-sorted-by}]
+                               (map relay-row
+                                    (filter-relays relays relay-search-text)))}})
 
 
 

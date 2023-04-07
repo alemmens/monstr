@@ -51,6 +51,12 @@
   (cond (str/starts-with? url "wss://") (subs url 6)
         (str/starts-with? url "ws://")  (subs url 5)
         :else url))
+  
+(defn numerical-relay-url?
+  "Returns true for relay urls like 'wss://123.456.789:4012'."
+  [url]
+  (every? #(re-matches #"\d+" %)
+          (str/split (relay-url-short url) #"(\.|:)")))
 
 (defn format-pubkey-short
   [pubkey]
@@ -83,6 +89,16 @@
   [& colls]
   (vec (apply concat colls)))
 
+(defn insert-at-index [i elt sequence]
+  (concat (take i sequence)
+          (list elt)
+          (drop i sequence)))
+
+(defn update-in-sequence [old-element new-element sequence]
+  (if-let [pos (first (keep-indexed #(when (= %2 old-element) %1) sequence))]
+    (insert-at-index pos new-element
+                     (remove #{old-element} sequence))
+    sequence))            
 (defn schedule!
   ([^ScheduledExecutorService executor ^Runnable f ^long delay]
    (schedule! executor f delay nil))

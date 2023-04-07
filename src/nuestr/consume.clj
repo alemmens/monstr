@@ -14,7 +14,8 @@
             [nuestr.status-bar :as status-bar]
             [nuestr.store :as store]
             [nuestr.subscribe :as subscribe]
-            [nuestr.timeline :as timeline])
+            [nuestr.timeline :as timeline]
+            [nuestr.util :as util])
   (:import (java.util.concurrent ScheduledExecutorService ScheduledFuture TimeUnit)))
 
 ;; todo where do we have stream buffers?
@@ -56,7 +57,9 @@
 
 (defn consume-recommend-server [db relay-url event executor subscribe-future-vol]
   (let [url (str/trim (:content event))]
-    (when (relay-conn/is-relay-url? url)
+    (when (and (relay-conn/is-relay-url? url)
+               ;; We don't want 'numerical' urls like 'wss://123.456.789'.
+               (not (util/numerical-relay-url? url)))
       #_(log/debugf "Relay recommendation for %s on %s." url relay-url)
       (when-not (domain/find-relay url)
         (let [r (domain/->Relay url false false true)]
