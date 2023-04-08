@@ -2,8 +2,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.edn :as edn]
-   [nuestr.domain :as domain]
-   )
+   [nuestr.domain :as domain])
   (:import (java.io File)))
 
 (defn nostr-desk-dir
@@ -85,5 +84,14 @@
   
 (defn load-relay-defaults
   []
-  (map #(assoc % :meta? true)
-       (read-string (slurp (io/resource "nuestr/relay-defaults.edn")))))
+  (read-string (slurp (io/resource "nuestr/relay-defaults.edn"))))
+
+#_
+(defn dump-relay-defaults
+  []
+  (with-open [w (clojure.java.io/writer "/tmp/relays.edn")]
+    (binding [*out* w]
+      (doseq [r (tab-relays/sort-relays (store/load-relays store/db)
+                                        :read?)]
+        (pr r)
+        (newline)))))
