@@ -20,15 +20,17 @@
             [nuestr.util-fx-more :as util-fx-more]
             [nuestr.util-java :as util-java]
             )
-  (:import (javafx.event ActionEvent Event)
-           (javafx.geometry Insets)
-           (javafx.scene Node)
-           (javafx.scene.control Hyperlink Label ListView)
-           (javafx.scene.input MouseEvent ScrollEvent)
-           (javafx.scene.layout HBox Priority VBox)
-           (javafx.stage Popup)
-           (nuestr.domain UITextNoteNew UITextNote UITextNoteWrapper)
-           (org.fxmisc.richtext GenericStyledArea)))
+  (:import
+   (javafx.collections FXCollections ObservableList)
+   (javafx.event ActionEvent Event)
+   (javafx.geometry Insets)
+   (javafx.scene Node)
+   (javafx.scene.control Hyperlink Label ListView)
+   (javafx.scene.input MouseEvent ScrollEvent)
+   (javafx.scene.layout HBox Priority VBox)
+   (javafx.stage Popup)
+   (nuestr.domain UITextNoteNew UITextNote UITextNoteWrapper)
+   (org.fxmisc.richtext GenericStyledArea)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Content
@@ -175,8 +177,13 @@
                   [{:fx/type :label
                     :style {:-fx-font-weight :bold}
                     :style-class ["label" "ndesk-info-popup-event-id"]}
-                   {:fx/type :label
-                    :style-class ["label" "ndesk-info-popup-seen-on"]}
+                   {:fx/type :list-view
+                    :style-class "nuestr-info-relays"
+                    :focus-traversable false
+                    :padding 5
+                    :pref-height 120
+                    :pref-width 160
+                    :items []}
                    {:fx/type :hyperlink
                     :style-class ["hyperlink" "ndesk-info-popup-copy-event-link"] ;; used in .lookup
                     :text "Copy event id"
@@ -199,17 +206,17 @@
         ^VBox v-box (first (seq (.getContent singleton-popup)))
         ^Label event-id-label (.lookup v-box ".ndesk-info-popup-event-id")
         ^Label seen-on-label (.lookup v-box ".ndesk-info-popup-seen-on")
+        ^ListView seen-on-list (.lookup v-box ".nuestr-info-relays")
         ^Hyperlink copy-event-id-hyperlink (.lookup v-box ".ndesk-info-popup-copy-event-link")
         ^Hyperlink copy-author-pubkey-hyperlink (.lookup v-box ".ndesk-info-popup-copy-author-pubkey-link")]
     ;; Set the content.
     (.setUserData copy-event-id-hyperlink {:event-id item-id})
     (.setUserData copy-author-pubkey-hyperlink {:author-pubkey author-pubkey})
     (.setText event-id-label (str "Event: " event-id-short))
-    (.setText seen-on-label (str/join "\n" (cons "Seen on:" seen-on-relays)))
+    (let [items (FXCollections/observableList (vec seen-on-relays))]
+      (.setItems seen-on-list items))
     ;; Set position and dimensions.
-    (.relocate v-box
-               (- (.getX node-pos) (* 0.5 popup-width))
-               (.getY node-pos))
+    (.relocate v-box 0 0)
     (.setMinWidth v-box popup-width)
     (.setMaxWidth v-box popup-width)
     (.setPrefWidth v-box popup-width)
@@ -218,7 +225,7 @@
 (defn show-info!
   [db item-id author-pubkey ^ActionEvent e]
   (let [node (.getSource e)
-        popup-width 250
+        popup-width 300
         bounds (.getBoundsInLocal node)
         node-pos (.localToScreen node (* 0.5 (.getWidth bounds)) 0.0)
         popup (ready-popup! db node-pos popup-width item-id author-pubkey)]
