@@ -80,11 +80,19 @@
 
 (defn- compare-for-url [r1 r2]
   (compare-urls (:url r1) (:url r2)))
+
+(defn compare-for-status [connected-info r1 r2]
+  (let [status1 (get connected-info (:url r1))
+        status2 (get connected-info (:url r2))]
+    (cond (= status1 status2) (compare-for-read r1 r2)
+          status1 -1
+          :else 1)))
     
-(defn sort-relays [relays sort-by]
+(defn sort-relays [relays sort-by connected-info]
   (sort (case sort-by
           :read? compare-for-read
           :write? compare-for-write
+          :status (partial compare-for-status connected-info)
           compare-for-url)
         relays))
 
@@ -92,7 +100,7 @@
 ;;; Header
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn- header [{:keys [relays relays-sorted-by]}]
+(defn- header [{:keys [relays relays-sorted-by connected-info]}]
   (let [up-arrow (char 0x25b2)]
     {:fx/type :h-box
      :style-class "header"
@@ -105,7 +113,7 @@
                             (if (= relays-sorted-by :url) up-arrow ""))
                  :on-action (fn [_]
                               (swap! domain/*state assoc
-                                     :relays (sort-relays relays :url)
+                                     :relays (sort-relays relays :url connected-info)
                                      :relays-sorted-by :url))}
                 {:fx/type  :hyperlink
                  :min-width checkbox-width
@@ -117,7 +125,7 @@
                               ""))
                  :on-action (fn [_]
                               (swap! domain/*state assoc
-                                     :relays (sort-relays relays :read?)
+                                     :relays (sort-relays relays :read? connected-info)
                                      :relays-sorted-by :read?))}
                 {:fx/type :hyperlink
                  :min-width checkbox-width
@@ -127,13 +135,18 @@
                             (if (= relays-sorted-by :write?) up-arrow ""))
                  :on-action (fn [_]
                               (swap! domain/*state assoc
-                                     :relays (sort-relays relays :write?)
+                                     :relays (sort-relays relays :write? connected-info)
                                      :relays-sorted-by :write?))}
-                {:fx/type :label
-                 :padding 2
-                 :min-width url-width
-                 :max-width url-width
-                 :text "Status"}]}))
+                {:fx/type :hyperlink
+                 :min-width checkbox-width
+                 :max-width checkbox-width
+                 :style-class ["hyperlink"]
+                 :text (str "Status "
+                            (if (= relays-sorted-by :status) up-arrow ""))
+                 :on-action (fn [_]
+                              (swap! domain/*state assoc
+                                     :relays (sort-relays relays :status connected-info)
+                                     :relays-sorted-by :status))}]}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Relay input field (for searching)
@@ -193,7 +206,8 @@
                                  :relay-search-text relay-search-text}
                                 {:fx/type header
                                  :relays relays
-                                 :relays-sorted-by relays-sorted-by}]
+                                 :relays-sorted-by relays-sorted-by
+                                 :connected-info connected-info}]
                                (map #(relay-row % connected-info)
                                     (filter-relays relays relay-search-text)))}})
 

@@ -92,6 +92,7 @@
   (with-open [w (clojure.java.io/writer "/tmp/relays.edn")]
     (binding [*out* w]
       (doseq [r (tab-relays/sort-relays (store/load-relays store/db)
-                                        :read?)]
+                                        :read?
+                                        nil)]
         (pr r)
         (newline)))))

@@ -56,7 +56,7 @@
       (store/replace-relays! store/db relays))
     ;;
     (swap! domain/*state assoc
-           :relays (tab-relays/sort-relays relays :read?)
+           :relays (tab-relays/sort-relays relays :read? nil)
            :relays-sorted-by :read?
            :refresh-relays-ts (System/currentTimeMillis))
     (status-bar/message! (format "Loaded %d relays." (count relays)))))
