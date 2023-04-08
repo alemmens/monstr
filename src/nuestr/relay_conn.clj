@@ -30,7 +30,11 @@
   ;; TODO: This is a bit too simple.
   (re-matches #"wss?://[^ ]+$" string))
 
-
+(defn can-be-used-for-relay-url? [string]
+   (and (is-relay-url? string)
+             ;; We don't want 'numerical' urls like 'wss://123.456.789'.
+        (not (util/numerical-relay-url? string))))
+  
 ;; --
 
 (def ^:private connect-timeout-secs 20)
