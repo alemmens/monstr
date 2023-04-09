@@ -185,14 +185,14 @@
                     :pref-width 160
                     :items []}
                    {:fx/type :hyperlink
-                    :style-class ["hyperlink" "ndesk-info-popup-copy-event-link"] ;; used in .lookup
+                    :style-class ["hyperlink" "ndesk-info-popup-copy-event-link"] ; used in .lookup
                     :text "Copy event id"
                     :on-action (fn [^ActionEvent e]
                                  (when-let [content
                                             (some-> e ^Hyperlink .getSource .getUserData :event-id)]
                                    (util/put-clipboard! content)))}
                    {:fx/type :hyperlink
-                    :style-class ["hyperlink" "ndesk-info-popup-copy-author-pubkey-link"] ;; used in .lookup
+                    :style-class ["hyperlink" "ndesk-info-popup-copy-author-pubkey-link"] ; used in .lookup
                     :text "Copy author pubkey"
                     :on-action (fn [^ActionEvent e]
                                  (when-let [content
@@ -205,7 +205,6 @@
         seen-on-relays (store/get-seen-on-relays db item-id)
         ^VBox v-box (first (seq (.getContent singleton-popup)))
         ^Label event-id-label (.lookup v-box ".ndesk-info-popup-event-id")
-        ^Label seen-on-label (.lookup v-box ".ndesk-info-popup-seen-on")
         ^ListView seen-on-list (.lookup v-box ".nuestr-info-relays")
         ^Hyperlink copy-event-id-hyperlink (.lookup v-box ".ndesk-info-popup-copy-event-link")
         ^Hyperlink copy-author-pubkey-hyperlink (.lookup v-box ".ndesk-info-popup-copy-author-pubkey-link")]
@@ -324,7 +323,15 @@
    :left {:fx/type :h-box
           :cursor :hand
           :style-class "nuestr-author-hbox"
-          :on-mouse-clicked (fn [_] (timeline/maybe-add-open-profile-state! pubkey))
+          :on-mouse-clicked (fn [e]
+                              (timeline/maybe-add-open-profile-state! pubkey)
+                              (fx/run-later ; run later, otherwise the new tab doesn't exist yet
+                               ;; Select the tab that we just added.
+                               (let [scene (.getScene (.getSource e))
+                                     tab-pane (.lookup scene "#nuestr-tabs")
+                                     index (+ 4 ; HACK: 4 is the number of tabs before the first Profile tab.
+                                              (util/position pubkey (keys (:open-profile-states @domain/*state))))]
+                                 (.select (.getSelectionModel tab-pane) index))))
           :children [{:fx/type :label
                       :style-class "ndesk-timeline-item-name"
                       :text name}

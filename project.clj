@@ -1,5 +1,5 @@
 (defproject nuestr "0.1.0-SNAPSHOT"
-  :description "Nuestr: a Desktop app for Nostr"
+  :description "Nuestr: a Desktop client for Nostr"
   :url "https://github.com/alemmens/nuestr"
   
   :dependencies

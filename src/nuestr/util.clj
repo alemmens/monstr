@@ -94,11 +94,18 @@
           (list elt)
           (drop i sequence)))
 
+(defn position
+  "Returns the position (index) of the first occurrence of `elt` in `sequence`
+  (or nil if `elt` does not occur in `sequence`)."
+  [elt sequence]
+  (first (keep-indexed #(when (= %2 elt) %1) sequence)))
+
 (defn update-in-sequence [old-element new-element sequence]
-  (if-let [pos (first (keep-indexed #(when (= %2 old-element) %1) sequence))]
+  (if-let [pos (position old-element sequence)]
     (insert-at-index pos new-element
                      (remove #{old-element} sequence))
-    sequence))            
+    sequence))
+            
 (defn schedule!
   ([^ScheduledExecutorService executor ^Runnable f ^long delay]
    (schedule! executor f delay nil))

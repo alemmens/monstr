@@ -2,6 +2,7 @@
   (:require
    [cljfx.api :as fx]
    [cljfx.ext.list-view :as fx.ext.list-view]
+   [cljfx.ext.tab-pane :as fx.ext.tab-pane]   
    [clojure.set :as set]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
@@ -202,6 +203,7 @@
 (defn tab*
   [{:keys [label content closable pubkey]}]
   {:fx/type :tab
+   :id (or pubkey (str (rand-int 1000000)))
    :closable closable
    :on-closed (fn [_]
                 (log/debugf "Closing tab %s with pubkey %s" label pubkey)
@@ -335,6 +337,8 @@
                             :show-add-column-dialog? show-add-column-dialog?}}
    :desc {:fx/type :tab-pane
           :side :top
+          :id "nuestr-tabs"
+          ; :style-class "nuestr-tab-pane"
           :tabs (for [[label content closable pubkey]
                       (concat [["Home" {:fx/type main-panes
                                         :views views
@@ -363,12 +367,11 @@
                                             :active-contact-pubkey active-contact-pubkey
                                             :metadata-cache metadata-cache}
                                 false]
-                               ;; Relays
-                               ["Relays"{:fx/type tab-relays/relays
-                                         :relays relays
-                                         :relays-sorted-by relays-sorted-by
-                                         :relay-search-text relay-search-text
-                                         :connected-info connected-info}
+                               ["Relays" {:fx/type tab-relays/relays
+                                          :relays relays
+                                          :relays-sorted-by relays-sorted-by
+                                          :relay-search-text relay-search-text
+                                          :connected-info connected-info}
                                 false]]
                               ;; Profile tabs.
                               (map (fn [pubkey]
