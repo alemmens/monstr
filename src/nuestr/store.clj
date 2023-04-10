@@ -201,7 +201,7 @@
                   " and e.pubkey in (%s) ")
                 " and e.kind = 1"
                 " order by e.created_at desc"
-                " limit 200")
+                " limit 100")
                (str/join ", " (map #(str "'" % "'") pubkeys)))])
 
 (defn load-relay-events

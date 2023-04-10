@@ -49,9 +49,10 @@
    :open-profile-states {}   ; a map from pubkeys (of open profile tabs) to ProfileState
    ;; Refresh
    :last-refresh nil         ; Java Instant indicating when the most recent refresh started
-   ;; Status bar
+   ;; Status bar and debugging
    :status-message nil
    :status-message-timestamp nil ; seconds since start of epoch
+   :debug-message nil
    })
 
 (defonce *state

@@ -455,6 +455,7 @@
                     identity-active-contact metadata-cache
                     last-refresh
                     status-message status-message-timestamp
+                    debug-message
                     open-profile-states
                     ]}]
   #_(log/debugf "Root with column ids=%s and %d contact-lists"
@@ -462,11 +463,14 @@
               (count contact-lists))
   {:fx/type :border-pane
    :top {:fx/type :h-box
+         :spacing 10
          :children [{:fx/type identity-selector
                      :identities identities
                      :active-key active-key
                      :show-new-identity? show-new-identity?
                      :identity-metadata identity-metadata}
+                    {:fx/type :label
+                     :text (or debug-message "")}
                     {:fx/type :h-box :h-box/hgrow :always}
                     (refresh-button last-refresh)]}
    :center {:fx/type tab-pane
@@ -512,6 +516,7 @@
                      contact-lists identity-active-contact metadata-cache
                      last-refresh views selected-view temp-view temp-view-changed?
                      status-message status-message-timestamp
+                     debug-message
                      open-profile-states
                      ]}]
   #_(log/debugf "Stage with %d identities and active key %s" (count identities) active-key)
@@ -549,5 +554,6 @@
            :metadata-cache metadata-cache
            :status-message status-message
            :status-message-timestamp status-message-timestamp
+           :debug-message debug-message
            :open-profile-states open-profile-states
            }}})

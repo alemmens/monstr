@@ -76,3 +76,8 @@
   (swap! domain/*state assoc
          :status-message message
          :status-message-timestamp (util/now-epoch-second)))
+
+(defn debug! [message]
+  (log/debug message)
+  (swap! domain/*state assoc
+         :debug-message message))

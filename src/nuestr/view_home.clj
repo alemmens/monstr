@@ -298,9 +298,10 @@
                        :h-box/margin 3
                        :text "thread"
                        :on-action (fn [e]
-                                    (let [column (and column-id (domain/find-column-by-id column-id))]
+                                    (let [column (and column-id (domain/find-column-by-id column-id))
+                                          scene (.getScene ^Node (.getSource e))]
                                       #_(log/debugf "Thread button clicked for column %s" (:name (:view column)))
-                                      (timeline/show-column-thread! *state column pubkey event-obj)))}])})
+                                      (timeline/show-column-thread! *state column pubkey event-obj scene)))}])})
 
 (defn- thread-action-button-row
   ;; Like action-button-row but without the 'thread' button.
@@ -324,6 +325,7 @@
           :cursor :hand
           :style-class "nuestr-author-hbox"
           :on-mouse-clicked (fn [e]
+                              ;; Add a new profile tab.
                               (timeline/maybe-add-open-profile-state! pubkey)
                               (fx/run-later ; run later, otherwise the new tab doesn't exist yet
                                ;; Select the tab that we just added.
@@ -372,7 +374,7 @@
                                 (if column-id
                                   (domain/find-column-by-id column-id)
                                   nil)
-                                (get (:open-profile-states @*state) pubkey )
+                                (get (:open-profile-states @*state) pubkey)
                                 event-from-store
                                 false))
     ;; Create a unique subscription id to load the event and subscribe to all read relays
@@ -397,7 +399,7 @@
                   (util/submit! executor ; get off of fx thread
                                 (fn []
                                   ;; Wait a bit so we don't overload the relays.
-                                  ;; TODO: we should use a queue instead of this black magic!
+                                  ;; TODO: we should probably use a queue instead.
                                   (Thread/sleep 50) ; 50ms
                                   (async-load-event! *state db column-id pubkey (:id item-data))))
                   ;; Show that we're working on it.
@@ -412,6 +414,7 @@
           {:keys [name about picture-url nip05-id created-at]} (some->> pubkey (metadata/get* metadata-cache))
           avatar-color (or (some-> pubkey media/color) :lightgray)]
       {:fx/type :border-pane
+       :id item-id
        :on-mouse-entered (fn [e] (show-timeline-item-info e item-data))
        :on-mouse-moved (fn [e] (show-timeline-item-info e item-data))
        :on-mouse-exited unshow-timeline-item-info
@@ -469,9 +472,9 @@
 
 (defn thread-home [{:keys [column-id pubkey *state db metadata-cache executor]}]
   {:fx/type fx/ext-on-instance-lifecycle
-   :on-created #(.setSelectionModel % util-fx-more/no-selection-model)
+   ; :on-created #(.setSelectionModel % util-fx-more/no-selection-model)
    :desc {:fx/type :list-view
-          :focus-traversable false
+          ; :focus-traversable false
           :style-class ["nuestr-thread-pane-listview"]
           :pref-height 100000  ; trick to make it stretch vertically
           :pref-width 100000

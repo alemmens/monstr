@@ -42,6 +42,11 @@
                                   (map :public-key contacts))))))
     true))
 
+(defn timeline-pairs [column-id pubkey]
+  (if-let [column (domain/find-column-by-id column-id)]
+    (vals (:identity->timeline-pair column))
+    (list (:timeline-pair (get (:open-profile-states @domain/*state) pubkey)))))
+
 (defn dispatch-metadata-update!
   [*state {:keys [pubkey]}]
   (fx/run-later
@@ -307,7 +312,7 @@
 
 (defn show-column-thread!
   "If `column` is false, then we assume that the thread is in the profile tab for `pubkey`."
-  [*state column pubkey event-obj]
+  [*state column pubkey event-obj scene]
   (fx/run-later
    (let [column-id (:id column)
          profile-state (get (:open-profile-states @*state) pubkey)
@@ -329,12 +334,23 @@
      (let [events (cons (store/load-event store/db root) ; can be nil if root is not in db
                         (store/load-events-with-etag store/db root))]
        (log/debugf "Loaded %d thread events for root %s" (count events) root)
-       (doseq [e (sort-by :created_at events)]
-         (when e
-           (thread-dispatch! *state column (get (:open-profile-states @*state) pubkey) e false)))
        ;; NOTE: we don't need to load recent events from relays here, because
        ;; that will be done by async-load-event! in view_home.clj.
-       ))))
+       (doseq [e (sort-by :created_at events)]
+         (when e
+           (thread-dispatch! *state column (get (:open-profile-states @*state) pubkey) e false))))
+     ;; Select the thread focus.
+     (doseq [pair (timeline-pairs column-id pubkey)]
+       (let [timeline (:thread-timeline pair)
+             listview (:thread-listview pair)
+             item-id->index (:item-id->index timeline)
+             item-id (:id event-obj)]
+         (when-let [index (.get item-id->index item-id)]
+           (let [wrapper (.get (:observable-list timeline) index)]
+             (status-bar/debug! (format "Index: %s, wrapper: %s, listview: %s"
+                                    index wrapper listview))
+             (.select (.getSelectionModel listview) wrapper))))))))
+
 
 (defn- unshow-thread!
   [*state column pubkey]

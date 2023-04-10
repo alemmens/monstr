@@ -105,7 +105,26 @@
     (insert-at-index pos new-element
                      (remove #{old-element} sequence))
     sequence))
-            
+
+(defn group-on
+  "Returns a vector with two elements: [1] all elements of `coll` for which
+  `pred` returns true, [2] all other elements of `coll`."
+  [pred coll]
+  (loop [yes '()
+         no '()
+         elts coll]
+    (if (empty? elts)
+      [yes no]
+      (let [elt (first elts)]
+        (if (pred elt)
+          (recur (cons elt yes)
+                 no
+                 (rest elts))
+          (recur yes
+                 (cons elt no)
+                 (rest elts)))))))
+
+         
 (defn schedule!
   ([^ScheduledExecutorService executor ^Runnable f ^long delay]
    (schedule! executor f delay nil))
