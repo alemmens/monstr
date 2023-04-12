@@ -122,7 +122,7 @@
 
 (defn consume-channel-metadata [db relay-url event]
   (try (let [{:keys [pubkey]} event
-             e-tag (first (parse/parse-tags event "e"))
+             e-tag (first (parse/e-tags event))
              [_ id recommended-relay-url] (if (string? e-tag)
                                             ;; Old-style e-tag has only the channel id.
                                             ["e" e-tag relay-url]
@@ -169,12 +169,14 @@
         ;; caused by async-load-event!, and it's for a thread view. That means we
         ;; consider the event to be relevant for any thread-timeline.
         (if (or thread? profile?)
+          #_
           (fx/run-later
            (timeline/thread-dispatch! *state
                                       (when thread? (domain/find-column-by-id column-or-profile-id))
                                       (when profile? (domain/find-profile-state-by-id column-or-profile-id))
                                       event
                                       false))
+          :do-nothing
           (timeline/dispatch-text-note! *state
                                         column-or-profile-id ; can be nil
                                         event

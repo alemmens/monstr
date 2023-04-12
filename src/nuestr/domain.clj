@@ -205,7 +205,7 @@
 (defrecord Timeline
   ;; these field values are only ever mutated on fx thread
   [^ObservableList adapted-list
-   ^ObservableList observable-list ;; contains UITextNoteWrapper
+   ^ObservableList observable-list ;; contains TextNoteWrapper
    ^HashMap author-pubkey->item-id-set
    ^HashMap item-id->index
    ^HashSet item-ids
@@ -270,13 +270,25 @@
 (defrecord Channel
     [id pubkey name about picture-url recommended-relay-url])
 
+#_
 (defrecord UITextNote
     [id pubkey content timestamp tags e-tags p-tags children missing?])
 
+#_
 (defrecord UITextNoteWrapper
     [loom-graph note-count max-timestamp ^UITextNote root])
 
+#_
 (defrecord UITextNoteNew
+    [event-obj max-timestamp])
+
+(defrecord TextNote
+    [id pubkey content timestamp tags e-tags p-tags children missing?])
+
+(defrecord TextNoteWrapper
+    [max-timestamp ^TextNote root])
+
+(defrecord TextNoteNew
     [event-obj max-timestamp])
 
 (defrecord UIReplyContext

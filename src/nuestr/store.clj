@@ -65,6 +65,9 @@
 
 (defonce db (init! (file-sys/db-path)))
 
+(defn join-strings [strings]
+  (str/join ", " (map #(str "'" % "'") strings)))
+  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Inserting and deleting
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -173,6 +176,12 @@
     :raw_event_tuple
     raw-event-tuple->event-obj))
 
+(defn load-events
+  [db event-ids]
+  (mapv (comp raw-event-tuple->event-obj :raw_event_tuple)
+        (jdbc/execute! db [(format "select e.raw_event_tuple from n_events e where e.id in (%s)"
+                                   (join-strings event-ids))]
+                       {:builder-fn rs/as-unqualified-lower-maps})))
 
 (defn timeline-query
   [pubkeys]
@@ -180,7 +189,7 @@
                 " where pubkey in (%s) and kind = 1"
                 " order by created_at"
                 " limit 100")
-               (str/join ", " (map #(str "'" % "'") pubkeys)))])
+               (join-strings pubkeys))])
 
 (defn load-timeline-events
   [db pubkeys]
@@ -202,7 +211,7 @@
                 " and e.kind = 1"
                 " order by e.created_at desc"
                 " limit 100")
-               (str/join ", " (map #(str "'" % "'") pubkeys)))])
+           (str/join ", " (map #(str "'" % "'") pubkeys)))])
 
 (defn load-relay-events
   [db relay-url pubkeys]
@@ -232,7 +241,18 @@
                                      " where t.tagged_event_id='" etag-id "'"
                                      " limit 1000")]
                        {:builder-fn rs/as-unqualified-lower-maps})))
-  
+
+(defn load-events-with-etags
+  [db etag-ids]
+  (mapv (comp raw-event-tuple->event-obj :raw_event_tuple)
+        (jdbc/execute! db
+                       [(format (str "select raw_event_tuple from n_events e"
+                                     " inner join e_tags t on t.source_event_id=e.id"
+                                     " where t.tagged_event_id in (%s)"
+                                     " limit 1000")
+                                (str/join ", " (map #(str "'" % "'") etag-ids)))]
+                       {:builder-fn rs/as-unqualified-lower-maps})))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Loading everything else
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

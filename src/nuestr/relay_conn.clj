@@ -379,7 +379,7 @@
      (add-column-subscriptions! column since))))
 
 (defn refresh! []
-  (status-bar/message! "Refreshing subscriptions.")
+  (status-bar/message! "Fetching new notes...")
   (doseq [c (:all-columns @domain/*state)]
     (add-column-subscriptions! c)))
 

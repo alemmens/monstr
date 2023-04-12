@@ -4,23 +4,26 @@
    [nuestr.domain :as domain]
    [nuestr.parse :as parse]
    [nuestr.util :as util]
-   [loom.graph :as loom]
-   [loom.attr :as loom-attr])
+   #_[loom.graph :as loom]
+   #_[loom.attr :as loom-attr]
+   )
   (:import
-   (nuestr.domain UITextNote UITextNoteWrapper)))
+   (nuestr.domain TextNote TextNoteWrapper #_UITextNote #_ UITextNoteWrapper)))
 
+#_
 (defn- create-node->num-predecessors
   [graph]
   (reduce (fn [acc n]
             (assoc acc n (count (loom/predecessors graph n))))
     {} (loom/nodes graph)))
 
+#_
 (defn- likely-root
   [graph]
   (let [num-predecessors (create-node->num-predecessors graph)]
     (first (apply max-key val num-predecessors))))
 
-
+#_
 (defn max-path-length [a b edges]
   (if (some #{[a b]} edges)
     (max 1 (max-path-length a b (remove #{[a b]} edges)))
@@ -52,8 +55,10 @@
            (filter (fn [[a b]] (> (max-path-length a b edges) 1))
                    edges))))
 
+#_
 (defn- simplify-graph [g] g)
 
+#_
 (defn- contribute!*
   [graph id parent-ids]
   (as-> graph G
@@ -63,6 +68,7 @@
     ;; Like so: :c -> :b -> :a
     (apply loom/add-edges G (map vec (partition 2 1 (reverse parent-ids))))))
 
+#_
 (defn- ->note
   ^UITextNote [pruned-graph n seen?]
   (let [seen? (conj seen? n)
@@ -75,9 +81,11 @@
       ;; UITextNote.
       (domain/->UITextNote n nil (format "<missing:%s>" n) nil [] [] [] kids true))))
 
+#_
 (defn show-graph [g]
   (log/debugf "Graph %s" (pr-str (loom/edges g))))
 
+#_
 (defn- build*
   [graph]
   (let [use-root (likely-root graph)
@@ -85,9 +93,10 @@
     #_(show-graph graph')
     (->note graph' use-root #{})))
 
+#_
 (defn contribute!
-  ^UITextNoteWrapper
-  [^UITextNoteWrapper wrapper {:keys [id created_at] :as event-obj} etag-ids ptag-ids]
+  ^TextNoteWrapper
+  [^TextNoteWrapper wrapper {:keys [id created_at] :as event-obj} etag-ids ptag-ids]
   ;; NOTE: we expect one of id or etag-ids to exist in the provided wrapper's
   ;; :loom-graph (or the :loom-graph should be empty) and we expect the
   ;; :loom-graph to be connected; this implies that our contributions here
@@ -103,10 +112,10 @@
     #_(log/debugf "Graph now has %d nodes" (count (loom/nodes graph)))
     (assoc wrapper
            :loom-graph graph
-           :note-count (count (loom/nodes graph))
            :max-timestamp (max (or (:max-timestamp wrapper) 0) (or created_at 0))
            :root (build* graph))))
 
+#_
 (defn init!
   ^UITextNoteWrapper [event-obj etag-ids ptag-ids]
   (let [x (domain/->UITextNoteWrapper (loom/digraph) 0 -1 nil)]
@@ -209,4 +218,62 @@
         id->node (into {} (map (fn [node] [(:id node) node])
                                nodes))]
     (add-children (add-descendants id->node nodes))))
-  
+
+(defn is-root? [node depth]
+  (= depth (count (:parent-ids node))))
+
+(defn thread-roots
+  "Returns a sequence of root nodes, i.e. nodes without any parents."
+  [id->node depth]
+  (filter #(is-root? % depth) (vals id->node)))
+
+(defn build-note ^TextNote [^Node parent id->node id->event]
+  (let [child-ids (:child-ids parent)
+        children (map #(build-note (get id->node %) id->node id->event)
+                      child-ids)
+        id (:id parent)
+        parent-event (get id->event id)
+        child-events (map #(get id->event %) child-ids)
+        timestamp (or (:created_at parent-event) 0)]
+    (domain/->TextNote id
+                       (:pubkey parent-event)
+                       (:content parent-event)
+                       timestamp
+                       (:tags parent-event)
+                       (parse/e-tags parent-event)
+                       (parse/p-tags parent-event)
+                       children
+                       (nil? parent-event))))
+
+
+(defn tree-max-timestamp [^TextNote note]
+  (max (:timestamp note)
+       (reduce max 0 (map tree-max-timestamp (:children note)))))
+
+(defn build-text-note-wrappers
+  "Returns a vector with [1] a sequence of TextNoteWrapper, [2]
+  an id->node map, [3] an id->event map."
+  [events thread-focus]
+  (let [id->node (build-thread events)
+        id->event (into {} (map (fn [e] [(:id e) e]) events))
+        roots (or (seq (thread-roots id->node 0))
+                  ;; Apparently we didn't find any root event.
+                  ;; Then use the 'second level' roots (i.e. nodes
+                  ;; with only 1 parent) instead.
+                  (seq (thread-roots id->node 1))
+                  ;; punt: just use all nodes as roots.
+                  (vals id->node))
+        notes (map #(build-note % id->node id->event)
+                   roots)]
+    [(map #(domain/->TextNoteWrapper (tree-max-timestamp %) %)
+          notes)
+     id->node
+     id->event]))
+
+
+(defn tree-size [^TextNote note]
+  (+ 1
+     (reduce + (map tree-size (:children note)))))
+
+(defn wrapper-tree-size [^TextNoteWrapper wrapper]
+  (tree-size (:root wrapper)))

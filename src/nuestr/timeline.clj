@@ -90,7 +90,7 @@
                 (:id column)
                 (:name (:view column)))
     (when-not (.contains item-ids id)
-      (let [ptag-ids (parse/parse-tags event-obj "p")]
+      (let [ptag-ids (parse/p-tags event-obj)]
         (when (accept-text-note? *state column identity-pubkey ptag-ids event-obj)
           #_(log/debugf "Adding event %s '%s'" id content)
           (.add item-ids id)
@@ -99,10 +99,11 @@
                   (HashSet. [id])
                   (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
           (let [init-idx (.size observable-list)
-                init-note (domain/->UITextNoteNew event-obj created_at)]
+                init-note (domain/->TextNoteNew event-obj created_at)]
             (.put item-id->index id init-idx)
             (.add observable-list init-note)))))))
 
+#_
 (defn- add-item-to-thread-timeline!
   [timeline ptag-ids {:keys [id pubkey] :as event-obj}] 
   #_(log/debugf "Adding event with id %s to thread timeline" id)
@@ -118,7 +119,7 @@
       (.add item-ids id)
       (.merge author-pubkey->item-id-set pubkey (HashSet. [id])
               (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
-      (let [etag-ids (parse/parse-tags event-obj "e") ;; order matters
+      (let [etag-ids (parse/e-tags) ;; order matters
             id-closure (cons id etag-ids)
             existing-index (first (keep #(.get item-id->index %) id-closure))]
         (if (some? existing-index)
@@ -175,9 +176,10 @@
 
 (defn events-share-etags?
   [event-a event-b]
-  (not-empty (set/intersection (set (cons (:id event-a) (parse/parse-tags event-a "e")))
-                               (set (cons (:id event-b) (parse/parse-tags event-b "e"))))))
+  (not-empty (set/intersection (set (cons (:id event-a) (parse/e-tags event-a)))
+                               (set (cons (:id event-b) (parse/e-tags event-b))))))
 
+#_
 (defn thread-dispatch!
   [*state column profile-state event-obj check-relevance?]
   ;; CONSIDER if is this too much usage of on-fx-thread - do we need to batch/debounce
@@ -197,7 +199,7 @@
           #_(log/debugf "Definitely adding thread event %s for focus %s"
                       (:id event-obj)
                       (:thread-focus (or column profile-state)))
-          (add-item-to-thread-timeline! timeline (parse/parse-tags event-obj "p") event-obj))))))
+          (add-item-to-thread-timeline! timeline (parse/p-tags event-obj) event-obj))))))
 
 (defn- flat-dispatch-for-column [*state event-obj column]
   ;; TODO: We probably don't need to dispatch for all identities?
@@ -224,7 +226,8 @@
    (if (string? column-id)
      (let [column (domain/find-column-by-id column-id)]     
        (if thread?
-         (thread-dispatch! *state column nil event-obj check-relevance?)
+         #_(thread-dispatch! *state column nil event-obj check-relevance?)
+         :do-nothing
          (flat-dispatch-for-column *state event-obj column)))
      (doseq [column (:all-columns @*state)]
        (flat-dispatch-for-column *state event-obj column)))))
@@ -309,7 +312,7 @@
           :active-key public-key)
    (file-sys/save-active-key)))
 
-
+#_
 (defn show-column-thread!
   "If `column` is false, then we assume that the thread is in the profile tab for `pubkey`."
   [*state column pubkey event-obj scene]
@@ -350,6 +353,102 @@
              (status-bar/debug! (format "Index: %s, wrapper: %s, listview: %s"
                                     index wrapper listview))
              (.select (.getSelectionModel listview) wrapper))))))))
+
+(defn fetch-events-with-ids [column-id pubkey ids]
+  ;; Create a unique subscription id to fetch all events with the given ids and
+  ;; subscribe to all relays in the hope that we find the events.  We'll unsubscribe
+  ;; automatically when we get an EOSE event.
+  (let [profile-state (get (:open-profile-states @domain/*state) pubkey)
+        subscription-id (format "%s:%s:%s"
+                                (if column-id "thread" "profile")
+                                (or column-id (:id profile-state))
+                                (rand-int 1000000000))]
+    ;; TODO: Don't subscribe to all relays, but try to use only relevant relays.    
+    (relay-conn/subscribe-all! subscription-id
+                               [{:ids ids :kinds [1]}]
+                               #(or (:read? %) (:meta? %)))))
+
+(defn connect-wrappers-to-listview! [wrappers column-id pubkey]
+  (doseq [pair (timeline-pairs column-id pubkey)]
+    (let [timeline (:thread-timeline pair)
+          listview (:thread-listview pair)
+          {:keys [^ObservableList observable-list
+                  ^HashMap author-pubkey->item-id-set
+                  ^HashMap item-id->index
+                  ^HashSet item-ids]}
+          timeline]
+      (doseq [wrapper wrappers]
+        (let [root ^TextNote (:root wrapper)
+              id (:id root)
+              pubkey (:pubkey root)
+              e-tags (:e-tags root)]
+          (when-not (get item-ids id)
+            (.add item-ids id)
+            (.merge author-pubkey->item-id-set pubkey (HashSet. [id])
+                    (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
+            (let [id-closure (cons id e-tags)
+                  index (.size observable-list)]
+              (doseq [id id-closure]
+                (.put item-id->index id index))
+              (.add observable-list wrapper))))))))
+
+(defn load-thread-events [thread-focus]
+  (let [root-id (parse/event-root thread-focus)
+        real-root (store/load-event store/db root-id) ; can be nil if not in db
+        root (or real-root thread-focus)
+        other-events (store/load-events-with-etag store/db (:id root))]
+    (distinct (cons root other-events))))
+
+(defn show-column-thread!
+  "If `column` is false, then we assume that the thread is in the profile tab for `pubkey`."
+  [*state column pubkey event-obj scene]
+  (fx/run-later
+   (let [column-id (:id column)
+         profile-state (get (:open-profile-states @*state) pubkey)]
+     #_(log/debugf "Show thread for event %s with root %s" event-obj root)
+     ;; Clear the thread and update the :show-thread? and :thread-focus properties.
+     (if column
+       (do (clear-column-thread! *state column)
+           (update-column! *state (assoc column
+                                         :show-thread? true
+                                         :thread-focus event-obj)))
+       (do (clear-timeline-pair! (:timeline-pair profile-state) true)
+           (update-profile-state! *state
+                                  pubkey
+                                  (assoc profile-state
+                                         :show-thread? true
+                                         :thread-focus event-obj))))
+     ;; Load and dispatch all events for the thread.
+     (let [db-events (load-thread-events event-obj)
+           all-etags (set (mapcat parse/e-tags db-events))
+           event-ids (set (map :id db-events))
+           new-ids (clojure.set/difference all-etags event-ids)]
+       (status-bar/debug! (format "%d new ids" (count new-ids)))
+       #_
+       (util/submit! domain/daemon-scheduled-executor ; get off of fx thread
+                     (fn [] (fetch-events-with-ids column-id pubkey new-ids)))
+       (let [new-events (store/load-events store/db new-ids)
+             events (distinct (concat db-events new-events))
+             [wrappers id->node id->event] (timeline-support/build-text-note-wrappers events event-obj)]
+         (status-bar/debug! (format "Loaded %d db-events, %d new events, %d wrappers, %s notes, %d nodes"
+                                    (count db-events)
+                                    (count new-events)
+                                    (count wrappers)
+                                    (pr-str (map timeline-support/tree-size wrappers))
+                                    (count id->node)))
+         (connect-wrappers-to-listview! wrappers column-id pubkey)
+         ;; Select the thread focus.
+         #_
+         (doseq [pair (timeline-pairs column-id pubkey)]
+           (let [timeline (:thread-timeline pair)
+                 listview (:thread-listview pair)
+                 item-id->index (:item-id->index timeline)
+                 item-id (:id event-obj)]
+             (when-let [index (.get item-id->index item-id)]
+               (let [wrapper (.get (:observable-list timeline) index)]
+                 (status-bar/debug! (format "Index: %s, wrapper: %s, listview: %s"
+                                            index wrapper listview))
+                 (.select (.getSelectionModel listview) wrapper))))))))))
 
 
 (defn- unshow-thread!

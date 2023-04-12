@@ -29,7 +29,7 @@
    (javafx.scene.input MouseEvent ScrollEvent)
    (javafx.scene.layout HBox Priority VBox)
    (javafx.stage Popup)
-   (nuestr.domain UITextNoteNew UITextNote UITextNoteWrapper)
+   (nuestr.domain TextNoteNew TextNote TextNoteWrapper)
    (org.fxmisc.richtext GenericStyledArea)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -363,6 +363,7 @@
   (when-let [event (store/load-event db event-id)]
     (assoc event :relays (store/load-relays-for-event db event-id))))
 
+#_
 (defn- async-load-event!
   "Load the event with the given id from either the database or from the relays."
   [*state db column-id pubkey event-id]
@@ -390,13 +391,13 @@
                                  #(or (:read? %) (:meta? %))))))
 
 (defn thread-timeline-item
-  [{:keys [^UITextNote root-data ^UITextNote item-data column-id pubkey *state db metadata-cache executor]}]
+  [{:keys [^TextNote root-data ^TextNote item-data column-id pubkey *state db metadata-cache executor]}]
   (if (:missing? item-data)
     {:fx/type :h-box
      :style-class ["ndesk-timeline-item-missing"]
      :children [(do
                   ;; Load the parent.
-                  (util/submit! executor ; get off of fx thread
+                  #_(util/submit! executor ; get off of fx thread
                                 (fn []
                                   ;; Wait a bit so we don't overload the relays.
                                   ;; TODO: we should probably use a queue instead.
@@ -433,7 +434,7 @@
      :bottom (thread-action-button-row *state db root-data item-id pubkey column-id)})))
 
 (defn- tree-rows*
-  [indent ^UITextNote root-data ^UITextNote item-data column-id pubkey *state db metadata-cache executor]
+  [indent ^TextNote root-data ^TextNote item-data column-id pubkey *state db metadata-cache executor]
   (let [spacer-width (* indent 10)]
     (cons
       {:fx/type :h-box
@@ -456,10 +457,10 @@
               (:children item-data)))))
 
 (defn- find-note
-  [^UITextNote note pred]
+  [^TextNote note pred]
   (if (pred note) note (first (map #(find-note % pred) (:children note)))))
 
-(defn- tree* [{:keys [^UITextNoteWrapper note-wrapper column-id pubkey *state db metadata-cache executor]}]
+(defn- tree* [{:keys [^TextNoteWrapper note-wrapper column-id pubkey *state db metadata-cache executor]}]
   ;; NOTE: we get nil note-wrapper sometimes when the list-cell is advancing
   ;; in some ways. For now just render label w/ err which we'll see if
   ;; this matters.
@@ -506,7 +507,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn timeline-item
-  [{:keys [root-data ^UITextNoteNew text-note-new column-id *state db metadata-cache executor]}]
+  [{:keys [root-data ^TextNoteNew text-note-new column-id *state db metadata-cache executor]}]
   ;; ROOT-DATA is nil for flat view, some kind of event data for threaded view.
   (let [event-obj (:event-obj text-note-new)
         pubkey (:pubkey event-obj)
@@ -535,7 +536,7 @@
 
 
 (defn timeline-item*
-  [{:keys [column-id root-data ^UITextNoteNew text-note-new relays *state db metadata-cache executor]}]
+  [{:keys [column-id root-data ^TextNoteNew text-note-new relays *state db metadata-cache executor]}]
   ;; note: we get nil note-wrapper sometimes when the list-cell is advancing
   ;; in some ways -- for now just render label w/ err which we'll see if
   ;; this matters --

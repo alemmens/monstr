@@ -20,11 +20,17 @@
     (filter #(= tag-str (first %)))
     (mapv second)))
 
+(defn e-tags [event]
+  (parse-tags event "e"))
+
+(defn p-tags [event]
+  (parse-tags event "p"))
+
 (defn event-root
   "Returns the event id of the root event associated with an event."
   [event]
   ;; For now we assume that the root is the first e-tag.
   ;; Note that NIP 10 deprecates this assumption, but current relays don't seem to implement
   ;; NIP 10 yet. TODO: MAKE THIS WORK FOR BOTH PRE AND POST NIP 10.
-  (or (first (parse-tags event "e"))
+  (or (first (e-tags event))
       (:id event)))
