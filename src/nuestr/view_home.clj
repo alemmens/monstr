@@ -491,6 +491,8 @@
                                        :metadata-cache metadata-cache
                                        :executor executor}})}}})
 
+
+#_
 (defn create-thread-view
   ^ListView [column-id pubkey *state db metadata-cache executor]
   (fx/instance
@@ -515,6 +517,8 @@
         {:keys [name about picture-url nip05-id created-at]} (some->> pubkey (metadata/get* metadata-cache))
         avatar-color (or (some-> pubkey media/color) :lightgray)]
     {:fx/type :border-pane
+     :padding (Insets. ; top right bottom left
+               0.0 0.0 0.0 (* (:depth text-note-new) 10.0))
      :on-mouse-entered (fn [e] (show-timeline-item-info e event-obj))
      :on-mouse-moved (fn [e] (show-timeline-item-info e event-obj))
      :on-mouse-exited unshow-timeline-item-info
@@ -552,7 +556,7 @@
      :metadata-cache metadata-cache
      :executor executor}))
 
-(defn home [{:keys [column-id *state db metadata-cache executor relays]}]
+(defn home [{:keys [column-id pubkey *state db metadata-cache executor relays]}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created #(.setSelectionModel % util-fx-more/no-selection-model)
    :desc {:fx/type :list-view
@@ -564,6 +568,7 @@
                                      {:graphic
                                       {:fx/type timeline-item*
                                        :column-id column-id
+                                       :pubkey pubkey
                                        :text-note-new text-note-new
                                        :relays relays
                                        :*state *state
@@ -583,3 +588,13 @@
                          :executor executor})))
 
 
+(defn create-thread-view
+  ^ListView [column-id pubkey *state db metadata-cache executor]
+  (fx/instance
+   (fx/create-component {:fx/type home
+                         :column-id column-id
+                         :pubkey pubkey
+                         :*state *state
+                         :db db
+                         :metadata-cache metadata-cache
+                         :executor executor})))

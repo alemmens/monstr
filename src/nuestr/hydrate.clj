@@ -22,8 +22,8 @@
 (defn new-timeline-pair
   "COLUMN-ID should be nil for timelines that are shown in Profile tabs."
   [column-id]
-  (let [flat-timeline (domain/new-timeline)
-        thread-timeline (domain/new-timeline)
+  (let [flat-timeline (domain/new-timeline false)
+        thread-timeline (domain/new-timeline true)
         flat-listview (view-home/create-list-view column-id
                                                   domain/*state store/db
                                                   metadata/cache

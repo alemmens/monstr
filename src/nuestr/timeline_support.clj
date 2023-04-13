@@ -253,7 +253,7 @@
 (defn build-text-note-wrappers
   "Returns a vector with [1] a sequence of TextNoteWrapper, [2]
   an id->node map, [3] an id->event map."
-  [events thread-focus]
+  [events]
   (let [id->node (build-thread events)
         id->event (into {} (map (fn [e] [(:id e) e]) events))
         roots (or (seq (thread-roots id->node 0))
@@ -264,7 +264,12 @@
                   ;; punt: just use all nodes as roots.
                   (vals id->node))
         notes (map #(build-note % id->node id->event)
-                   roots)]
+                   ;; We only take the first 'root' in order to
+                   ;; prevent duplicate events in the trees.
+                   ;; This hack can potentially lead to missing
+                   ;; events, but that looks less buggy
+                   ;; than having duplicate events.
+                   (take 1 roots))]
     [(map #(domain/->TextNoteWrapper (tree-max-timestamp %) %)
           notes)
      id->node

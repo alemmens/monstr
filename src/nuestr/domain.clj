@@ -219,7 +219,7 @@
     (.minusDays n)
     .toInstant))
 
-(defn new-timeline []
+(defn new-timeline [thread?]
   ;; NOTE: we're querying and subscribing to all of time but for now, for ux
   ;; experience, we filter underlying data by n days
   ;; todo we'll really wish to query/subscribe at an epoch and only update it on scroll etc.
@@ -228,9 +228,11 @@
         observable-list (FXCollections/observableArrayList)
         filtered-list (FilteredList. observable-list
                         (util-java/->Predicate #(> (:max-timestamp %) init-timeline-epoch)))
-        adapted-list (.sorted filtered-list
-                              ;; latest wrapper entries first:
-                              (comparator #(< (:max-timestamp %2) (:max-timestamp %1))))]
+        adapted-list (if thread?
+                       filtered-list
+                       (.sorted filtered-list
+                                ;; latest wrapper entries first:
+                                (comparator #(< (:max-timestamp %2) (:max-timestamp %1)))))]
     (->Timeline
       adapted-list
       observable-list
@@ -270,18 +272,6 @@
 (defrecord Channel
     [id pubkey name about picture-url recommended-relay-url])
 
-#_
-(defrecord UITextNote
-    [id pubkey content timestamp tags e-tags p-tags children missing?])
-
-#_
-(defrecord UITextNoteWrapper
-    [loom-graph note-count max-timestamp ^UITextNote root])
-
-#_
-(defrecord UITextNoteNew
-    [event-obj max-timestamp])
-
 (defrecord TextNote
     [id pubkey content timestamp tags e-tags p-tags children missing?])
 
@@ -289,7 +279,7 @@
     [max-timestamp ^TextNote root])
 
 (defrecord TextNoteNew
-    [event-obj max-timestamp])
+    [event-obj max-timestamp depth])
 
 (defrecord UIReplyContext
     [root-event-id event-id])
@@ -327,7 +317,7 @@
                     #{}
                     (set followers)
                     (set following-views)
-                    (->TimelinePair (new-timeline) (new-timeline)
+                    (->TimelinePair (new-timeline false) (new-timeline true)
                                     (list-creator) (thread-creator))
                     false
                     nil)))

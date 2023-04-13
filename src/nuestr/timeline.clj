@@ -77,6 +77,23 @@
 
 
 
+(defn add-event-to-timeline! [timeline {:keys [id pubkey created_at content] :as event} depth]
+  #_(log/debugf "Adding event %s '%s'" id content)
+  (let [{:keys [^ObservableList observable-list
+                ^HashMap author-pubkey->item-id-set
+                ^HashMap item-id->index
+                ^HashSet item-ids]}
+        timeline]
+    (.add item-ids id)
+    (.merge author-pubkey->item-id-set
+            pubkey
+            (HashSet. [id])
+            (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
+    (let [index (.size observable-list)
+          note (domain/->TextNoteNew event created_at depth)]
+      (.put item-id->index id index)
+      (.add observable-list note))))
+
 (defn flat-dispatch!
   [*state timeline identity-pubkey {:keys [id pubkey created_at content] :as event-obj} column]
   (let [{:keys [^ObservableList observable-list
@@ -84,24 +101,10 @@
                 ^HashMap item-id->index
                 ^HashSet item-ids]}
         timeline]
-    #_
-    (log/debugf "Flat dispatch of event %s for column %s with view %s"
-                id
-                (:id column)
-                (:name (:view column)))
-    (when-not (.contains item-ids id)
+    (when-not (.contains (:item-ids timeline) id)
       (let [ptag-ids (parse/p-tags event-obj)]
         (when (accept-text-note? *state column identity-pubkey ptag-ids event-obj)
-          #_(log/debugf "Adding event %s '%s'" id content)
-          (.add item-ids id)
-          (.merge author-pubkey->item-id-set
-                  pubkey
-                  (HashSet. [id])
-                  (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
-          (let [init-idx (.size observable-list)
-                init-note (domain/->TextNoteNew event-obj created_at)]
-            (.put item-id->index id init-idx)
-            (.add observable-list init-note)))))))
+          (add-event-to-timeline! timeline event-obj 0.0))))))
 
 #_
 (defn- add-item-to-thread-timeline!
@@ -312,48 +315,6 @@
           :active-key public-key)
    (file-sys/save-active-key)))
 
-#_
-(defn show-column-thread!
-  "If `column` is false, then we assume that the thread is in the profile tab for `pubkey`."
-  [*state column pubkey event-obj scene]
-  (fx/run-later
-   (let [column-id (:id column)
-         profile-state (get (:open-profile-states @*state) pubkey)
-         root (parse/event-root event-obj)]
-     #_(log/debugf "Show thread for event %s with root %s" event-obj root)
-     ;; Clear the thread and update the :show-thread? and :thread-focus properties.
-     (if column
-       (do (clear-column-thread! *state column)
-           (update-column! *state (assoc column
-                                         :show-thread? true
-                                         :thread-focus event-obj)))
-       (do (clear-timeline-pair! (:timeline-pair profile-state) true)
-           (update-profile-state! *state
-                                  pubkey
-                                  (assoc profile-state
-                                         :show-thread? true
-                                         :thread-focus event-obj))))
-     ;; Load and dispatch all events for the thread.
-     (let [events (cons (store/load-event store/db root) ; can be nil if root is not in db
-                        (store/load-events-with-etag store/db root))]
-       (log/debugf "Loaded %d thread events for root %s" (count events) root)
-       ;; NOTE: we don't need to load recent events from relays here, because
-       ;; that will be done by async-load-event! in view_home.clj.
-       (doseq [e (sort-by :created_at events)]
-         (when e
-           (thread-dispatch! *state column (get (:open-profile-states @*state) pubkey) e false))))
-     ;; Select the thread focus.
-     (doseq [pair (timeline-pairs column-id pubkey)]
-       (let [timeline (:thread-timeline pair)
-             listview (:thread-listview pair)
-             item-id->index (:item-id->index timeline)
-             item-id (:id event-obj)]
-         (when-let [index (.get item-id->index item-id)]
-           (let [wrapper (.get (:observable-list timeline) index)]
-             (status-bar/debug! (format "Index: %s, wrapper: %s, listview: %s"
-                                    index wrapper listview))
-             (.select (.getSelectionModel listview) wrapper))))))))
-
 (defn fetch-events-with-ids [column-id pubkey ids]
   ;; Create a unique subscription id to fetch all events with the given ids and
   ;; subscribe to all relays in the hope that we find the events.  We'll unsubscribe
@@ -368,36 +329,32 @@
                                [{:ids ids :kinds [1]}]
                                #(or (:read? %) (:meta? %)))))
 
-(defn connect-wrappers-to-listview! [wrappers column-id pubkey]
+(defn connect-note-to-listview! [text-note depth id->event timeline listview]
+  (let [id (:id text-note)]
+    (when-not (get (:item-ids timeline) id)
+      (add-event-to-timeline! timeline (get id->event id) depth)
+      (doseq [child (sort-by :timestamp (:children text-note))]
+        (connect-note-to-listview! child (inc depth) id->event timeline listview)))))
+
+(defn connect-wrappers-to-listview! [wrappers id->event column-id pubkey]
   (doseq [pair (timeline-pairs column-id pubkey)]
     (let [timeline (:thread-timeline pair)
-          listview (:thread-listview pair)
-          {:keys [^ObservableList observable-list
-                  ^HashMap author-pubkey->item-id-set
-                  ^HashMap item-id->index
-                  ^HashSet item-ids]}
-          timeline]
+          listview (:thread-listview pair)]
       (doseq [wrapper wrappers]
-        (let [root ^TextNote (:root wrapper)
-              id (:id root)
-              pubkey (:pubkey root)
-              e-tags (:e-tags root)]
-          (when-not (get item-ids id)
-            (.add item-ids id)
-            (.merge author-pubkey->item-id-set pubkey (HashSet. [id])
-                    (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
-            (let [id-closure (cons id e-tags)
-                  index (.size observable-list)]
-              (doseq [id id-closure]
-                (.put item-id->index id index))
-              (.add observable-list wrapper))))))))
+        (connect-note-to-listview! (:root wrapper) 0.0 id->event timeline listview)))))
 
-(defn load-thread-events [thread-focus]
-  (let [root-id (parse/event-root thread-focus)
-        real-root (store/load-event store/db root-id) ; can be nil if not in db
-        root (or real-root thread-focus)
-        other-events (store/load-events-with-etag store/db (:id root))]
-    (distinct (cons root other-events))))
+(defn load-thread-events [ids existing-ids]
+  ;; Keep loading events until we've reached closure.
+  (let [direct-events (store/load-events store/db (seq ids))
+        referenced-events (store/load-events-with-etags store/db (seq ids))
+        events (concat direct-events referenced-events)
+        e-tags (set (mapcat parse/e-tags events))
+        new-existing-ids (set/union ids existing-ids)
+        new-ids (set/difference e-tags new-existing-ids)]
+    (if (seq new-ids)
+      (distinct (concat (load-thread-events new-ids new-existing-ids)
+                        events))
+      events)))
 
 (defn show-column-thread!
   "If `column` is false, then we assume that the thread is in the profile tab for `pubkey`."
@@ -419,24 +376,17 @@
                                          :show-thread? true
                                          :thread-focus event-obj))))
      ;; Load and dispatch all events for the thread.
-     (let [db-events (load-thread-events event-obj)
-           all-etags (set (mapcat parse/e-tags db-events))
-           event-ids (set (map :id db-events))
-           new-ids (clojure.set/difference all-etags event-ids)]
-       (status-bar/debug! (format "%d new ids" (count new-ids)))
-       #_
-       (util/submit! domain/daemon-scheduled-executor ; get off of fx thread
-                     (fn [] (fetch-events-with-ids column-id pubkey new-ids)))
-       (let [new-events (store/load-events store/db new-ids)
-             events (distinct (concat db-events new-events))
-             [wrappers id->node id->event] (timeline-support/build-text-note-wrappers events event-obj)]
-         (status-bar/debug! (format "Loaded %d db-events, %d new events, %d wrappers, %s notes, %d nodes"
-                                    (count db-events)
-                                    (count new-events)
+     (let [events (load-thread-events (set [(:id event-obj)])
+                                      #{})]
+       #_(util/submit! domain/daemon-scheduled-executor ; get off of fx thread
+                       (fn [] (fetch-events-with-ids column-id pubkey new-ids)))
+       (let [[wrappers id->node id->event] (timeline-support/build-text-note-wrappers events)]
+         (status-bar/debug! (format "Loaded %d events, %d wrappers, %s notes, %d nodes"
+                                    (count events)
                                     (count wrappers)
                                     (pr-str (map timeline-support/tree-size wrappers))
                                     (count id->node)))
-         (connect-wrappers-to-listview! wrappers column-id pubkey)
+         (connect-wrappers-to-listview! wrappers id->event column-id pubkey)
          ;; Select the thread focus.
          #_
          (doseq [pair (timeline-pairs column-id pubkey)]
