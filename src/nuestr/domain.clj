@@ -213,7 +213,7 @@
    ])
 
 
-(defn- days-ago
+(defn days-ago
   ^Instant [n]
   (-> (ZonedDateTime/now)
     (.minusDays n)

@@ -229,27 +229,43 @@
 
 (defn build-note ^TextNote [^Node parent id->node id->event]
   (let [child-ids (:child-ids parent)
-        children (map #(build-note (get id->node %) id->node id->event)
-                      child-ids)
+        children (remove nil? (map #(build-note (get id->node %) id->node id->event)
+                                   child-ids))
         id (:id parent)
         parent-event (get id->event id)
         child-events (map #(get id->event %) child-ids)
         timestamp (or (:created_at parent-event) 0)]
-    (domain/->TextNote id
-                       (:pubkey parent-event)
-                       (:content parent-event)
-                       timestamp
-                       (:tags parent-event)
-                       (parse/e-tags parent-event)
-                       (parse/p-tags parent-event)
-                       children
-                       (nil? parent-event))))
+    (when parent-event
+      (domain/->TextNote id
+                         (:pubkey parent-event)
+                         (:content parent-event)
+                         timestamp
+                         (:tags parent-event)
+                         (parse/e-tags parent-event)
+                         (parse/p-tags parent-event)
+                         children
+                         (:missing? parent-event)))))
 
+
+(defn tree-ids [^TextNote note]
+  (cons (:id note)
+        (mapcat tree-ids (:children note))))
 
 (defn tree-max-timestamp [^TextNote note]
-  (max (:timestamp note)
+  (max (or (:timestamp note) 0)
        (reduce max 0 (map tree-max-timestamp (:children note)))))
 
+(defn build-notes [roots id->node id->event]
+  (let [note (build-note (first roots) id->node id->event)]
+    (if (= 1 (count roots))
+      (list note)
+      (let [ids (tree-ids note)]
+        (cons note
+              (build-notes (rest roots)
+                           ;; Make sure we don't include events more than once.
+                           (apply dissoc id->node ids)
+                           (apply dissoc id->event ids)))))))
+          
 (defn build-text-note-wrappers
   "Returns a vector with [1] a sequence of TextNoteWrapper, [2]
   an id->node map, [3] an id->event map."
@@ -263,13 +279,7 @@
                   (seq (thread-roots id->node 1))
                   ;; punt: just use all nodes as roots.
                   (vals id->node))
-        notes (map #(build-note % id->node id->event)
-                   ;; We only take the first 'root' in order to
-                   ;; prevent duplicate events in the trees.
-                   ;; This hack can potentially lead to missing
-                   ;; events, but that looks less buggy
-                   ;; than having duplicate events.
-                   (take 1 roots))]
+        notes (build-notes roots id->node id->event)]
     [(map #(domain/->TextNoteWrapper (tree-max-timestamp %) %)
           notes)
      id->node

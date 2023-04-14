@@ -343,15 +343,26 @@
       (doseq [wrapper wrappers]
         (connect-note-to-listview! (:root wrapper) 0.0 id->event timeline listview)))))
 
-(defn load-thread-events [ids existing-ids]
-  ;; Keep loading events until we've reached closure.
+(defn load-thread-events
+  "Tries to load all events in the thread of which `ids` are a part.
+  `ids` and `existing-ids` are sets."
+  [ids existing-ids]
   (let [direct-events (store/load-events store/db (seq ids))
+        missing-event-ids (set/difference ids (set (map :id direct-events)))
+        missing-events (map (fn [id]
+                              {:id id
+                               :missing? true
+                               :tags ()
+                               :created_at (.getEpochSecond (domain/days-ago 10)) ; just an arbitrary date in the past
+                               :content (format "Missing %s" (util/format-pubkey-short id))})
+                            missing-event-ids)
         referenced-events (store/load-events-with-etags store/db (seq ids))
-        events (concat direct-events referenced-events)
+        events (concat direct-events referenced-events missing-events)
         e-tags (set (mapcat parse/e-tags events))
         new-existing-ids (set/union ids existing-ids)
         new-ids (set/difference e-tags new-existing-ids)]
     (if (seq new-ids)
+      ;; Keep loading events until we've reached closure.      
       (distinct (concat (load-thread-events new-ids new-existing-ids)
                         events))
       events)))
@@ -381,11 +392,11 @@
        #_(util/submit! domain/daemon-scheduled-executor ; get off of fx thread
                        (fn [] (fetch-events-with-ids column-id pubkey new-ids)))
        (let [[wrappers id->node id->event] (timeline-support/build-text-note-wrappers events)]
-         (status-bar/debug! (format "Loaded %d events, %d wrappers, %s notes, %d nodes"
-                                    (count events)
-                                    (count wrappers)
-                                    (pr-str (map timeline-support/tree-size wrappers))
-                                    (count id->node)))
+         #_(status-bar/debug! (format "Loaded %d events, %d wrappers, %s notes, %d nodes"
+                                      (count events)
+                                      (count wrappers)
+                                      (pr-str (map timeline-support/tree-size wrappers))
+                                      (count id->node)))
          (connect-wrappers-to-listview! wrappers id->event column-id pubkey)
          ;; Select the thread focus.
          #_
