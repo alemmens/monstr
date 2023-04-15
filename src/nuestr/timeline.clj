@@ -367,6 +367,21 @@
                         events))
       events)))
 
+(defn select-thread-focus [thread-focus column-id pubkey]
+  (doseq [pair (timeline-pairs column-id pubkey)]
+    (let [timeline (:thread-timeline pair)
+          listview ^ListView (:thread-listview pair)
+          item-id->index (:item-id->index timeline)
+          item-id (:id thread-focus)]
+      (when-let [index (.get item-id->index item-id)]
+        (let [item (.get (:observable-list timeline) index)]
+          ;; Scroll to the thread focus item and select it.
+          (.scrollTo ^ListView listview
+                     ;; Index is a java.long.Integer but scrollTo
+                     ;; seems to need a long or it won't do anything!
+                     (long index))
+          (.select (.getSelectionModel listview) (long index)))))))
+  
 (defn show-column-thread!
   "If `column` is false, then we assume that the thread is in the profile tab for `pubkey`."
   [*state column pubkey event-obj scene]
@@ -398,19 +413,7 @@
                                       (pr-str (map timeline-support/tree-size wrappers))
                                       (count id->node)))
          (connect-wrappers-to-listview! wrappers id->event column-id pubkey)
-         ;; Select the thread focus.
-         #_
-         (doseq [pair (timeline-pairs column-id pubkey)]
-           (let [timeline (:thread-timeline pair)
-                 listview (:thread-listview pair)
-                 item-id->index (:item-id->index timeline)
-                 item-id (:id event-obj)]
-             (when-let [index (.get item-id->index item-id)]
-               (let [wrapper (.get (:observable-list timeline) index)]
-                 (status-bar/debug! (format "Index: %s, wrapper: %s, listview: %s"
-                                            index wrapper listview))
-                 (.select (.getSelectionModel listview) wrapper))))))))))
-
+         (select-thread-focus event-obj column-id pubkey))))))
 
 (defn- unshow-thread!
   [*state column pubkey]

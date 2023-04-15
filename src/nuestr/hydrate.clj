@@ -108,9 +108,9 @@
       ;; TODO: also load watermarks and include in new subscriptions.
       (doseq [r relay-urls]
         (let [events (store/load-relay-events db r closure-public-keys)]
-          (status-bar/message! (format "Loaded %d events for %s from database"
-                                       (count events)
-                                       r))
+          #_(status-bar/message! (format "Loaded %d events for %s from database"
+                                         (count events)
+                                         r))
           (fx/run-later (dispatch-text-notes *state r events false)))))
     ;; NOTE: use *all* identities to update subscriptions.
     (swap! domain/*state assoc :last-refresh false)

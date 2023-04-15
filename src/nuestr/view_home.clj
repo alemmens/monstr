@@ -1,5 +1,6 @@
 (ns nuestr.view-home
   (:require [cljfx.api :as fx]
+            [cljfx.ext.list-view :as fx.ext.list-view]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
             [nuestr.cache :as cache]
@@ -433,79 +434,8 @@
      ;; The action buttons (Reply, Info, ...) are at the bottom of the timeline item.
      :bottom (thread-action-button-row *state db root-data item-id pubkey column-id)})))
 
-(defn- tree-rows*
-  [indent ^TextNote root-data ^TextNote item-data column-id pubkey *state db metadata-cache executor]
-  (let [spacer-width (* indent 10)]
-    (cons
-      {:fx/type :h-box
-       :children [{:fx/type :label
-                   :min-width spacer-width
-                   :max-width spacer-width
-                   :text ""}
-                  {:fx/type thread-timeline-item
-                   :h-box/hgrow :always
-                   :spacer-width spacer-width
-                   :item-data item-data
-                   :root-data root-data
-                   :column-id column-id
-                   :pubkey pubkey
-                   :*state *state
-                   :db store/db
-                   :metadata-cache metadata/cache
-                   :executor executor}]}
-      (mapcat #(tree-rows* (inc indent) root-data % column-id pubkey *state db metadata-cache executor)
-              (:children item-data)))))
-
-(defn- find-note
-  [^TextNote note pred]
-  (if (pred note) note (first (map #(find-note % pred) (:children note)))))
-
-(defn- tree* [{:keys [^TextNoteWrapper note-wrapper column-id pubkey *state db metadata-cache executor]}]
-  ;; NOTE: we get nil note-wrapper sometimes when the list-cell is advancing
-  ;; in some ways. For now just render label w/ err which we'll see if
-  ;; this matters.
-  (if (nil? note-wrapper)
-    {:fx/type :label :text "err"}
-    (let [root (:root note-wrapper)]
-      {:fx/type :v-box
-       :children (vec (tree-rows* 0 root root column-id pubkey
-                                  *state db metadata-cache executor))})))
-
-(defn thread-home [{:keys [column-id pubkey *state db metadata-cache executor]}]
-  {:fx/type fx/ext-on-instance-lifecycle
-   ; :on-created #(.setSelectionModel % util-fx-more/no-selection-model)
-   :desc {:fx/type :list-view
-          ; :focus-traversable false
-          :style-class ["nuestr-thread-pane-listview"]
-          :pref-height 100000  ; trick to make it stretch vertically
-          :pref-width 100000
-          :cell-factory {:fx/cell-type :list-cell
-                         :describe (fn [note-wrapper]
-                                     {:graphic
-                                      {:fx/type tree*
-                                       :column-id column-id
-                                       :pubkey pubkey
-                                       :note-wrapper note-wrapper
-                                       :*state *state
-                                       :db db
-                                       :metadata-cache metadata-cache
-                                       :executor executor}})}}})
-
-
-#_
-(defn create-thread-view
-  ^ListView [column-id pubkey *state db metadata-cache executor]
-  (fx/instance
-   (fx/create-component {:fx/type thread-home
-                         :column-id column-id
-                         :pubkey pubkey
-                         :*state *state
-                         :db db
-                         :metadata-cache metadata-cache
-                         :executor executor})))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Flat timelines
+;;; Timeline
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn timeline-item
@@ -558,9 +488,9 @@
 
 (defn home [{:keys [column-id pubkey *state db metadata-cache executor relays]}]
   {:fx/type fx/ext-on-instance-lifecycle
-   :on-created #(.setSelectionModel % util-fx-more/no-selection-model)
+   ;; :on-created #(.setSelectionModel % util-fx-more/no-selection-model)
    :desc {:fx/type :list-view
-          :focus-traversable false
+          :focus-traversable true
           :pref-height 100000  ; trick to make it stretch vertically
           :pref-width 100000
           :cell-factory {:fx/cell-type :list-cell

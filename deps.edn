@@ -1,9 +1,7 @@
 {:deps {org.clojure/clojure {:mvn/version "1.11.1"}
         cljfx/cljfx {:mvn/version "1.7.22"}
 
-        ;; aleph/aleph {:mvn/version "0.6.0"}
         aleph/aleph {:mvn/version "0.6.1"}
-        aysylu/loom {:mvn/version "1.0.2"}
         
         fr.acinq.secp256k1/secp256k1-kmp {:mvn/version "0.7.0"}
         fr.acinq.secp256k1/secp256k1-kmp-jni-jvm {:mvn/version "0.7.0"}
