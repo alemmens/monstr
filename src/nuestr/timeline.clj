@@ -258,9 +258,8 @@
      (update-timeline-pair! (:timeline-pair profile-state))
      (doseq [r (domain/relay-urls @domain/*state)]
        (let [events (store/load-relay-events store/db r [pubkey])]
-         (status-bar/message! (format "Loaded %d events for %s from %s from database"
+         (status-bar/message! (format "Loaded %d database events from %s"
                                       (count events)
-                                      pubkey
                                       r))
          (doseq [e events]
            #_(log/debugf "Dispatching '%s' for %s" (:content e) pubkey)

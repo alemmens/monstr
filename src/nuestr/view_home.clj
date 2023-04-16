@@ -282,7 +282,7 @@
                                                       item-id)))})
   
 (defn- action-button-row
-  [*state db event-obj root-data item-id pubkey column-id]
+  [*state db event-obj root-data item-id pubkey column-id thread?]
   {:fx/type :h-box
    :style-class ["ndesk-content-controls"] ;; used for .lookup
    :style (BORDER| :lightgrey)
@@ -294,29 +294,16 @@
                       (reply-button *state
                                     (:id (if (nil? root-data) event-obj root-data))
                                     item-id)
-                      {:fx/type :button
-                       :style-class ["button" "ndesk-thread-button"] ;; used for .lookup
-                       :h-box/margin 3
-                       :text "thread"
-                       :on-action (fn [e]
-                                    (let [column (and column-id (domain/find-column-by-id column-id))
-                                          scene (.getScene ^Node (.getSource e))]
-                                      #_(log/debugf "Thread button clicked for column %s" (:name (:view column)))
-                                      (timeline/show-column-thread! *state column pubkey event-obj scene)))}])})
-
-(defn- thread-action-button-row
-  ;; Like action-button-row but without the 'thread' button.
-  [*state db root-data item-id pubkey column-id]
-  {:fx/type :h-box
-   :style-class ["ndesk-content-controls"] ;; used for .lookup
-   :style (BORDER| :lightgrey)
-   :visible false
-   :alignment :center
-   :max-width Integer/MAX_VALUE
-   :children [(info-button db item-id pubkey)
-              (reply-button *state
-                            (if (nil? root-data) item-id (:id root-data))
-                            item-id)]})
+                      (when-not thread?
+                        {:fx/type :button
+                         :style-class ["button" "ndesk-thread-button"] ;; used for .lookup
+                         :h-box/margin 3
+                         :text "thread"
+                         :on-action (fn [e]
+                                      (let [column (and column-id (domain/find-column-by-id column-id))
+                                            scene (.getScene ^Node (.getSource e))]
+                                        #_(log/debugf "Thread button clicked for column %s" (:name (:view column)))
+                                        (timeline/show-column-thread! *state column pubkey event-obj scene)))})])})
 
 (defn- author-pane [name pubkey timestamp]
   {:fx/type :border-pane
@@ -360,6 +347,7 @@
 ;;; Thread pane
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+#_
 (defn- load-from-store [db event-id]
   (when-let [event (store/load-event db event-id)]
     (assoc event :relays (store/load-relays-for-event db event-id))))
@@ -391,6 +379,7 @@
                                  [{:ids [event-id] :kinds [1]}]
                                  #(or (:read? %) (:meta? %))))))
 
+#_
 (defn thread-timeline-item
   [{:keys [^TextNote root-data ^TextNote item-data column-id pubkey *state db metadata-cache executor]}]
   (if (:missing? item-data)
@@ -409,37 +398,14 @@
                    :h-box/hgrow :always
                    :style-class ["ndesk-timeline-item-missing-hyperlink"]
                    :text (format "missing %s..." (:id item-data))})]}
-    (let [item-id (:id item-data)
-          pubkey (:pubkey item-data)
-          pubkey-for-avatar (or (some-> pubkey (subs 0 3)) "?")
-          timestamp (:timestamp item-data)
-          {:keys [name about picture-url nip05-id created-at]} (some->> pubkey (metadata/get* metadata-cache))
-          avatar-color (or (some-> pubkey media/color) :lightgray)]
-      {:fx/type :border-pane
-       :id item-id
-       :on-mouse-entered (fn [e] (show-timeline-item-info e item-data))
-       :on-mouse-moved (fn [e] (show-timeline-item-info e item-data))
-       :on-mouse-exited unshow-timeline-item-info
-       :left (media/avatar-or-empty-space picture-url avatar-color pubkey-for-avatar)
-       :center {:fx/type :border-pane
-                :top (author-pane name pubkey timestamp)
-                :bottom {:fx/type :h-box
-                         :children [{:fx/type timeline-item-content
-                                     :h-box/hgrow :always
-                                     :column-id column-id
-                                     :pubkey pubkey
-                                     :content (:content item-data)
-                                     :tags (:tags item-data)
-                                     :metadata-cache metadata-cache}]}}
-     ;; The action buttons (Reply, Info, ...) are at the bottom of the timeline item.
-     :bottom (thread-action-button-row *state db root-data item-id pubkey column-id)})))
+    :obsolete))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Timeline
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn timeline-item
-  [{:keys [root-data ^TextNoteNew text-note-new column-id *state db metadata-cache executor]}]
+  [{:keys [root-data ^TextNoteNew text-note-new column-id *state db metadata-cache executor thread?]}]
   ;; ROOT-DATA is nil for flat view, some kind of event data for threaded view.
   (let [event-obj (:event-obj text-note-new)
         pubkey (:pubkey event-obj)
@@ -466,11 +432,11 @@
                                    :tags (:tags event-obj)
                                    :metadata-cache metadata-cache}]}}
      ;; The action buttons (Reply, Thread, ...) are at the bottom of the timeline item.
-     :bottom (action-button-row *state db event-obj root-data (:id event-obj) pubkey column-id)}))
+     :bottom (action-button-row *state db event-obj root-data (:id event-obj) pubkey column-id thread?)}))
 
 
 (defn timeline-item*
-  [{:keys [column-id root-data ^TextNoteNew text-note-new relays *state db metadata-cache executor]}]
+  [{:keys [column-id root-data ^TextNoteNew text-note-new relays *state db metadata-cache executor thread?]}]
   ;; note: we get nil note-wrapper sometimes when the list-cell is advancing
   ;; in some ways -- for now just render label w/ err which we'll see if
   ;; this matters --
@@ -484,9 +450,10 @@
      :*state *state
      :db db
      :metadata-cache metadata-cache
-     :executor executor}))
+     :executor executor
+     :thread? thread?}))
 
-(defn home [{:keys [column-id pubkey *state db metadata-cache executor relays]}]
+(defn home [{:keys [column-id pubkey *state db metadata-cache executor relays thread?]}]
   {:fx/type fx/ext-on-instance-lifecycle
    ;; :on-created #(.setSelectionModel % util-fx-more/no-selection-model)
    :desc {:fx/type :list-view
@@ -504,7 +471,8 @@
                                        :*state *state
                                        :db db
                                        :metadata-cache metadata-cache
-                                       :executor executor}})}}})
+                                       :executor executor
+                                       :thread? thread?}})}}})
 
 (defn create-list-view
   ^ListView [column-id *state db metadata-cache executor]
@@ -515,7 +483,8 @@
                          :*state *state
                          :db db
                          :metadata-cache metadata-cache
-                         :executor executor})))
+                         :executor executor
+                         :thread? false})))
 
 
 (defn create-thread-view
@@ -527,4 +496,5 @@
                          :*state *state
                          :db db
                          :metadata-cache metadata-cache
-                         :executor executor})))
+                         :executor executor
+                         :thread? true})))
