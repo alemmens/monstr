@@ -164,41 +164,50 @@
        :auto-fix false
        :on-hidden (fn [_])
        :content [{:fx/type :v-box
-                  :style-class "ndesk-info-popup-region"
+                  :style-class "nuestr-info-popup"
                   :padding 20
+                  :spacing 5
                   :style {:-fx-background-color :white}
                   :effect {:fx/type :drop-shadow}
                   :on-mouse-exited
                   (fn [^MouseEvent x]
-                    (let [popup (.getWindow
-                                  (.getScene ^Node
-                                    (.getSource x)))]
+                    (let [popup (.getWindow (.getScene ^Node (.getSource x)))]
                       (.hide popup)))
                   :children
-                  [{:fx/type :label
-                    :style {:-fx-font-weight :bold}
-                    :style-class ["label" "ndesk-info-popup-event-id"]}
+                  [{:fx/type :h-box
+                    :spacing 8
+                    :children [{:fx/type :label
+                                :padding 2
+                                ; :style {:-fx-font-weight :bold}
+                                :style-class ["label" "ndesk-info-popup-event-id"]}
+                               {:fx/type :hyperlink
+                                :style-class ["hyperlink" "ndesk-info-popup-copy-event-link"] ; used in .lookup
+                                :text "copy"
+                                :on-action (fn [^ActionEvent e]
+                                             (when-let [content
+                                                        (some-> e ^Hyperlink .getSource .getUserData :event-id)]
+                                               (util/put-clipboard! content)))}]}
+                   {:fx/type :h-box
+                    :spacing 8
+                    :children [{:fx/type :label
+                                :padding 2
+                                ; :style {:-fx-font-weight :bold}
+                                :style-class ["label" "ndesk-info-popup-pubkey"]}
+                               {:fx/type :hyperlink
+                                :style-class ["hyperlink" "ndesk-info-popup-copy-author-pubkey-link"] ; used in .lookup
+                                :text "copy"
+                                :on-action (fn [^ActionEvent e]
+                                             (when-let [content
+                                                        (some-> e ^Hyperlink .getSource .getUserData :author-pubkey)]
+                                               (util/put-clipboard! content)))}]}
+                   {:fx/type :label
+                    :text "Relays:"}
                    {:fx/type :list-view
                     :style-class "nuestr-info-relays"
                     :focus-traversable false
-                    :padding 5
                     :pref-height 120
                     :pref-width 160
-                    :items []}
-                   {:fx/type :hyperlink
-                    :style-class ["hyperlink" "ndesk-info-popup-copy-event-link"] ; used in .lookup
-                    :text "Copy event id"
-                    :on-action (fn [^ActionEvent e]
-                                 (when-let [content
-                                            (some-> e ^Hyperlink .getSource .getUserData :event-id)]
-                                   (util/put-clipboard! content)))}
-                   {:fx/type :hyperlink
-                    :style-class ["hyperlink" "ndesk-info-popup-copy-author-pubkey-link"] ; used in .lookup
-                    :text "Copy author pubkey"
-                    :on-action (fn [^ActionEvent e]
-                                 (when-let [content
-                                            (some-> e ^Hyperlink .getSource .getUserData :author-pubkey)]
-                                   (util/put-clipboard! content)))}]}]})))
+                    :items []}]}]})))
 
 (defn- ready-popup!
   ^Popup [db node-pos popup-width item-id author-pubkey]
@@ -206,13 +215,15 @@
         seen-on-relays (store/get-seen-on-relays db item-id)
         ^VBox v-box (first (seq (.getContent singleton-popup)))
         ^Label event-id-label (.lookup v-box ".ndesk-info-popup-event-id")
+        ^Label pubkey-label (.lookup v-box ".ndesk-info-popup-pubkey")
         ^ListView seen-on-list (.lookup v-box ".nuestr-info-relays")
         ^Hyperlink copy-event-id-hyperlink (.lookup v-box ".ndesk-info-popup-copy-event-link")
         ^Hyperlink copy-author-pubkey-hyperlink (.lookup v-box ".ndesk-info-popup-copy-author-pubkey-link")]
     ;; Set the content.
+    (.setText event-id-label (str "Event id: " event-id-short))    
     (.setUserData copy-event-id-hyperlink {:event-id item-id})
+    (.setText pubkey-label (str "Author pubkey: " (util/format-pubkey-short author-pubkey)))
     (.setUserData copy-author-pubkey-hyperlink {:author-pubkey author-pubkey})
-    (.setText event-id-label (str "Event: " event-id-short))
     (let [items (FXCollections/observableList (vec seen-on-relays))]
       (.setItems seen-on-list items))
     ;; Set position and dimensions.
