@@ -376,6 +376,9 @@
                             {:missing-ids missing-ids
                              :found-ids #{}})       
        (when (seq new-missing-ids)
+         ;; We discovered new missing events (presumably because they are referenced by
+         ;; events that we found in the previous round), so we try to fetch them from the
+         ;; relays.
          (util/submit! domain/daemon-scheduled-executor ; get off of fx thread
                        (fn [] (fetch-events-with-ids column-id pubkey new-missing-ids))))
        (let [[wrappers id->node id->event] (timeline-support/build-text-note-wrappers events)]

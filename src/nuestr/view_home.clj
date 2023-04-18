@@ -343,72 +343,16 @@
            :text (or (some-> timestamp util/format-timestamp) "?")}})
 
 (defn show-timeline-item-info [e event-obj]
-  (show-action-row! domain/*state true e)
-  (let [seen-on (store/get-seen-on-relays store/db (:id event-obj))]
-    (status-bar/message! (format "Seen on %s."
-                                 (str/join " and "
-                                           (map util/relay-url-short seen-on))))))
+  (when-not (:missing? event-obj)
+    (show-action-row! domain/*state true e)
+    (let [seen-on (store/get-seen-on-relays store/db (:id event-obj))]
+      (status-bar/message! (format "Seen on %s."
+                                   (str/join " and "
+                                             (map util/relay-url-short seen-on)))))))
 
 (defn unshow-timeline-item-info [e]
   (show-action-row! domain/*state false e)
   (status-bar/message! ""))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Thread pane
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-#_
-(defn- load-from-store [db event-id]
-  (when-let [event (store/load-event db event-id)]
-    (assoc event :relays (store/load-relays-for-event db event-id))))
-
-#_
-(defn- async-load-event!
-  "Load the event with the given id from either the database or from the relays."
-  [*state db column-id pubkey event-id]
-  #_(log/debugf "Async load event with column-id=%s and pubkey=%s"
-              column-id pubkey)
-  (if-let [event-from-store (load-from-store db event-id)]
-    (fx/run-later
-     (timeline/thread-dispatch! *state
-                                (if column-id
-                                  (domain/find-column-by-id column-id)
-                                  nil)
-                                (get (:open-profile-states @*state) pubkey)
-                                event-from-store
-                                false))
-    ;; Create a unique subscription id to load the event and subscribe to all read relays
-    ;; in the hope that we find the event.  We'll unsubscribe automatically when we get an
-    ;; EOSE event.
-    (let [profile-state (get (:open-profile-states @*state) pubkey)
-          subscription-id (format "%s:%s:%s"
-                                  (if column-id "thread" "profile")
-                                  (or column-id (:id profile-state))
-                                  (rand-int 1000000000))]
-      (relay-conn/subscribe-all! subscription-id
-                                 [{:ids [event-id] :kinds [1]}]
-                                 #(or (:read? %) (:meta? %))))))
-
-#_
-(defn thread-timeline-item
-  [{:keys [^TextNote root-data ^TextNote item-data column-id pubkey *state db metadata-cache executor]}]
-  (if (:missing? item-data)
-    {:fx/type :h-box
-     :style-class ["ndesk-timeline-item-missing"]
-     :children [(do
-                  ;; Load the parent.
-                  #_(util/submit! executor ; get off of fx thread
-                                (fn []
-                                  ;; Wait a bit so we don't overload the relays.
-                                  ;; TODO: we should probably use a queue instead.
-                                  (Thread/sleep 50) ; 50ms
-                                  (async-load-event! *state db column-id pubkey (:id item-data))))
-                  ;; Show that we're working on it.
-                  {:fx/type :hyperlink
-                   :h-box/hgrow :always
-                   :style-class ["ndesk-timeline-item-missing-hyperlink"]
-                   :text (format "missing %s..." (:id item-data))})]}
-    :obsolete))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Timeline
