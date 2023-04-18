@@ -274,6 +274,7 @@
                                                          (format "thread: %s" name)
                                                          name)
                                                  :padding 5}
+                                                #_ ; not necessary anymore
                                                 (when (and show-thread? (seq (:missing-ids column)))
                                                   ;; We have some missing events in the
                                                   ;; thread.  Show a 'refresh' button to

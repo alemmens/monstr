@@ -160,6 +160,8 @@
   (not-empty (set/intersection (set (cons (:id event-a) (parse/e-tags event-a)))
                                (set (cons (:id event-b) (parse/e-tags event-b))))))
 
+(declare refresh-column-thread!)
+
 (defn thread-dispatch!
   [*state column profile-state event]
   (let [id (:id event)]
@@ -167,7 +169,8 @@
     (when (get (thread-property column profile-state :missing-ids) id)
       (update-thread-info! *state column profile-state
                            {:found-ids (conj (thread-property column profile-state :found-ids)
-                                             id)}))))
+                                             id)}))
+    (refresh-column-thread! column profile-state)))
 
 (defn- flat-dispatch-for-column [*state event-obj column]
   ;; TODO: We probably don't need to dispatch for all identities?
@@ -366,13 +369,15 @@
      ;; Load and dispatch all events for the thread.
      (let [events (load-thread-events (set [(:id event-obj)])
                                       #{})
-           missing-ids (set (map :id (filter :missing? events)))]
+           missing-ids (set (map :id (filter :missing? events)))
+           old-missing-ids (thread-property *state column profile-state :missing-ids)
+           new-missing-ids (set/difference missing-ids old-missing-ids missing-ids)]
        (update-thread-info! *state (domain/find-column-by-id column-id) profile-state
                             {:missing-ids missing-ids
-                             :found-ids #{}})
-       (when (seq missing-ids)
+                             :found-ids #{}})       
+       (when (seq new-missing-ids)
          (util/submit! domain/daemon-scheduled-executor ; get off of fx thread
-                       (fn [] (fetch-events-with-ids column-id pubkey missing-ids))))
+                       (fn [] (fetch-events-with-ids column-id pubkey new-missing-ids))))
        (let [[wrappers id->node id->event] (timeline-support/build-text-note-wrappers events)]
          #_
          (status-bar/debug! (format "Loaded %d events, %d wrappers, %s notes, %d nodes, show?:%s"
