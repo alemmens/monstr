@@ -166,22 +166,15 @@
             column-or-profile-id (second parts)
             event (assoc verified-event :relays (list relay-url))]
         ;; If the subscription id starts with "thread:" or "profile:", the event is
-        ;; caused by async-load-event!, and it's for a thread view. That means we
-        ;; consider the event to be relevant for any thread-timeline.
+        ;; caused by timeline/fetch-events-with-ids and it's for a thread view.
         (if (or thread? profile?)
-          #_
-          (fx/run-later
-           (timeline/thread-dispatch! *state
-                                      (when thread? (domain/find-column-by-id column-or-profile-id))
-                                      (when profile? (domain/find-profile-state-by-id column-or-profile-id))
-                                      event
-                                      false))
-          :do-nothing
+          (timeline/thread-dispatch! *state
+                                     (when thread? (domain/find-column-by-id column-or-profile-id))
+                                     (when profile? (domain/find-profile-state-by-id column-or-profile-id))
+                                     event)
           (timeline/dispatch-text-note! *state
                                         column-or-profile-id ; can be nil
-                                        event
-                                        false
-                                        false)))
+                                        event)))
     2 (consume-recommend-server db relay-url verified-event executor resubscribe-future-vol)
     ;; NIP-02
     3 (consume-contact-list db *state executor resubscribe-future-vol relay-url verified-event)

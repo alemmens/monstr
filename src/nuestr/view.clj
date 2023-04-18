@@ -157,8 +157,7 @@
                  :create #(doto listview
                             (VBox/setVgrow Priority/ALWAYS))}])})
 
-(defn refresh-button
-  [last-refresh]
+(defn refresh-button [last-refresh]
   {:fx/type :v-box
    :padding 5
    :children [{:fx/type :h-box :v-box/vgrow :always}
@@ -264,6 +263,7 @@
                  :h-box/hgrow :always
                  :children [{:fx/type :h-box
                              :alignment :center
+                             :spacing 10
                              :style-class "relay-timeline-label"
                              :children (remove nil?
                                                [{:fx/type :h-box :h-box/hgrow :always}
@@ -274,6 +274,18 @@
                                                          (format "thread: %s" name)
                                                          name)
                                                  :padding 5}
+                                                (when (and show-thread? (seq (:missing-ids column)))
+                                                  ;; We have some missing events in the
+                                                  ;; thread.  Show a 'refresh' button to
+                                                  ;; indicate that there's a chance that
+                                                  ;; the events can be shown now.
+                                                  {:fx/type :button
+                                                   :text (str (char 0x21bb)) ; clockwise open-circle arrow
+                                                   :padding 5
+                                                   :on-mouse-pressed (fn [e]
+                                                                       (timeline/refresh-column-thread! domain/*state
+                                                                                                        column
+                                                                                                        nil))})
                                                 {:fx/type :button
                                                  :padding 5
                                                  :on-mouse-pressed {:event/type :remove-visible-column

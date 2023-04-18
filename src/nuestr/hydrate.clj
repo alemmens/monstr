@@ -46,7 +46,7 @@
   [view identities]
   (log/debugf "New column for %s" (pr-str view))
   (let [id (.toString (UUID/randomUUID))
-        column (domain/->Column id view nil false nil)]
+        column (domain/->Column id view nil false nil #{} #{})]
     (assoc column
            :identity->timeline-pair (new-timelines-map id (map :public-key identities)))))
 
@@ -78,9 +78,7 @@
                                   (if (string? column)
                                     (:id column)
                                     false)
-                                  (assoc event-obj :relays (list relay-url))
-                                  false
-                                  false)))
+                                  (assoc event-obj :relays (list relay-url)))))
 
 (defn hydrate!*
   [*state db new-identities]

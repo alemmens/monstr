@@ -311,10 +311,9 @@
                          :h-box/margin 3
                          :text "thread"
                          :on-action (fn [e]
-                                      (let [column (and column-id (domain/find-column-by-id column-id))
-                                            scene (.getScene ^Node (.getSource e))]
+                                      (let [column (and column-id (domain/find-column-by-id column-id))]
                                         #_(log/debugf "Thread button clicked for column %s" (:name (:view column)))
-                                        (timeline/show-column-thread! *state column pubkey event-obj scene)))})])})
+                                        (timeline/show-column-thread! *state column pubkey event-obj)))})])})
 
 (defn- author-pane [name pubkey timestamp]
   {:fx/type :border-pane

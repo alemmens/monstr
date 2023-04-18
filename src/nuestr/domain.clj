@@ -150,6 +150,8 @@
      identity->timeline-pair ; a map from identity pubkeys to TimelinePair records
      show-thread?
      thread-focus  ; The note (event-obj) that is the focus of the thread. Only relevant when showing a thread.
+     missing-ids   ; A set with ids of events that are missing in the thread.
+     found-ids     ; A set with ids of events that were missing but have been fetched from relays now.
      ])
 
 (defn column-matches-relay-urls?
@@ -286,6 +288,7 @@
 
 (defrecord ProfileState
     [id
+     pubkey
      ;; If changed? is true, the Save button will be enabled.
      followers-changed?
      following-views-changed ; set of (names of) following views that have changed
@@ -298,6 +301,8 @@
      timeline-pair
      show-thread?
      thread-focus  ; The note (event-obj) that is the focus of the thread. Only relevant when showing a thread.
+     missing-ids   ; A set with ids of events that are missing in the thread.
+     found-ids     ; A set with ids of events that were missing but have been fetched from relays now.
      ])
 
 (defn new-profile-state [pubkey list-creator thread-creator]
@@ -313,6 +318,7 @@
                                      (vals (:views @*state))))]
     (log/debugf "New profile state with following-views %s" (pr-str following-views))
     (->ProfileState (.toString (UUID/randomUUID))
+                    pubkey
                     false
                     #{}
                     (set followers)
@@ -320,7 +326,9 @@
                     (->TimelinePair (new-timeline false) (new-timeline true)
                                     (list-creator) (thread-creator))
                     false
-                    nil)))
+                    nil
+                    #{}
+                    #{})))
 
 (defn find-profile-state-by-id [id]
   (first (filter #(= (:id %) id)
