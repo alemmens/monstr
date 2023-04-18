@@ -97,7 +97,11 @@
                           (file-sys/load-active-key)
                           (first new-public-keys))]
       (log/debugf "Hydrating with key %s" pubkey)
-      (timeline/update-active-timelines! *state pubkey))    
+      (timeline/update-active-timelines! *state pubkey))
+    ;; Fetch notes from relays.
+    (swap! domain/*state assoc :last-refresh false)
+    (fx/run-later (relay-conn/refresh!))
+    ;; Load notes from database.
     (let [contact-lists (hydrate-contact-lists! new-identities)
           ;; TODO: Make sure that user follow lists for all views are also in
           ;; this 'closure' list of public keys!
@@ -109,10 +113,7 @@
           #_(status-bar/message! (format "Loaded %d events for %s from database"
                                          (count events)
                                          r))
-          (fx/run-later (dispatch-text-notes *state r events false)))))
-    ;; NOTE: use *all* identities to update subscriptions.
-    (swap! domain/*state assoc :last-refresh false)
-    (fx/run-later (relay-conn/refresh!))))
+          (fx/run-later (dispatch-text-notes *state r events false)))))))
 
 (defn dehydrate!* [*state _db dead-identities]
   (let [dead-public-keys-set (into #{} (map :public-key) dead-identities)]
