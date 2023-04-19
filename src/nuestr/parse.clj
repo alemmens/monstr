@@ -17,14 +17,45 @@
   [{:keys [tags] :as _event-obj} tag-str]
   ;; note: result order should match tag order
   (->> tags
-    (filter #(= tag-str (first %)))
-    (mapv second)))
+       (filter #(= tag-str (first %)))
+       ;; TODO: THIS IS TOO SIMPLE. FOR SOME TAGS WE CAN NOW
+       ;; HAVE MORE THAN ONE VALUE.
+       (mapv second)))
 
 (defn e-tags [event]
   (parse-tags event "e"))
 
 (defn p-tags [event]
   (parse-tags event "p"))
+
+(defn new-etags
+  "Returns a sequence of e-tags, where each e-tag is a vector
+  that starts with the string 'e', followed by an event id,
+  optionally followed by a relay url, optionally followed by
+  a marker ('reply', 'root', or 'mention'). See NIP 10.
+
+  Example result:
+   ([\"e\"
+   \"ee11d86dfa871f363886b95eacb7e60c599e87021cbfcbf007e92f34bac9ed9e\"
+   \"wss://relay.damus.io\"
+   \"root\"]
+  [\"e\"
+   \"8a384db6e13368e966d93f3b021b2e98113f1a7c34e34a22dbf0887f5312c654\"
+   \"wss://nostr-pub.wellorder.net\"
+   \"reply\"])
+  "
+  [event]
+  (filter #(= "e" (first %))
+          (:tags event)))
+
+(defn relay-hint [etag]
+  (get etag 2))
+
+(defn relay-hints [event]
+  (remove empty? (map relay-hint (new-etags event))))
+
+(defn event-has-relay-hints? [event]
+  (not (empty? (relay-hints event))))
 
 (defn event-root
   "Returns the event id of the root event associated with an event."

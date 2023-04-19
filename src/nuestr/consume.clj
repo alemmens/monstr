@@ -14,6 +14,7 @@
             [nuestr.status-bar :as status-bar]
             [nuestr.store :as store]
             [nuestr.subscribe :as subscribe]
+            [nuestr.tab-relays :as tab-relays]
             [nuestr.timeline :as timeline]
             [nuestr.util :as util])
   (:import (java.util.concurrent ScheduledExecutorService ScheduledFuture TimeUnit)))
@@ -54,28 +55,6 @@
 (defn resubscribe!
   [^ScheduledExecutorService executor resubscribe-future-vol]
   (schedule-subscription! relay-conn/refresh! 15000 executor resubscribe-future-vol))
-
-(defn maybe-add-relay!
-  "Returns the new Relay if successful, otherwise nil."
-  [url]
-  (when (and (relay-conn/is-relay-url? url)
-             ;; We don't want 'numerical' urls like 'wss://123.456.789'.
-             (not (util/numerical-relay-url? url)))
-    (when-not (domain/find-relay url)
-      (let [r (domain/->Relay url false false true)]
-        (status-bar/message! (format "Adding recommended relay %s" url))
-        ;; Add the recommended relay.
-        (store/insert-relay! store/db r)
-        (swap! domain/*state assoc
-               ;; TODO: Insert the relay at the right position (using the current sort order).
-               :relays (conj (:relays @domain/*state) r))
-        ;; And try to get server recommendations from the new relay.
-        (relay-conn/add-meta-subscription! url)
-        ;; Return the new relay
-        r))))
-  
-(defn consume-recommend-server [db relay-url event executor subscribe-future-vol]
-  (maybe-add-relay! (str/trim (:content event))))
 
 (defn consume-contact-list [_db *state ^ScheduledExecutorService executor resubscribe-future-vol relay-url
                             {:keys [id pubkey created_at] :as event-obj}]
@@ -175,7 +154,7 @@
           (timeline/dispatch-text-note! *state
                                         column-or-profile-id ; can be nil
                                         event)))
-    2 (consume-recommend-server db relay-url verified-event executor resubscribe-future-vol)
+    2 (tab-relays/maybe-add-relay! (str/trim (:content verified-event)))
     ;; NIP-02
     3 (consume-contact-list db *state executor resubscribe-future-vol relay-url verified-event)
     ;; NIP-04

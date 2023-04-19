@@ -408,25 +408,30 @@
      :thread? thread?}))
 
 (defn home [{:keys [column-id pubkey *state db metadata-cache executor relays thread?]}]
-  {:fx/type fx/ext-on-instance-lifecycle
-   ;; :on-created #(.setSelectionModel % util-fx-more/no-selection-model)
-   :desc {:fx/type :list-view
-          :focus-traversable true
-          :pref-height 100000  ; trick to make it stretch vertically
-          :pref-width 100000
-          :cell-factory {:fx/cell-type :list-cell
-                         :describe (fn [text-note-new]
-                                     {:graphic
-                                      {:fx/type timeline-item*
-                                       :column-id column-id
-                                       :pubkey pubkey
-                                       :text-note-new text-note-new
-                                       :relays relays
-                                       :*state *state
-                                       :db db
-                                       :metadata-cache metadata-cache
-                                       :executor executor
-                                       :thread? thread?}})}}})
+  (let [desc {:fx/type :list-view
+              :focus-traversable thread?
+              :pref-height 100000  ; trick to make it stretch vertically
+              :pref-width 100000
+              :cell-factory {:fx/cell-type :list-cell
+                             :describe (fn [text-note-new]
+                                         {:graphic
+                                          {:fx/type timeline-item*
+                                           :column-id column-id
+                                           :pubkey pubkey
+                                           :text-note-new text-note-new
+                                           :relays relays
+                                           :*state *state
+                                           :db db
+                                           :metadata-cache metadata-cache
+                                           :executor executor
+                                           :thread? thread?}})}}]
+    (if thread?
+      {:fx/type fx/ext-on-instance-lifecycle
+       :desc desc}
+      {:fx/type fx/ext-on-instance-lifecycle
+       :on-created #(.setSelectionModel % util-fx-more/no-selection-model)
+       :desc desc})))
+      
 
 (defn create-list-view
   ^ListView [column-id *state db metadata-cache executor]

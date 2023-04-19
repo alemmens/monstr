@@ -4,7 +4,6 @@
    [clojure.string :as str]
    [clojure.tools.logging :as log]
    [clojure.string :as str]
-   [nuestr.consume :as consume]
    [nuestr.domain :as domain]
    [nuestr.file-sys :as file-sys]
    [nuestr.relay-conn :as relay-conn]
@@ -96,6 +95,26 @@
           compare-for-url)
         relays))
 
+(defn maybe-add-relay!
+  "Returns the new Relay if successful, otherwise nil."
+  [url]
+  (when (and (relay-conn/is-relay-url? url)
+             ;; We don't want 'numerical' urls like 'wss://123.456.789'.
+             (not (util/numerical-relay-url? url)))
+    (when-not (domain/find-relay url)
+      (let [r (domain/->Relay url false false true)]
+        (status-bar/message! (format "Adding recommended relay %s" url))
+        ;; Add the recommended relay.
+        (store/insert-relay! store/db r)
+        (swap! domain/*state assoc
+               :relays (sort-relays (conj (:relays @domain/*state) r)
+                                    (:relays-sorted-by @domain/*state)
+                                    (:connected-info @domain/*state)))
+        ;; And try to get server recommendations from the new relay.
+        (relay-conn/add-meta-subscription! url)
+        ;; Return the new relay
+        r))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Header
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -157,7 +176,7 @@
    :disable (boolean (or (not (relay-conn/can-be-used-for-relay-url? relay-search-text))
                          (domain/find-relay relay-search-text)))
    :on-mouse-pressed (fn [_]
-                       (if (consume/maybe-add-relay! relay-search-text)
+                       (if (maybe-add-relay! relay-search-text)
                          (status-bar/message! (format "Added new relay %s" relay-search-text))
                          (status-bar/message! (format "Can't add relay %s" relay-search-text))))
    :text "Add Relay"})

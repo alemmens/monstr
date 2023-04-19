@@ -228,7 +228,7 @@
   [db since]
   (mapv (comp raw-event-tuple->event-obj :raw_event_tuple)
         (jdbc/execute! db
-                       [(format "select raw_event_tuple from n_events where created_at >= %d limit 1000"
+                       [(format "select raw_event_tuple from n_events where created_at >= %d limit 10000"
                                 since)]
                        {:builder-fn rs/as-unqualified-lower-maps})))
 
@@ -256,7 +256,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Loading everything else
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 (defn load-identities
   [db]
@@ -417,3 +416,9 @@
                       [(str "select relay_url from relay_event_id where event_id='" event-id "'")]
                       {:builder-fn rs/as-unqualified-lower-maps})))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Research
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn find-relay-hints []
+  (remove empty? (map parse/relay-hints (load-events-since db 0))))
