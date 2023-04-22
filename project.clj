@@ -4,6 +4,8 @@
   
   :dependencies
   [[org.clojure/clojure "1.10.3"]
+   [org.clojure/math.numeric-tower "0.0.5"]
+   
    [cljfx/cljfx "1.7.22"]   
    [aleph/aleph "0.6.1"]
    

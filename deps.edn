@@ -1,6 +1,7 @@
 {:deps {org.clojure/clojure {:mvn/version "1.11.1"}
+        org.clojure/math.numeric-tower {:mvn/version "0.0.5"}
+        
         cljfx/cljfx {:mvn/version "1.7.22"}
-
         aleph/aleph {:mvn/version "0.6.1"}
         
         fr.acinq.secp256k1/secp256k1-kmp {:mvn/version "0.7.0"}

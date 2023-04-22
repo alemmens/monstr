@@ -421,4 +421,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn find-relay-hints []
-  (remove empty? (map parse/relay-hints (load-events-since db 0))))
+  #_(remove empty? (map parse/relay-hints (load-events-since db 0)))
+  (filter parse/event-has-relay-hints?  (load-events-since db 0))
+  )

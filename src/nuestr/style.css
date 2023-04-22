@@ -50,18 +50,21 @@
 
 .nuestr-info-popup .hyperlink {
     -fx-fill: blue;
+    -fx-text-fill: blue;    
     -fx-margin: 0;
     -fx-border-width: 0;
 }
 
 .nuestr-info-popup .hyperlink:focused {
     -fx-fill: blue;
+    -fx-text-fill: blue;    
     -fx-margin: 0;
     -fx-border-width: 0;
 }
 
 .nuestr-info-popup .hyperlink:visited {
     -fx-fill: blue;
+    -fx-text-fill: blue;        
     -fx-border-width: 0;
     -fx-margin: 0;
     -fx-underline: false;
