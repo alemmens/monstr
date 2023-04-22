@@ -32,20 +32,9 @@
            (javafx.beans.property ReadOnlyProperty)))
 
 
-(defn keycard-create-new
-  [{:keys [show-new-identity? new-identity-error views]}]
-  {:fx/type fx/ext-let-refs
-   :refs {:dialog {:fx/type view-new-identity/dialog
-                   :views views
-                   :show-new-identity? show-new-identity?
-                   :new-identity-error new-identity-error}}
-   :desc {:fx/type :h-box
-          :cursor :hand
-          :style-class ["ndesk-keycard"]
-          :on-mouse-clicked {:event/type :show-new-identity}
-          :children
-          [{:fx/type :label
-            :text "Add account"}]}})
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Contacts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn contact-card
   [{:keys [active? parsed-contact parsed-metadata]}]
@@ -129,6 +118,10 @@
                      :metadata-cache metadata-cache))
                  parsed-contacts)))}}]}))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Main panes
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defn messages [_]
   {:fx/type :label
    :text "messages"})
@@ -211,6 +204,64 @@
    :text label
    :content content})
 
+(defn whats-on-your-mind [{:keys [can-publish?]}]
+  {:fx/type :h-box
+   :alignment :center
+   :children [{:fx/type publish-box
+               :can-publish? can-publish?
+               :h-box/margin 5
+               :min-width 300
+               :max-width 600}
+              {:fx/type :label
+               :h-box/margin 5
+               :graphic {:fx/type :button
+                         ;; NOTE: :on-action and :on-mouse-clicked don't seem to work
+                         ;; when the publish text-area has focus but :on-mouse-pressed
+                         ;; does.
+                         :on-mouse-pressed {:event/type :publish!}
+                         :disable (not can-publish?)
+                         :style-class ["button" "ndesk-publish-button"]
+                         :text "Publish"}}]})
+
+
+(defn column-header [{:keys [column show-thread? listview visible-column-ids]}]
+  (let [column-id (:id column)
+        name (:name (:view column))]
+    {:fx/type :h-box
+     :alignment :center
+     :spacing 10
+     :style-class "relay-timeline-label"
+     :children (remove nil?
+                       [{:fx/type :h-box :h-box/hgrow :always}
+                        (when show-thread?
+                          (timeline/back-from-thread-button column nil))
+                        {:fx/type :label
+                         :text (if show-thread?
+                                 (format "thread: %s" name)
+                                 name)
+                         :padding 5}
+                        {:fx/type :button
+                         :padding 5
+                         :on-mouse-pressed {:event/type :remove-visible-column
+                                            :column-id column-id}
+                         :text "x"}
+                        {:fx/type :h-box :h-box/hgrow :always}
+                        (when (= column-id (last visible-column-ids))
+                          {:fx/type add-column-button
+                           :text "+"
+                           :visible-column-ids visible-column-ids
+                           :all-column-ids (domain/all-column-ids)})])}))
+
+(defn column-pane [{:keys [column show-thread? listview visible-column-ids]}]
+  {:fx/type :v-box
+   :children [{:fx/type column-header
+               :column column
+               :show-thread? show-thread?
+               :listview listview
+               :visible-column-ids visible-column-ids}
+              {:fx/type main-pane
+               :listview listview}]})
+  
 (defn main-panes
   [{:keys [views visible-column-ids all-columns
            relays show-add-column-dialog? can-publish?
@@ -223,25 +274,11 @@
   {:fx/type :v-box
    :children
    [;; The "what's on your mind?" box.
-    {:fx/type :h-box
-     :alignment :center
-     :children [{:fx/type publish-box
-                 :can-publish? can-publish?
-                 :h-box/margin 5
-                 :min-width 300
-                 :max-width 600}
-                {:fx/type :label
-                 :h-box/margin 5
-                 :graphic {:fx/type :button
-                           ;; NOTE: :on-action and :on-mouse-clicked don't seem to work
-                           ;; when the publish text-area has focus but :on-mouse-pressed
-                           ;; does.
-                           :on-mouse-pressed {:event/type :publish!}
-                           :disable (not can-publish?)
-                           :style-class ["button" "ndesk-publish-button"]
-                           :text "Publish"}}]}
+    {:fx/type whats-on-your-mind
+     :can-publish? can-publish?}
     ;; Columns
     {:fx/type :h-box
+     :spacing 5
      :children
      (if (seq visible-column-ids)
        (map (fn [column-id]
@@ -258,52 +295,15 @@
                               column-id (:name (:view column))
                               show-thread?
                               pair listview))
-                {:fx/type :v-box
-                 :h-box/margin 5
-                 :h-box/hgrow :always
-                 :children [{:fx/type :h-box
-                             :alignment :center
-                             :spacing 10
-                             :style-class "relay-timeline-label"
-                             :children (remove nil?
-                                               [{:fx/type :h-box :h-box/hgrow :always}
-                                                (when show-thread?
-                                                  (timeline/back-from-thread-button column nil))
-                                                {:fx/type :label
-                                                 :text (if show-thread?
-                                                         (format "thread: %s" name)
-                                                         name)
-                                                 :padding 5}
-                                                #_ ; not necessary anymore
-                                                (when (and show-thread? (seq (:missing-ids column)))
-                                                  ;; We have some missing events in the
-                                                  ;; thread.  Show a 'refresh' button to
-                                                  ;; indicate that there's a chance that
-                                                  ;; the events can be shown now.
-                                                  {:fx/type :button
-                                                   :text (str (char 0x21bb)) ; clockwise open-circle arrow
-                                                   :padding 5
-                                                   :on-mouse-pressed (fn [e]
-                                                                       (timeline/refresh-column-thread! domain/*state
-                                                                                                        column
-                                                                                                        nil))})
-                                                {:fx/type :button
-                                                 :padding 5
-                                                 :on-mouse-pressed {:event/type :remove-visible-column
-                                                                    :column-id column-id}
-                                                 :text "x"}
-                                                {:fx/type :h-box :h-box/hgrow :always}
-                                                (when (= column-id (last visible-column-ids))
-                                                  {:fx/type add-column-button
-                                                   :text "+"
-                                                   :visible-column-ids visible-column-ids
-                                                   :all-column-ids (domain/all-column-ids)})])}
-                            {:fx/type main-pane
-                             :listview listview}]}))
+                {:fx/type column-pane
+                 :column column
+                 :show-thread? show-thread?
+                 :listview listview
+                 :visible-column-ids visible-column-ids}))
             visible-column-ids)
-       ;; If there are no relay timelines, just show an "Add timeline" button (centered).
+       ;; If there are no columns, just show an "Add column" button (centered).
        [{:fx/type :h-box :h-box/hgrow :always}
-        (add-column-button "Add timeline")
+        (add-column-button "Add column")
         {:fx/type :h-box :h-box/hgrow :always}])}]})
 
 
@@ -408,24 +408,24 @@
                    :closable closable
                    :content content})}})
 
-(defn keycards
-  [{:keys [active-key views identities identity-metadata show-new-identity? new-identity-error]}]
-  {:fx/type :v-box
-   :style-class "ndesk-lhs-pane"
-   :children (vec
-               (concat
-                 (map
-                   #(hash-map
-                      :fx/type tab-profile/keycard
-                      :fx/key (:public-key %)
-                      :active? (= active-key (:public-key %))
-                      :identity_ %
-                      :this-identity-metadata (get identity-metadata (:public-key %)))
-                   identities)
-                 [{:fx/type keycard-create-new
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Accounts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn keycard-create-new
+  [{:keys [show-new-identity? new-identity-error views]}]
+  {:fx/type fx/ext-let-refs
+   :refs {:dialog {:fx/type view-new-identity/dialog
                    :views views
                    :show-new-identity? show-new-identity?
-                   :new-identity-error new-identity-error}]))})
+                   :new-identity-error new-identity-error}}
+   :desc {:fx/type :h-box
+          :cursor :hand
+          :style-class ["ndesk-keycard"]
+          :on-mouse-clicked {:event/type :show-new-identity}
+          :children
+          [{:fx/type :label
+            :text "Add account"}]}})
 
 (defn identity-selector
   [{:keys [identities views active-key identity-metadata show-new-identity?]}]
@@ -457,6 +457,9 @@
                  [label combo-box add-new-button]
                  [label add-new-button]))})
               
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Stage
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn root [{:keys [visible-column-ids all-columns
                     views selected-view temp-view temp-view-changed?
