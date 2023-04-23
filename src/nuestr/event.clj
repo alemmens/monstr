@@ -15,7 +15,6 @@
     [nuestr.timeline :as timeline]
     [nuestr.util :as util]
     [nuestr.util-domain :as util-domain]
-    [nuestr.view-home :as view-home]
     [nuestr.x.crypt :as crypt]
     [manifold.deferred :as d])
   (:import (javafx.scene.control DialogEvent Dialog Button TextArea)
@@ -383,17 +382,6 @@ will be removed when the view is deleted. Continue?"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Managing profiles
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defn open-profile [ui-event pubkey]
-  ;; Add a new profile tab.
-  (timeline/maybe-add-open-profile-state! pubkey)
-  (fx/run-later ; run later, otherwise the new tab doesn't exist yet
-   ;; Select the tab that we just added.
-   (let [scene (.getScene (.getSource ui-event))
-         tab-pane (.lookup scene "#nuestr-tabs")
-         index (+ 4 ; HACK: 4 is the number of tabs before the first Profile tab.
-                  (util/position pubkey (keys (:open-profile-states @domain/*state))))]
-     (.select (.getSelectionModel tab-pane) index))))
 
 (defn- save-following-views
   [{:keys [views pubkey]}]

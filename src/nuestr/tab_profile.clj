@@ -6,6 +6,7 @@
    [nuestr.domain :as domain]
    [nuestr.file-sys :as file-sys]
    [nuestr.media :as media]
+   [nuestr.nip19 :as nip19]
    [nuestr.status-bar :as status-bar]
    [nuestr.store :as store]
    [nuestr.timeline :as timeline]
@@ -45,11 +46,12 @@
                               {:fx/type :label
                                :alignment :top-left
                                :style-class ["label" "ndesk-keycard-pubkey"]
-                               :text (if profile?
-                                       ;; In the profile tab we have enough room to
-                                       ;; show the whole public key.
-                                       public-key
-                                       (util/format-pubkey-short public-key))}]}]}
+                               :text (let [npub (nip19/encode "npub" public-key)]
+                                       (if profile?
+                                         ;; In the profile tab we have enough room to
+                                         ;; show the whole public key.
+                                         npub
+                                         (util/format-string-short npub)))}]}]}
                 {:fx/type :h-box
                  :padding 10
                  :children [{:fx/type :text

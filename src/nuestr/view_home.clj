@@ -223,7 +223,7 @@
     ;; Set the content.
     (.setText event-id-label (str "Event id: " event-id-short))    
     (.setUserData copy-event-id-hyperlink {:event-id item-id})
-    (.setText pubkey-label (str "Author pubkey: " (util/format-pubkey-short author-pubkey)))
+    (.setText pubkey-label (str "Author: " (util/format-string-short (nip19/encode "npub" author-pubkey))))
     (.setUserData copy-author-pubkey-hyperlink {:author-pubkey author-pubkey})
     (let [items (FXCollections/observableList (vec seen-on-relays))]
       (.setItems seen-on-list items))
@@ -323,19 +323,11 @@
    :left {:fx/type :h-box
           :cursor :hand
           :style-class "nuestr-author-hbox"
-          :on-mouse-clicked (fn [e]
-                              ;; Add a new profile tab.
-                              (timeline/maybe-add-open-profile-state! pubkey)
-                              (fx/run-later ; run later, otherwise the new tab doesn't exist yet
-                               ;; Select the tab that we just added.
-                               (let [scene (.getScene (.getSource e))
-                                     tab-pane (.lookup scene "#nuestr-tabs")
-                                     index (+ 4 ; HACK: 4 is the number of tabs before the first Profile tab.
-                                              (util/position pubkey (keys (:open-profile-states @domain/*state))))]
-                                 (.select (.getSelectionModel tab-pane) index))))
+          :on-mouse-clicked (fn [e] (timeline/open-profile e pubkey))
           :children [{:fx/type :label
                       :style-class "ndesk-timeline-item-name"
                       :text name}
+                     #_
                      {:fx/type :label
                       :style-class "ndesk-timeline-item-pubkey"
                       :text (or (some-> pubkey util/format-pubkey-short) "?")}]}

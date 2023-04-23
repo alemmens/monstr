@@ -415,23 +415,6 @@
 ;;; Accounts
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-#_
-(defn keycard-create-new
-  [{:keys [show-new-identity? new-identity-error views]}]
-  {:fx/type fx/ext-let-refs
-   :refs {:dialog {:fx/type view-new-identity/dialog
-                   :views views
-                   :show-new-identity? show-new-identity?
-                   :new-identity-error new-identity-error}}
-   :desc {:fx/type :h-box
-          :cursor :hand
-          :style-class ["ndesk-keycard"]
-          :on-mouse-clicked {:event/type :show-new-identity}
-          :max-height 15          
-          :children
-          [{:fx/type :label
-            :text "Add account"}]}})
-
 (defn keycard-create-new
   [{:keys [show-new-identity? new-identity-error views]}]
   {:fx/type fx/ext-let-refs
@@ -502,7 +485,7 @@
                :text "Search" ; (str (char 0x2315))}
                :on-mouse-pressed (fn [e]
                                    (if-let [pubkey-hex (parse-search-text (:search-text @domain/*state))]
-                                     (event/open-profile e pubkey-hex)
+                                     (timeline/open-profile e pubkey-hex)
                                      (modal/info-popup "Search string not found.")))}]})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -262,6 +262,17 @@
                                                        domain/daemon-scheduled-executor))))
     (add-profile-notes pubkey))))
 
+(defn open-profile [ui-event pubkey]
+  ;; Add a new profile tab.
+  (maybe-add-open-profile-state! pubkey)
+  (fx/run-later ; run later, otherwise the new tab doesn't exist yet
+   ;; Select the tab that we just added.
+   (let [scene (.getScene (.getSource ui-event))
+         tab-pane (.lookup scene "#nuestr-tabs")
+         index (+ 4 ; HACK: 4 is the number of tabs before the first Profile tab.
+                  (util/position pubkey (keys (:open-profile-states @domain/*state))))]
+     (.select (.getSelectionModel tab-pane) index))))
+
 (defn update-active-timelines!
   "Update the active timelines for the identity with the given public key."
   [*state public-key] ;; note public-key may be nil!

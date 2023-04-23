@@ -58,6 +58,13 @@
   (every? #(re-matches #"\d+" %)
           (str/split (relay-url-short url) #"(\.|:)")))
 
+(defn format-string-short [string]
+  (if (> (count string) 15)
+    (str (subs string 0 10)
+         "..."
+         (subs string (- (count string) 5)))
+    string))
+
 (defn format-pubkey-short
   [pubkey]
   (str (subs pubkey 0 3) "..." (subs pubkey (- (count pubkey) 4))))
