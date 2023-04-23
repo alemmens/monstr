@@ -8,11 +8,14 @@
    [clojure.tools.logging :as log]
    [nuestr.cache :as cache]
    [nuestr.domain :as domain]
-   [nuestr.event :as ev]
+   [nuestr.event :as event]
    [nuestr.media :as media]
    [nuestr.metadata :as metadata]
+   [nuestr.modal :as modal]
+   [nuestr.nip19 :as nip19]
    [nuestr.relay-conn :as relay-conn]
    [nuestr.status-bar :as status-bar]
+   [nuestr.store :as store]
    [nuestr.style :as style :refer [BORDER|]]
    [nuestr.subscribe :as subscribe]
    [nuestr.tab-profile :as tab-profile]
@@ -412,6 +415,7 @@
 ;;; Accounts
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+#_
 (defn keycard-create-new
   [{:keys [show-new-identity? new-identity-error views]}]
   {:fx/type fx/ext-let-refs
@@ -423,20 +427,29 @@
           :cursor :hand
           :style-class ["ndesk-keycard"]
           :on-mouse-clicked {:event/type :show-new-identity}
+          :max-height 15          
           :children
           [{:fx/type :label
             :text "Add account"}]}})
 
+(defn keycard-create-new
+  [{:keys [show-new-identity? new-identity-error views]}]
+  {:fx/type fx/ext-let-refs
+   :refs {:dialog {:fx/type view-new-identity/dialog
+                   :views views
+                   :show-new-identity? show-new-identity?
+                   :new-identity-error new-identity-error}}
+   :desc {:fx/type :button
+          :padding 5
+          :on-mouse-clicked {:event/type :show-new-identity}
+          :text "Add account"}})
+
 (defn identity-selector
   [{:keys [identities views active-key identity-metadata show-new-identity?]}]
   {:fx/type :h-box
-   ; :alignment :center
-   :padding 10
-   :children (let [label {:fx/type :label
-                          :alignment :center
-                          :padding 10
-                          :text "Account: "}
-                   combo-box (when active-key
+   :spacing 5
+   :padding 14
+   :children (let [combo-box (when active-key
                                {:fx/type :combo-box
                                 :value (or (:name (get identity-metadata active-key))
                                            active-key)
@@ -450,13 +463,48 @@
                                                :describe (fn [k] {:text (:name (get identity-metadata k))})}
                                 :items (sort-by #(:name (get identity-metadata %))
                                                 (keys identity-metadata))})
-                   add-new-button {:fx/type keycard-create-new
-                                   :padding 5
-                                   :show-new-identity? show-new-identity?}]
+                   add-new-button {:fx/type :v-box
+                                   :padding 4
+                                   :children [{:fx/type keycard-create-new
+                                               :show-new-identity? show-new-identity?}]}]
                (if active-key
-                 [label combo-box add-new-button]
-                 [label add-new-button]))})
-              
+                 [combo-box add-new-button]
+                 [add-new-button]))})
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Search
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn parse-search-text [string]
+  (if-let [pubkey-hex (if (str/starts-with? string "npub")
+                        (second (nip19/decode string))
+                        string)]
+    (when (seq (store/load-metadata store/db [pubkey-hex]))
+      pubkey-hex)))
+       
+(defn search-pane [{:keys [search-text]}]
+  {:fx/type :h-box
+   :spacing 5
+   :padding 18
+   :children [{:fx/type :text-field
+               :max-width 500
+               :min-width 400
+               :padding 5
+               :prompt-text "npub or raw pubkey"
+               :text (or search-text "")
+               :style-class ["text-input"]
+               :on-text-changed  (fn [new-text]
+                                   (swap! domain/*state assoc
+                                          :search-text new-text))}
+              {:fx/type :button
+               :padding 5
+               :text "Search" ; (str (char 0x2315))}
+               :on-mouse-pressed (fn [e]
+                                   (if-let [pubkey-hex (parse-search-text (:search-text @domain/*state))]
+                                     (event/open-profile e pubkey-hex)
+                                     (modal/info-popup "Search string not found.")))}]})
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Stage
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -470,6 +518,7 @@
                     show-new-identity? new-identity-error active-reply-context contact-lists
                     identity-active-contact metadata-cache
                     last-refresh
+                    search-text
                     status-message status-message-timestamp
                     debug-message
                     open-profile-states
@@ -485,6 +534,8 @@
                      :active-key active-key
                      :show-new-identity? show-new-identity?
                      :identity-metadata identity-metadata}
+                    {:fx/type search-pane
+                     :search-text search-text}
                     {:fx/type :label
                      :text (or debug-message "")}
                     {:fx/type :h-box :h-box/hgrow :always}
@@ -531,6 +582,7 @@
                      show-new-identity? new-identity-error active-reply-context
                      contact-lists identity-active-contact metadata-cache
                      last-refresh views selected-view temp-view temp-view-changed?
+                     search-text
                      status-message status-message-timestamp
                      debug-message
                      open-profile-states
@@ -568,6 +620,7 @@
            :show-add-column-dialog? show-add-column-dialog?
            :new-timeline new-timeline
            :metadata-cache metadata-cache
+           :search-text search-text
            :status-message status-message
            :status-message-timestamp status-message-timestamp
            :debug-message debug-message

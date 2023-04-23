@@ -24,6 +24,12 @@
     -fx-background-color: lightyellow;
 }
 
+.nuestr-search-icon {
+    -fx-font-family: "Roboto";
+    -fx-font-size: 15pt;
+    -fx-font-weight: normal;
+}
+
 .nuestr-view-name {
     -fx-font-weight: bold;
 }

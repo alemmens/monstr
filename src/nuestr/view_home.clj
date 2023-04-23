@@ -8,6 +8,7 @@
             [nuestr.links :as links]
             [nuestr.media :as media]
             [nuestr.metadata :as metadata]
+            [nuestr.nip19 :as nip19]
             [nuestr.relay-conn :as relay-conn]
             [nuestr.rich-text :as rich-text]
             [nuestr.status-bar :as status-bar]
@@ -199,7 +200,7 @@
                                 :on-action (fn [^ActionEvent e]
                                              (when-let [content
                                                         (some-> e ^Hyperlink .getSource .getUserData :author-pubkey)]
-                                               (util/put-clipboard! content)))}]}
+                                               (util/put-clipboard! (nip19/encode "npub" content))))}]}
                    {:fx/type :label
                     :text "Relays:"}
                    {:fx/type :list-view

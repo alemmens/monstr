@@ -22,3 +22,17 @@
       ^ButtonType (.orElse nil)
       .getButtonData
       (= ButtonBar$ButtonData/OK_DONE))))
+
+(defn info-popup
+  "Just shows a message and waits for user to click on OK."
+  [message]
+  (let [alert (Alert. Alert$AlertType/INFORMATION)
+        ^Button ok-button (-> alert .getDialogPane (.lookupButton ButtonType/OK))]
+    (.setHeaderText alert nil)
+    (.setContentText alert message)
+    (.setText ok-button "OK")
+    (some-> alert
+      .showAndWait
+      ^ButtonType (.orElse nil)
+      .getButtonData
+      (= ButtonBar$ButtonData/OK_DONE))))
