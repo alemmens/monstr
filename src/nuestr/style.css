@@ -90,8 +90,8 @@
 
 .ndesk-keycard {
     -fx-padding: 15px;
-    -fx-border-insets: 2px;
-    -fx-background-insets: 5px;
+    -fx-border-insets: 0px;
+    -fx-background-insets: 0px;
     -fx-border-color: -nd-basic-border-color;
     -fx-background-color: white;
 }
@@ -115,6 +115,7 @@
 }
 
 .ndesk-keycard-about {
+    -fx-font-size: 12pt;
     -fx-padding: 20px;
 }
 

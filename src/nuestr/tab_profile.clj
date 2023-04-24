@@ -23,6 +23,7 @@
     (log/debugf "Keycard for %s with metadata %s" public-key metadata)
     {:fx/type :v-box
      :pref-width 600
+     :padding 0
      :spacing 15
      :style-class ["ndesk-keycard"]                   
      :children (remove nil?
@@ -55,10 +56,9 @@
                                                  npub
                                                  (util/format-string-short npub)))}]}]}
                         {:fx/type :h-box
-                                        ; :padding 10
                          :children [{:fx/type :text
                                      :style-class "ndesk-keycard-about"
-                                     :wrapping-width 400
+                                     :wrapping-width 500
                                      :text (or (:about metadata) "")}]}
                         (when identity_
                           {:fx/type :button
@@ -127,6 +127,7 @@
     (log/debugf "Following views: %s" (pr-str following-views))
     {:fx/type :scroll-pane
      :padding 20
+     :pref-width 600
      :hbar-policy :never
      :vbar-policy :as-needed
      :content {:fx/type :v-box
@@ -155,7 +156,7 @@
   [{:keys [pubkey open-profile-states identities identity-metadata views]}]
   {:fx/type :h-box
    :padding 10
-   :spacing 10
+   :spacing 1;  10
    :children [#_ ; TODO: FINISH THIS
               {:fx/type followers-pane
                :pubkey pubkey
@@ -180,7 +181,7 @@
                    (:flat-listview timeline-pair))]
     (log/debugf "%d user posts" (count (:item-ids (domain/timeline timeline-pair thread?))))
     {:fx/type :v-box
-     :padding 10
+     ; :padding 10
      :children (if (nil? listview)
                  []
                  [{:fx/type :h-box
@@ -205,10 +206,10 @@
     (if pubkey
       {:fx/type :h-box
        :padding 10
-       :spacing 10
+       :spacing 20
        :children [{:fx/type :v-box
                    ; :padding 10
-                   :spacing 5
+                   :spacing 1;  5
                    :children (remove nil?
                                      [{:fx/type :h-box
                                        :padding 10
