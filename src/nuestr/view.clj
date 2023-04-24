@@ -227,7 +227,7 @@
                          :text "Publish"}}]})
 
 
-(defn column-header [{:keys [column show-thread? listview visible-column-ids]}]
+(defn column-header [{:keys [column show-thread? listview visible-column-ids all-columns]}]
   (let [column-id (:id column)
         name (:name (:view column))]
     {:fx/type :h-box
@@ -253,14 +253,15 @@
                           {:fx/type add-column-button
                            :text "+"
                            :visible-column-ids visible-column-ids
-                           :all-column-ids (domain/all-column-ids)})])}))
+                           :all-column-ids (map :id all-columns)})])}))
 
-(defn column-pane [{:keys [column show-thread? listview visible-column-ids]}]
+(defn column-pane [{:keys [column show-thread? listview all-columns visible-column-ids]}]
   {:fx/type :v-box
    :children [{:fx/type column-header
                :column column
                :show-thread? show-thread?
                :listview listview
+               :all-columns all-columns
                :visible-column-ids visible-column-ids}
               {:fx/type main-pane
                :listview listview}]})
@@ -302,6 +303,7 @@
                  :column column
                  :show-thread? show-thread?
                  :listview listview
+                 :all-columns all-columns
                  :visible-column-ids visible-column-ids}))
             visible-column-ids)
        ;; If there are no columns, just show an "Add column" button (centered).
@@ -460,11 +462,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn parse-search-text [string]
-  (if-let [pubkey-hex (if (str/starts-with? string "npub")
-                        (second (nip19/decode string))
-                        string)]
-    (when (seq (store/load-metadata store/db [pubkey-hex]))
-      pubkey-hex)))
+  (if (str/starts-with? string "npub")
+    (second (nip19/decode string))
+    (when (seq (store/load-metadata store/db [string]))
+      string)))
        
 (defn search-pane [{:keys [search-text]}]
   {:fx/type :h-box
@@ -485,7 +486,15 @@
                :text "Search" ; (str (char 0x2315))}
                :on-mouse-pressed (fn [e]
                                    (if-let [pubkey-hex (parse-search-text (:search-text @domain/*state))]
-                                     (timeline/open-profile e pubkey-hex)
+                                     (let [subscription-id (format "profile:%s:%s"
+                                                                    (:id (get (:open-profile-states @domain/*state) pubkey-hex))
+                                                                    (rand-int 1000000000))]
+                                       (util/submit! domain/daemon-scheduled-executor
+                                                     (fn []
+                                                       (relay-conn/subscribe-all! subscription-id
+                                                                                  [{:authors [pubkey-hex] :kinds [0 1]}]
+                                                                                  #(or (:read? %) (:meta? %)))))
+                                       (timeline/open-profile e pubkey-hex))
                                      (modal/info-popup "Search string not found.")))}]})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
