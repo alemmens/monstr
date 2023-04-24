@@ -5,6 +5,7 @@
             [nuestr.domain :as domain]
             [nuestr.file-sys :as file-sys]
             [nuestr.metadata :as metadata]
+            [nuestr.modal :as modal]
             [nuestr.parse :as parse]
             [nuestr.relay-conn :as relay-conn]
             [nuestr.status-bar :as status-bar]
@@ -248,34 +249,35 @@
     (let [view-home (find-ns 'nuestr.view-home)
           list-creator (ns-resolve view-home (symbol "create-list-view"))
           thread-creator (ns-resolve view-home (symbol "create-thread-view"))]
-    (swap! domain/*state assoc-in
-           [:open-profile-states pubkey]
-           (domain/new-profile-state pubkey
-                                     (fn []
-                                       (list-creator nil
-                                                     domain/*state
-                                                     store/db
-                                                     metadata/cache
-                                                     domain/daemon-scheduled-executor))
-                                     (fn []
-                                       (thread-creator nil pubkey
+      (swap! domain/*state assoc-in
+             [:open-profile-states pubkey]
+             (domain/new-profile-state pubkey
+                                       (fn []
+                                         (list-creator nil
                                                        domain/*state
                                                        store/db
                                                        metadata/cache
-                                                       domain/daemon-scheduled-executor)))))))
+                                                       domain/daemon-scheduled-executor))
+                                       (fn []
+                                         (thread-creator nil pubkey
+                                                         domain/*state
+                                                         store/db
+                                                         metadata/cache
+                                                         domain/daemon-scheduled-executor)))))
+    (get-profile-events pubkey)
+    (util/submit! domain/daemon-scheduled-executor
+                  (fn []
+                    (let [subscription-id (format "profile:%s:%s"
+                                                  (:id (get (:open-profile-states @domain/*state) pubkey))
+                                                  (rand-int 1000000000))]
+                      (relay-conn/subscribe-all! subscription-id
+                                                 [{:authors [pubkey] :kinds [0 1] :limit 1000}]
+                                                 #(or (:read? %) (:meta? %))))))))
+
 
 (defn open-profile [ui-event pubkey]
   ;; Add a new profile tab.
   (maybe-add-open-profile-state! pubkey)
-  (get-profile-events pubkey)  
-  (util/submit! domain/daemon-scheduled-executor
-                (fn []
-                  (let [subscription-id (format "profile:%s:%s"
-                                                (:id (get (:open-profile-states @domain/*state) pubkey))
-                                                (rand-int 1000000000))]
-                    (relay-conn/subscribe-all! subscription-id
-                                               [{:authors [pubkey] :kinds [0 1] :limit 1000}]
-                                               #(or (:read? %) (:meta? %))))))
   ;; Select the tab that we just added.  
   (fx/run-later ; run later, otherwise the new tab doesn't exist yet
    (let [scene (.getScene (.getSource ui-event))

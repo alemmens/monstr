@@ -89,7 +89,7 @@
 }
 
 .ndesk-keycard {
-    -fx-padding: 5px;
+    -fx-padding: 15px;
     -fx-border-insets: 2px;
     -fx-background-insets: 5px;
     -fx-border-color: -nd-basic-border-color;

@@ -23,41 +23,48 @@
     (log/debugf "Keycard for %s with metadata %s" public-key metadata)
     {:fx/type :v-box
      :pref-width 600
+     :spacing 15
      :style-class ["ndesk-keycard"]                   
-     :children [{:fx/type :h-box
-                 :children
-                 [(if (str/blank? picture-url)
-                    {:fx/type :label
-                     :min-width avatar-dim
-                     :min-height avatar-dim
-                     :max-width avatar-dim
-                     :max-height avatar-dim
-                     :style {:-fx-background-color avatar-color}
-                     :style-class "ndesk-keycard-photo"
-                     :text (subs public-key 0 3)}
-                    {:fx/type media/avatar
-                     :picture-url picture-url
-                     :width avatar-dim})
-                  {:fx/type :v-box
-                   :children [{:fx/type :label
-                               :alignment :top-left
-                               :style-class ["label" "ndesk-keycard-name"]
-                               :text (or (:name metadata) "")}
-                              {:fx/type :label
-                               :alignment :top-left
-                               :style-class ["label" "ndesk-keycard-pubkey"]
-                               :text (let [npub (nip19/encode "npub" public-key)]
-                                       (if profile?
-                                         ;; In the profile tab we have enough room to
-                                         ;; show the whole public key.
-                                         npub
-                                         (util/format-string-short npub)))}]}]}
-                {:fx/type :h-box
-                 :padding 10
-                 :children [{:fx/type :text
-                             :style-class "ndesk-keycard-about"
-                             :wrapping-width 400
-                             :text (or (:about metadata) "")}]}]}))
+     :children (remove nil?
+                       [{:fx/type :h-box
+                         :children
+                         [(if (str/blank? picture-url)
+                            {:fx/type :label
+                             :min-width avatar-dim
+                             :min-height avatar-dim
+                             :max-width avatar-dim
+                             :max-height avatar-dim
+                             :style {:-fx-background-color avatar-color}
+                             :style-class "ndesk-keycard-photo"
+                             :text (subs public-key 0 3)}
+                            {:fx/type media/avatar
+                             :picture-url picture-url
+                             :width avatar-dim})
+                          {:fx/type :v-box
+                           :children [{:fx/type :label
+                                       :alignment :top-left
+                                       :style-class ["label" "ndesk-keycard-name"]
+                                       :text (or (:name metadata) "")}
+                                      {:fx/type :label
+                                       :alignment :top-left
+                                       :style-class ["label" "ndesk-keycard-pubkey"]
+                                       :text (let [npub (nip19/encode "npub" public-key)]
+                                               (if profile?
+                                                 ;; In the profile tab we have enough room to
+                                                 ;; show the whole public key.
+                                                 npub
+                                                 (util/format-string-short npub)))}]}]}
+                        {:fx/type :h-box
+                                        ; :padding 10
+                         :children [{:fx/type :text
+                                     :style-class "ndesk-keycard-about"
+                                     :wrapping-width 400
+                                     :text (or (:about metadata) "")}]}
+                        (when identity_
+                          {:fx/type :button
+                           :text "Delete account"
+                           :on-action {:event/type :delete-account
+                                       :identity identity_}})])}))
 
 (defn followers-pane
   [{:keys [pubkey open-profile-states identities identity-metadata]}]
@@ -147,6 +154,7 @@
 (defn follows
   [{:keys [pubkey open-profile-states identities identity-metadata views]}]
   {:fx/type :h-box
+   :padding 10
    :spacing 10
    :children [#_ ; TODO: FINISH THIS
               {:fx/type followers-pane
@@ -199,10 +207,11 @@
        :padding 10
        :spacing 10
        :children [{:fx/type :v-box
-                   :padding 10
-                   :spacing 10
+                   ; :padding 10
+                   :spacing 5
                    :children (remove nil?
                                      [{:fx/type :h-box
+                                       :padding 10
                                        :children [{:fx/type keycard
                                                    :fx/key pubkey
                                                    :public-key pubkey
@@ -211,11 +220,6 @@
                                                    :identity_ identity
                                                    :metadata metadata}
                                                   ]}
-                                      (when identity
-                                        {:fx/type :button
-                                         :text "Delete account"
-                                         :on-action {:event/type :delete-account
-                                                     :identity identity}})
                                       {:fx/type follows
                                        :pubkey pubkey
                                        :open-profile-states open-profile-states
