@@ -308,7 +308,5 @@
       (is (= data data_))
       (is (= (encode prefix_ data_) entity)))))
 
-(run-tests 'nuestr.nip19)
-
   
 

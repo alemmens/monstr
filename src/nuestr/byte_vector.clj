@@ -241,5 +241,3 @@ String: '"
   (assert (every? #(<= 0 % 1) bits))
   (clojure.string/join (map #(if (= 0 %) "0" "1") bits)))
 
-
-(run-tests 'nuestr.byte-vector)
