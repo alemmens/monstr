@@ -189,14 +189,21 @@
   "Dispatch a text note to all timelines for which the given event is relevant.
   If COLUMN-ID is a string, the note is flat-dispatched to the specified column. Otherwise
   the note is dispatched to all columns."
-  [*state column-id event-obj]
+  [*state column-or-profile-id event-obj profile?]
   ;; CONSIDER if this is too much usage of on-fx-thread - do we need to batch/debounce?
   (fx/run-later
-   (if (string? column-id)
-     (let [column (domain/find-column-by-id column-id)]     
-       (flat-dispatch-for-column *state event-obj column))
-     (doseq [column (:all-columns @*state)]
-       (flat-dispatch-for-column *state event-obj column)))))
+   (if profile?
+     (when-let [profile-state (domain/find-profile-state-by-id column-or-profile-id)]
+       (flat-dispatch! domain/*state
+                       (:flat-timeline (:timeline-pair profile-state))
+                       (:pubkey profile-state)
+                       event-obj
+                       nil))
+     (if (string? column-or-profile-id)
+       (let [column (domain/find-column-by-id column-or-profile-id)]     
+         (flat-dispatch-for-column *state event-obj column))
+       (doseq [column (:all-columns @*state)]
+         (flat-dispatch-for-column *state event-obj column))))))
 
 (defn- update-timeline-pair! [pair]
   (.setItems (:flat-listview pair)
@@ -212,20 +219,16 @@
     (update-timeline-pair! pair)))
 
 
-(defn add-profile-notes [pubkey]
+(defn- get-profile-events [pubkey]
   (fx/run-later
-   (log/debugf "Adding profile notes for %s, relays=%s"
+   (log/debugf "Getting profile events for %s, relays=%s"
                pubkey
                (pr-str (domain/relay-urls @domain/*state)))
    (when-let [profile-state (get (:open-profile-states @domain/*state) pubkey)]
      (update-timeline-pair! (:timeline-pair profile-state))
      (doseq [r (domain/relay-urls @domain/*state)]
        (let [events (store/load-relay-events store/db r [pubkey])]
-         (status-bar/message! (format "Loaded %d database events from %s"
-                                      (count events)
-                                      r))
          (doseq [e events]
-           #_(log/debugf "Dispatching '%s' for %s" (:content e) pubkey)
            (flat-dispatch! domain/*state
                            (:flat-timeline (:timeline-pair profile-state))
                            pubkey
@@ -259,14 +262,22 @@
                                                        domain/*state
                                                        store/db
                                                        metadata/cache
-                                                       domain/daemon-scheduled-executor))))
-    (add-profile-notes pubkey))))
+                                                       domain/daemon-scheduled-executor)))))))
 
 (defn open-profile [ui-event pubkey]
   ;; Add a new profile tab.
   (maybe-add-open-profile-state! pubkey)
+  (get-profile-events pubkey)  
+  (util/submit! domain/daemon-scheduled-executor
+                (fn []
+                  (let [subscription-id (format "profile:%s:%s"
+                                                (:id (get (:open-profile-states @domain/*state) pubkey))
+                                                (rand-int 1000000000))]
+                    (relay-conn/subscribe-all! subscription-id
+                                               [{:authors [pubkey] :kinds [0 1] :limit 1000}]
+                                               #(or (:read? %) (:meta? %))))))
+  ;; Select the tab that we just added.  
   (fx/run-later ; run later, otherwise the new tab doesn't exist yet
-   ;; Select the tab that we just added.
    (let [scene (.getScene (.getSource ui-event))
          tab-pane (.lookup scene "#nuestr-tabs")
          index (+ 4 ; HACK: 4 is the number of tabs before the first Profile tab.
@@ -295,7 +306,7 @@
   (when (seq ids)
     (let [profile-state (get (:open-profile-states @domain/*state) pubkey)
           subscription-id (format "%s:%s:%s"
-                                  (if column-id "thread" "profile")
+                                  (if column-id "thread" "pt")  ; pt = profile thread
                                   (or column-id (:id profile-state))
                                   (rand-int 1000000000))]
       ;; TODO: Don't subscribe to all relays, but try to use only relevant relays.

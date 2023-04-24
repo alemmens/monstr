@@ -485,16 +485,8 @@
                :padding 5
                :text "Search" ; (str (char 0x2315))}
                :on-mouse-pressed (fn [e]
-                                   (if-let [pubkey-hex (parse-search-text (:search-text @domain/*state))]
-                                     (let [subscription-id (format "profile:%s:%s"
-                                                                    (:id (get (:open-profile-states @domain/*state) pubkey-hex))
-                                                                    (rand-int 1000000000))]
-                                       (util/submit! domain/daemon-scheduled-executor
-                                                     (fn []
-                                                       (relay-conn/subscribe-all! subscription-id
-                                                                                  [{:authors [pubkey-hex] :kinds [0 1]}]
-                                                                                  #(or (:read? %) (:meta? %)))))
-                                       (timeline/open-profile e pubkey-hex))
+                                   (if-let [pubkey (parse-search-text (:search-text @domain/*state))]
+                                     (timeline/open-profile e pubkey)
                                      (modal/info-popup "Search string not found.")))}]})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

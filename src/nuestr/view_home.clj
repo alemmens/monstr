@@ -324,13 +324,16 @@
           :cursor :hand
           :style-class "nuestr-author-hbox"
           :on-mouse-clicked (fn [e] (timeline/open-profile e pubkey))
-          :children [{:fx/type :label
-                      :style-class "ndesk-timeline-item-name"
-                      :text name}
-                     #_
-                     {:fx/type :label
-                      :style-class "ndesk-timeline-item-pubkey"
-                      :text (or (some-> pubkey util/format-pubkey-short) "?")}]}
+          :children (remove nil?
+                            [{:fx/type :label
+                              :style-class "ndesk-timeline-item-name"
+                              :text name}
+                             (when (empty? name)
+                               {:fx/type :label
+                                :style-class "ndesk-timeline-item-pubkey"
+                                :text (if (empty? pubkey)
+                                        "?"
+                                        (util/format-string-short (nip19/encode "npub" pubkey)))})])}
    :right {:fx/type :label
            :style-class "ndesk-timeline-item-timestamp"
            :text (or (some-> timestamp util/format-timestamp) "?")}})

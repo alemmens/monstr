@@ -50,7 +50,6 @@
     (assoc column
            :identity->timeline-pair (new-timelines-map id (map :public-key identities)))))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Hydrating and dispatching
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -78,7 +77,8 @@
                                   (if (string? column)
                                     (:id column)
                                     false)
-                                  (assoc event-obj :relays (list relay-url)))))
+                                  (assoc event-obj :relays (list relay-url))
+                                  false)))
 
 (defn hydrate!*
   [*state db new-identities]

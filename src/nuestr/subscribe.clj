@@ -43,7 +43,11 @@
   ;; 43: hide message
   ;; 44: mute user
   (let [account-pubkeys (map :public-key (:identities @domain/*state))]
-    [{:kinds [0 1 2 3]
+    [{:kinds [0 2 3]
+      :since since
+      :authors (relevant-pubkeys-for-view view)
+      :limit 1000}
+     {:kinds [1]
       :since since
       :authors (relevant-pubkeys-for-view view)
       :limit 1000}
@@ -63,8 +67,10 @@
 
 (defn meta-subscription
   "Returns a map from subscription id to filters."
-  []
-  (let [filter {:kinds [2] :limit 3000}
+  [pubkeys]
+  #_(status-bar/debug! (format "Subscribing to meta for %s" pubkeys))
+  (let [filter (if pubkeys
+                 {:kinds [0 2] :authors [pubkeys]}
+                 {:kinds [2] :limit 3000})
         subscription-id (format "meta:%s" (.toString (UUID/randomUUID)))]
     {subscription-id [filter]}))
-  

@@ -140,20 +140,24 @@
     ;; NIP-01
     0 (consume-set-metadata-event db *state metadata-cache relay-url verified-event)
     1 (let [parts (str/split subscription-id #":")
-            thread? (= (first parts) "thread:")
-            profile? (= (first parts) "profile:")
+            thread? (= (first parts) "thread")
+            profile-thread? (= (first parts) "pt")
+            profile? (= (first parts) "profile")
             column-or-profile-id (second parts)
             event (assoc verified-event :relays (list relay-url))]
-        ;; If the subscription id starts with "thread:" or "profile:", the event is
+        ;; If the subscription id starts with "thread:" or "pt:", the event is
         ;; caused by timeline/fetch-events-with-ids and it's for a thread view.
-        (if (or thread? profile?)
+        ;; If the subscription id starts with "profile", it's for the events
+        ;; belonging to a profile.
+        (if (or thread? profile-thread?)
           (timeline/thread-dispatch! *state
                                      (when thread? (domain/find-column-by-id column-or-profile-id))
-                                     (when profile? (domain/find-profile-state-by-id column-or-profile-id))
+                                     (when profile-thread? (domain/find-profile-state-by-id column-or-profile-id))
                                      event)
           (timeline/dispatch-text-note! *state
                                         column-or-profile-id ; can be nil
-                                        event)))
+                                        event
+                                        profile?)))
     2 (tab-relays/maybe-add-relay! (str/trim (:content verified-event)))
     ;; NIP-02
     3 (consume-contact-list db *state executor resubscribe-future-vol relay-url verified-event)

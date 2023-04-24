@@ -248,14 +248,15 @@
           (destroy! read-conn-vol)
           (vswap! (:read-connections-vol conn-registry) dissoc relay-url))))))
 
-(defn add-meta-subscription! [relay-url]
+(defn add-meta-subscription! [relay-url pubkeys]
   (log/debugf "Adding meta subscription for %s" relay-url)
   (locking conn-registry
-    (maybe-add-subscriptions! relay-url (subscribe/meta-subscription))))
+    (maybe-add-subscriptions! relay-url (subscribe/meta-subscription pubkeys))))
 
-(defn update-meta-info! []
+(defn update-meta-info! [pubkeys]
+  #_(status-bar/message! (format "Updating meta info for %s" pubkeys))
   (doseq [r (domain/relay-urls @domain/*state)]
-    (add-meta-subscription! r)))
+    (add-meta-subscription! r pubkeys)))
 
 (defn subscribe-all!
   "Establish a subscription to all relays for which `relay-test` returns true.
@@ -263,11 +264,11 @@
   [id filters relay-test]
   {:pre [(vector? filters) (every? map? filters)]}
   (let [filters' (mapv util/compact filters)]
-    (locking conn-registry
-      (log/debugf "There are %d read connections"
-                  (count @(:read-connections-vol conn-registry)))
-      (doseq [r (:relays @domain/*state)]
-        (when (relay-test r)
+    (log/debugf "There are %d read connections"
+                (count @(:read-connections-vol conn-registry)))
+    (doseq [r (:relays @domain/*state)]
+      (when (relay-test r)
+        (locking conn-registry          
           (maybe-add-subscriptions! (:url r) {id filters}))))))
 
 (defn unsubscribe-all!

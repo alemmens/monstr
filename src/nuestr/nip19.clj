@@ -204,9 +204,11 @@
       (let [size (- (count rest) 6)
             checksum (subs rest size)
             data (subs rest 0 size)]
-        (when (verify-checksum? prefix data checksum)
-          (when-let [content (parse-content prefix (decode-bech32 data))]
-            [prefix content]))))))
+        (try (when (verify-checksum? prefix data checksum)
+               (when-let [content (parse-content prefix (decode-bech32 data))]
+                 [prefix content]))
+             (catch Throwable e
+               nil))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; NIP-19 encoding
@@ -260,13 +262,15 @@
 (defn encode
   "See the documentation of `decode` for a description of the arguments."
   [prefix data]
-  (let [content (encode-content prefix data)
-        checksum (create-checksum prefix
-                                  (map bech32-char-to-int (encode-bech32 content)))]
-    (str prefix
-         "1"
-         (encode-bech32 content)
-         checksum)))
+  (try (let [content (encode-content prefix data)
+             checksum (create-checksum prefix
+                                       (map bech32-char-to-int (encode-bech32 content)))]
+         (str prefix
+              "1"
+              (encode-bech32 content)
+              checksum))
+       (catch Throwable e
+         nil)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Test
