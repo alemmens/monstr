@@ -164,9 +164,13 @@
       ["select signature_ from signature_event_id where event_id = ?" event-id]
       {:builder-fn rs/as-unqualified-lower-maps})))
 
-(defn- raw-event-tuple->event-obj
-  [raw-event-tuple]
+(defn- raw-event-tuple->event-obj [raw-event-tuple]
   (-> raw-event-tuple json/parse (nth 2)))
+
+(defn- raw-event-tuple-plus-relay->event-obj [raw-event-tuple relay-url]
+  (assoc (-> raw-event-tuple json/parse (nth 2))
+         :relays [relay-url]))
+                             
 
 (defn load-event
   [db event-id]
@@ -212,6 +216,29 @@
                 " order by e.created_at desc"
                 " limit 100")
            (str/join ", " (map #(str "'" % "'") pubkeys)))])
+
+(defn relays-events-query
+  [relay-urls pubkeys]
+  [(format (str "select e.raw_event_tuple, r.relay_url from n_events e"
+                " inner join relay_event_id r on e.id=r.event_id"
+                " where r.relay_url in (%s)"
+                (when pubkeys
+                  " and e.pubkey in (%s) ")
+                " and e.kind = 1"
+                " order by e.created_at desc"
+                " limit 300")
+           (join-strings relay-urls)
+           (join-strings pubkeys))])
+
+(defn load-relays-events
+  [db relay-urls pubkeys]
+  (log/debugf "Loading timeline events for %s with %d pubkeys" relay-urls (count pubkeys))
+  (when-not (empty? pubkeys)
+    (mapv #(raw-event-tuple-plus-relay->event-obj (:raw_event_tuple %)
+                                                  (:relay_url %))
+          (jdbc/execute! db
+                         (relays-events-query relay-urls pubkeys)
+                         {:builder-fn rs/as-unqualified-lower-maps}))))
 
 (defn load-relay-events
   [db relay-url pubkeys]

@@ -380,46 +380,13 @@ will be removed when the view is deleted. Continue?"
         (hydrate/add-column-for-view! new-view)))]])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Managing profiles
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defn- save-following-views
-  [{:keys [views pubkey]}]
-  [[:bg
-    (fn [*state _db _exec _dispatch!]
-      (let [profile-state (get (:open-profile-states @*state) pubkey)
-            following-views (:following-views profile-state)]
-        #_(log/debugf "Saving following views for %s, changed=%s"
-                      pubkey (:following-views-changed profile-state))
-        (doseq [v (keys views)]
-          ;; Update view's follow set.          
-          (let [follow-set (:follow-set (domain/find-view v))
-                new-follow-set (if (following-views v)
-                                 (conj follow-set pubkey)
-                                 (disj follow-set pubkey))]
-            (domain/update-view! v :follow-set new-follow-set)))
-        ;; Update the columns that use the views.
-        (let [new-columns (map #(assoc % :view (domain/find-view (:name (:view %))))
-                               (:all-columns @domain/*state))]
-          (swap! *state assoc :all-columns new-columns))
-        (swap! *state assoc-in
-               [:open-profile-states pubkey :following-views-changed]
-               #{})        
-        (doseq [v (:following-views-changed profile-state)]
-          ;; Refresh column if its view has changed.
-          (let [column (domain/find-column-with-view-name v)]
-            (assert column)
-            (hydrate/refresh-column! column))))
-      ;; Save views.
-      (file-sys/save-views (:views @*state)))]])
-  
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Event handler
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn handle
   [{:event/keys [type] :as event}]
   (log/debugf "Handling %s" type)
+
   (case type
     :click-keycard (click-keycard event)
     :show-new-identity (show-new-identity-effect true)

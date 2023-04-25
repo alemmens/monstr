@@ -73,8 +73,8 @@
     (util-fx/add-style-class! "hyperlink")
     (util-fx/on-mouse-clicked!
      (fn [e]
-       (if (str/starts-with? url "nostr://npub")
-         (let [[_ pubkey] (nip19/decode (subs url (count "nostr://")))]
+       (if (str/starts-with? url "nostr:npub")
+         (let [[_ pubkey] (nip19/decode (subs url (count "nostr:")))]
            (status-bar/message! (format "Pubkey: %s" pubkey))
            (timeline/open-profile e pubkey))
          (util/open-url! url))))))

@@ -75,7 +75,7 @@
           (if resolved-tag-letter
             (rich-text/append-hyperlink! x tag-link-text
               ;; todo this is all wrong of course
-              (format "nostr://%s"
+              (format "nostr:%s"
                 (cond p-tag? (format "%s" (nip19/encode "npub" resolved-tag-val))
                       e-tag? (format "%s" (nip19/encode "nevent" resolved-tag-val))
                       :else "<missing>")))

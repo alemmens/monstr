@@ -4,6 +4,7 @@
    [clojure.tools.logging :as log]
    [clojure.string :as str]
    [nuestr.domain :as domain]
+   ; [nuestr.event :as event]
    [nuestr.file-sys :as file-sys]
    [nuestr.media :as media]
    [nuestr.nip19 :as nip19]
@@ -12,6 +13,7 @@
    [nuestr.timeline :as timeline]
    [nuestr.util :as util])
   (:import (javafx.geometry Insets)
+           (javafx.scene.control DialogEvent Dialog Button TextArea)
            (javafx.scene.layout VBox HBox Priority)))
 
 
@@ -107,6 +109,44 @@
                                        :on-action identity
                                        :text "Save"}]}]}}))
 
+
+(defn save-following-views [event views pubkey]
+  ;; Disable the button now, because otherwise it will take too long.
+  (let [^Button button (.getSource event)]
+    (status-bar/message! (str "Button: " (pr-str button)))        
+    (.setDisable button true))
+  ;;
+  (let [profile-state (get (:open-profile-states @domain/*state) pubkey)
+        following-views (:following-views profile-state)]
+    #_(log/debugf "Saving following views for %s, changed=%s"
+                  pubkey (:following-views-changed profile-state))
+    (doseq [v (keys views)]
+      ;; Update view's follow set.          
+      (let [follow-set (:follow-set (domain/find-view v))
+            new-follow-set (if (following-views v)
+                             (conj follow-set pubkey)
+                             (disj follow-set pubkey))]
+        (domain/update-view! v :follow-set new-follow-set)))
+    ;; Update the columns that use the views.
+    (let [new-columns (map #(assoc % :view (domain/find-view (:name (:view %))))
+                           (:all-columns @domain/*state))]
+      (swap! domain/*state assoc :all-columns new-columns))
+    (fx/run-later
+     ;; Use a trick to be able to refer to hydrate/refresh-column! without getting
+     ;; cyclical reference problems.
+     (let [hydrate-namespace (find-ns 'nuestr.hydrate)
+           refresh-column (ns-resolve hydrate-namespace (symbol "refresh-column!"))]
+       (doseq [v (:following-views-changed profile-state)]
+         ;; Refresh column if its view has changed.
+         (let [column (domain/find-column-with-view-name v)]
+           (assert column)
+           (refresh-column column))))))
+  ;; Save views.
+  (file-sys/save-views (:views @domain/*state))
+  (swap! domain/*state assoc-in
+         [:open-profile-states pubkey :following-views-changed]
+         #{}))
+
 (defn following-views-pane
   [{:keys [pubkey open-profile-states views]}]
   (let [following-views (:following-views (get open-profile-states pubkey))
@@ -144,13 +184,13 @@
                                                    {:fx/type :label :text name}]})}
                           {:fx/type :h-box
                            :padding 10
-                           :children [{:fx/type :button
-                                       :disable (empty? (:following-views-changed
-                                                         (get (:open-profile-states @domain/*state) pubkey)))
-                                       :on-action {:event/type :save-following-views
-                                                   :views views
-                                                   :pubkey pubkey}
-                                       :text "Save"}]}]}}))
+                           :children [(let [id (str "profile-button-" pubkey)]
+                                        {:fx/type :button
+                                         :id id
+                                         :disable (empty? (:following-views-changed
+                                                           (get (:open-profile-states @domain/*state) pubkey)))
+                                         :on-action (fn [e] (save-following-views e views pubkey))
+                                         :text "Save"})]}]}}))
   
 (defn follows
   [{:keys [pubkey open-profile-states identities identity-metadata views]}]

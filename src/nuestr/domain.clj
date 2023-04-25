@@ -65,6 +65,10 @@
               (filter #(or (:write? %) (:read? %))
                       (:relays state)))))
 
+(defn read-relay-urls [state]
+  (doall (map :url
+              (filter #(:read? %) (:relays state)))))
+
 (defn all-relay-urls [state]
   (sort (map :url (:relays state))))
 
