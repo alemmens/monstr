@@ -44,14 +44,13 @@
 (defn- hex-str? [s]
   (and (string? s) (re-matches #"[a-f0-9]{32,}" s)))
 
-(defn- resolve-tag*
-  [tag-idx tags-vec]
+(defn- resolve-tag* [tag-idx tags-vec]
   (when (and (vector? tags-vec) (< tag-idx (count tags-vec)))
     (let [tag-val (get tags-vec tag-idx)]
       (when (and (vector? tag-val)
-              (>= (count tag-val) 2)
-              (#{"p" "e"} (first tag-val))
-              (hex-str? (second tag-val)))
+                 (>= (count tag-val) 2)
+                 (#{"p" "e"} (first tag-val))
+                 (hex-str? (second tag-val)))
         tag-val))))
 
 (defn- append-content-with-nostr-tags!*
@@ -65,12 +64,10 @@
               ;; TODO: we need to use metadata names instead of pubkeys when possible.
               tag-link-text (cond
                               p-tag? (format "@%s"
-                                       (or
-                                         (some->>
-                                           resolved-tag-val
-                                           (metadata/get* metadata-cache)
-                                           :name
-                                           not-empty)
+                                       (or (some->> resolved-tag-val
+                                                    (metadata/get* metadata-cache)
+                                                    :name
+                                                    not-empty)
                                          (util/format-pubkey-short resolved-tag-val)))
                               e-tag? (format "@%s" (util/format-event-id-short resolved-tag-val))
                               :else (format "#[%d]" tag-idx))]
@@ -79,10 +76,9 @@
             (rich-text/append-hyperlink! x tag-link-text
               ;; todo this is all wrong of course
               (format "nostr://%s"
-                (cond
-                  p-tag? (format "%s" resolved-tag-val)
-                  e-tag? (format "event/%s" resolved-tag-val)
-                  :else "<missing>")))
+                (cond p-tag? (format "%s" (nip19/encode "npub" resolved-tag-val))
+                      e-tag? (format "%s" (nip19/encode "nevent" resolved-tag-val))
+                      :else "<missing>")))
             (rich-text/append-text! x tag-link-text))
           (recur j (next more-found-nostr-tags)))
         (rich-text/append-text! x (subs content cursor (count content)))))))

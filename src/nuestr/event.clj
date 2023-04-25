@@ -402,16 +402,16 @@ will be removed when the view is deleted. Continue?"
         (let [new-columns (map #(assoc % :view (domain/find-view (:name (:view %))))
                                (:all-columns @domain/*state))]
           (swap! *state assoc :all-columns new-columns))
+        (swap! *state assoc-in
+               [:open-profile-states pubkey :following-views-changed]
+               #{})        
         (doseq [v (:following-views-changed profile-state)]
           ;; Refresh column if its view has changed.
           (let [column (domain/find-column-with-view-name v)]
             (assert column)
             (hydrate/refresh-column! column))))
       ;; Save views.
-      (file-sys/save-views (:views @*state))
-      (swap! *state assoc-in
-             [:open-profile-states pubkey :following-views-changed]
-             #{}))]])
+      (file-sys/save-views (:views @*state)))]])
   
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Event handler

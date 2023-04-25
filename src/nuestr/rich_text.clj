@@ -1,10 +1,14 @@
 (ns nuestr.rich-text
   (:require
+   [clojure.tools.logging :as log]
+   [clojure.string :as str]
+   [nuestr.byte-vector :as byte-vector]
+   [nuestr.nip19 :as nip19]
+   [nuestr.status-bar :as status-bar]
+   [nuestr.timeline :as timeline]
    [nuestr.util-fx :as util-fx]
    [nuestr.util-java :as util-java]
-   [nuestr.util :as util]
-   [clojure.tools.logging :as log]
-   [clojure.string :as str])
+   [nuestr.util :as util])
   (:import (org.fxmisc.richtext.model TextOps SegmentOps SegmentOpsBase StyledSegment ReadOnlyStyledDocument)
            (java.util Optional)
            (org.fxmisc.richtext GenericStyledArea TextExt)
@@ -68,7 +72,12 @@
   (doto (text-ext* text)
     (util-fx/add-style-class! "hyperlink")
     (util-fx/on-mouse-clicked!
-      (fn [& _] (util/open-url! url)))))
+     (fn [e]
+       (if (str/starts-with? url "nostr://npub")
+         (let [[_ pubkey] (nip19/decode (subs url (count "nostr://")))]
+           (status-bar/message! (format "Pubkey: %s" pubkey))
+           (timeline/open-profile e pubkey))
+         (util/open-url! url))))))
 
 ;; --
 
@@ -110,8 +119,7 @@
   [^GenericStyledArea n text url]
   (when (not-empty url)
     (.append n
-             (ReadOnlyStyledDocument/fromSegment
-              (->HyperlinkSeg text url)
-              nil ;; paragraph style
-              nil ;; text style
-              seg-ops*))))
+             (ReadOnlyStyledDocument/fromSegment (->HyperlinkSeg text url)
+                                                 nil ;; paragraph style
+                                                 nil ;; text style
+                                                 seg-ops*))))
