@@ -405,6 +405,4 @@ will be removed when the view is deleted. Continue?"
     :save-view (save-view event)
     :delete-view (delete-view event)
     :add-view (add-view event)
-    ;; Profile tab
-    :save-following-views (save-following-views event)
     (log/error "no matching clause" type)))
