@@ -5,7 +5,8 @@
    [nuestr.util-java :as util-java])
   (:import
    (java.time ZonedDateTime Instant)
-   (java.util.concurrent ThreadFactory Executors ScheduledExecutorService TimeUnit)
+   (java.util.concurrent ThreadFactory Executors ScheduledExecutorService TimeUnit
+                         ConcurrentLinkedQueue)
    (java.util HashMap HashSet UUID)
    (javafx.collections FXCollections ObservableList)
    (javafx.collections.transformation FilteredList)))
@@ -217,8 +218,9 @@
    ^HashMap author-pubkey->item-id-set
    ^HashMap item-id->index
    ^HashSet item-ids
+   max-size-vol
    timeline-epoch-vol
-   ])
+   ^ConcurrentLinkedQueue queue])
 
 
 (defn days-ago
@@ -233,9 +235,10 @@
   ;; todo we'll really wish to query/subscribe at an epoch and only update it on scroll etc.
   (let [init-timeline-epoch (-> (days-ago 365) .getEpochSecond)
         timeline-epoch-vol (volatile! init-timeline-epoch)
+        max-size-vol (volatile! 20)
         observable-list (FXCollections/observableArrayList)
         filtered-list (FilteredList. observable-list
-                        (util-java/->Predicate #(> (:max-timestamp %) init-timeline-epoch)))
+                                     (util-java/->Predicate #(> (:max-timestamp %) init-timeline-epoch)))
         adapted-list (if thread?
                        filtered-list
                        (.sorted filtered-list
@@ -247,7 +250,9 @@
       (HashMap.)
       (HashMap.)
       (HashSet.)
-      timeline-epoch-vol)))
+      max-size-vol
+      timeline-epoch-vol
+      (ConcurrentLinkedQueue.))))
 
 (defrecord Identity
     [public-key secret-key])

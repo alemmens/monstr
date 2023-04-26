@@ -7,6 +7,7 @@
             [nuestr.domain :as domain]
             [nuestr.links :as links]
             [nuestr.media :as media]
+            [nuestr.modal :as modal]
             [nuestr.metadata :as metadata]
             [nuestr.nip19 :as nip19]
             [nuestr.relay-conn :as relay-conn]
@@ -401,9 +402,16 @@
 
 (defn home [{:keys [column-id pubkey *state db metadata-cache executor relays thread?]}]
   (let [desc {:fx/type :list-view
-              :focus-traversable thread?
+              :focus-traversable false ; thread?
               :pref-height 100000  ; trick to make it stretch vertically
               :pref-width 100000
+              :on-scroll (fn [e]
+                           (let [delta-y (.getDeltaY ^ScrollEvent e)]
+                             (when (< delta-y 0)
+                               ;; Reached scroll bar bottom: try to add new text notes.
+                               (status-bar/debug! "Growing timeline...")
+                               (fx/run-later
+                                (timeline/grow-timeline! column-id pubkey thread?)))))
               :cell-factory {:fx/cell-type :list-cell
                              :describe (fn [text-note-new]
                                          {:graphic

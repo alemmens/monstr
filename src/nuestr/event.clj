@@ -386,7 +386,6 @@ will be removed when the view is deleted. Continue?"
 (defn handle
   [{:event/keys [type] :as event}]
   (log/debugf "Handling %s" type)
-
   (case type
     :click-keycard (click-keycard event)
     :show-new-identity (show-new-identity-effect true)

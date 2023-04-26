@@ -14,6 +14,7 @@
             [nuestr.util :as util]
             [nuestr.util-java :as util-java])
   (:import (java.util HashMap HashSet)
+           (java.util.concurrent ConcurrentLinkedQueue)
            (javafx.collections FXCollections ObservableList)
            (javafx.collections.transformation FilteredList)
            (javafx.scene.control ListView)))
@@ -81,17 +82,43 @@
   (let [{:keys [^ObservableList observable-list
                 ^HashMap author-pubkey->item-id-set
                 ^HashMap item-id->index
-                ^HashSet item-ids]}
+                ^HashSet item-ids
+                max-size-vol
+                ^ConcurrentLinkedQueue queue]}
         timeline]
-    (.add item-ids id)
-    (.merge author-pubkey->item-id-set
-            pubkey
-            (HashSet. [id])
-            (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
-    (let [index (.size observable-list)
-          note (domain/->TextNoteNew event created_at depth)]
-      (.put item-id->index id index)
-      (.add observable-list note))))
+    (if (<= (.size observable-list) @max-size-vol)
+      ;; If there's room on the timeline, add the event immediately.
+      (do (.add item-ids id)
+          (.merge author-pubkey->item-id-set
+                  pubkey
+                  (HashSet. [id])
+                  (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
+          (let [index (.size observable-list)
+                note (domain/->TextNoteNew event created_at depth)]
+            (.put item-id->index id index)
+            (.add observable-list note)))
+      ;; Otherwise add it to the queue, so it can be added later.
+      (.add ^ConcurrentLinkedQueue queue event))))
+
+(defn grow-timeline! [column-id pubkey thread?]
+  ;; This is called when the user scrolls to the bottom of a timeline listview.  We
+  ;; increase the max size of the timeline and move events from the waiting queue to the
+  ;; timeline.
+  (when-not thread? ; threads don't grow dynamically
+    (doseq [pair (timeline-pairs column-id pubkey)]
+      (let [timeline (:flat-timeline pair)
+            listview (:flat-listview pair)]
+        (when (<= @(:max-size-vol timeline)
+                  (.size ^ObservableList (:observable-list timeline)))
+          ;; Increase the timeline's max size by 20.
+          (let [increment 20
+                ^ConcurrentLinkedQueue queue (:queue timeline)]
+            (vswap! (:max-size-vol timeline) + increment)
+            ;; And move events from the queue to the timeline.
+            (loop [i 0]
+              (when-not (or (.isEmpty queue) (>= i increment))
+                (do (add-event-to-timeline! timeline (.poll queue) 0.0)
+                    (recur (inc i)))))))))))
 
 (defn flat-dispatch!
   [*state timeline identity-pubkey {:keys [id pubkey created_at content] :as event-obj} column]

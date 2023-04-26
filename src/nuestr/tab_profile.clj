@@ -113,7 +113,6 @@
 (defn save-following-views [event views pubkey]
   ;; Disable the button now, because otherwise it will take too long.
   (let [^Button button (.getSource event)]
-    (status-bar/message! (str "Button: " (pr-str button)))        
     (.setDisable button true))
   ;;
   (let [profile-state (get (:open-profile-states @domain/*state) pubkey)

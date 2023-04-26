@@ -79,41 +79,6 @@
                                     false)
                                   (assoc event-obj :relays (list relay-url))
                                   false)))
-#_
-(defn hydrate!*
-  [*state db new-identities]
-  ;; TODO: consider transduce iterate over timeline-data and throttling dispatches via
-  ;; yielding of bg thread; this way we'd move on to subscriptions, allowing new stuff to
-  ;; come in sooner as we backfill.
-  (log/debugf "Hydrating with %d new identities" (count new-identities))
-  (let [new-public-keys (mapv :public-key new-identities)
-        identity-metadata (store/load-metadata db new-public-keys)
-        relay-urls (domain/relay-urls @*state)]
-    (swap! *state assoc
-           :identities (distinct (concat (:identities @*state) new-identities)))
-    (swap! *state update
-           :identity-metadata merge identity-metadata)
-    (when-let [pubkey (or (:active-key @domain/*state)
-                          (file-sys/load-active-key)
-                          (first new-public-keys))]
-      (log/debugf "Hydrating with key %s" pubkey)
-      (timeline/update-active-timelines! *state pubkey))
-    ;; Fetch notes from relays.
-    (swap! domain/*state assoc :last-refresh false)
-    (fx/run-later (relay-conn/refresh!))
-    ;; Load notes from database.
-    (let [contact-lists (hydrate-contact-lists! new-identities)
-          ;; TODO: Make sure that user follow lists for all views are also in
-          ;; this 'closure' list of public keys!
-          closure-public-keys (subscribe/whale-of-pubkeys* new-public-keys contact-lists)]
-      ;; TODO: also limit timeline events to something, some cardinality?
-      ;; TODO: also load watermarks and include in new subscriptions.
-       (doseq [r relay-urls]
-        (let [events (store/load-relay-events db r closure-public-keys)]
-          #_(status-bar/message! (format "Loaded %d events for %s from database"
-                                         (count events)
-                                         r))
-          (fx/run-later (dispatch-text-notes *state r events false)))))))
 
 (defn hydrate!*
   [*state db new-identities]
@@ -143,6 +108,7 @@
           closure-pubkeys (subscribe/whale-of-pubkeys* new-public-keys contact-lists)]
       ;; TODO: also limit timeline events to something, some cardinality?
       ;; TODO: also load watermarks and include in new subscriptions.
+      #_
       (fx/run-later
        (let [events (store/load-relays-events store/db
                                               (domain/read-relay-urls @*state)
@@ -191,44 +157,27 @@
 ;;; Hydrating per column
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-#_
 (defn- hydrate-column! [column]
   (log/debugf "Hydrating column '%s' with view '%s' and relays %s"
               (:id column)
               (:name (:view column))
               (:relay-urls (:view column)))
+  #_
   (let [view (:view column)
-        relevant-pubkeys (subscribe/relevant-pubkeys-for-view view)]
-    (doseq [r (:relay-urls view)]
-      (let [events (store/load-relay-events store/db r relevant-pubkeys)]
-        (status-bar/message! (format "Loaded %d events for %s from database"
-                                     (count events)
-                                     r))
-        (dispatch-text-notes domain/*state r events column)))
-    ;; TODO: pass relevant-pubkeys here so we don't have to recompute it
-    ;; in `add-column-subscriptions`.
-    (relay-conn/add-column-subscriptions! column)))
-
-(defn- hydrate-column! [column]
-  (log/debugf "Hydrating column '%s' with view '%s' and relays %s"
-              (:id column)
-              (:name (:view column))
-              (:relay-urls (:view column)))
-  (let [view (:view column)
-        relevant-pubkeys (subscribe/relevant-pubkeys-for-view view)]
-    (let [events (store/load-relays-events store/db (:relay-urls view) relevant-pubkeys)]
-      (status-bar/message! (format "Loaded %d events from database"
-                                   (count events)))
-      (doseq [event events]
-        (timeline/dispatch-text-note! domain/*state
-                                      (if (string? column)
-                                        (:id column)
-                                        false)
-                                      event
-                                      false)))
-    ;; TODO: pass relevant-pubkeys here so we don't have to recompute it
-    ;; in `add-column-subscriptions`.
-    (relay-conn/add-column-subscriptions! column)))
+        relevant-pubkeys (subscribe/relevant-pubkeys-for-view view)
+        events (store/load-relays-events store/db (:relay-urls view) relevant-pubkeys)]
+    (status-bar/message! (format "Loaded %d events from database"
+                                 (count events)))
+    (doseq [event events]
+      (timeline/dispatch-text-note! domain/*state
+                                    (if (string? column)
+                                      (:id column)
+                                      false)
+                                    event
+                                    false)))
+  ;; TODO: pass relevant-pubkeys here so we don't have to recompute it
+  ;; in `add-column-subscriptions`.
+  (relay-conn/add-column-subscriptions! column))
 
 (defn add-column-for-view! [view]
   (let [column (new-column view (:identities @domain/*state))]
