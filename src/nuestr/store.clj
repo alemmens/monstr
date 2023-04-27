@@ -214,7 +214,7 @@
                   " and e.pubkey in (%s) ")
                 " and e.kind = 1"
                 " order by e.created_at desc"
-                " limit 100")
+                " limit 1000")
            (str/join ", " (map #(str "'" % "'") pubkeys)))])
 
 (defn relays-events-query
@@ -226,7 +226,7 @@
                   " and e.pubkey in (%s) ")
                 " and e.kind = 1"
                 " order by e.created_at desc"
-                " limit 300")
+                " limit 5000")
            (join-strings relay-urls)
            (join-strings pubkeys))])
 

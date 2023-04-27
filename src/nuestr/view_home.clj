@@ -407,11 +407,11 @@
               :pref-width 100000
               :on-scroll (fn [e]
                            (let [delta-y (.getDeltaY ^ScrollEvent e)]
-                             (when (< delta-y 0)
+                             (when (and (< delta-y 0)
+                                        ;; Threads don't grow dynamically.
+                                        (not thread?))
                                ;; Reached scroll bar bottom: try to add new text notes.
-                               (status-bar/debug! "Growing timeline...")
-                               (fx/run-later
-                                (timeline/grow-timeline! column-id pubkey thread?)))))
+                               (timeline/grow-timeline! column-id pubkey))))
               :cell-factory {:fx/cell-type :list-cell
                              :describe (fn [text-note-new]
                                          {:graphic
@@ -434,11 +434,12 @@
       
 
 (defn create-list-view
-  ^ListView [column-id *state db metadata-cache executor]
+  ^ListView [column-id pubkey *state db metadata-cache executor]
   ;; Note that COLUMN-ID is nil for timeline list views in Profile tabs.
   (fx/instance
    (fx/create-component {:fx/type home
                          :column-id column-id
+                         :pubkey pubkey
                          :*state *state
                          :db db
                          :metadata-cache metadata-cache

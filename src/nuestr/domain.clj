@@ -6,7 +6,7 @@
   (:import
    (java.time ZonedDateTime Instant)
    (java.util.concurrent ThreadFactory Executors ScheduledExecutorService TimeUnit
-                         ConcurrentLinkedQueue)
+                         PriorityBlockingQueue ConcurrentLinkedQueue)
    (java.util HashMap HashSet UUID)
    (javafx.collections FXCollections ObservableList)
    (javafx.collections.transformation FilteredList)))
@@ -218,9 +218,10 @@
    ^HashMap author-pubkey->item-id-set
    ^HashMap item-id->index
    ^HashSet item-ids
-   max-size-vol
+   max-size ; an atom
    timeline-epoch-vol
-   ^ConcurrentLinkedQueue queue])
+   ;; We use a PriorityBlockingQueue to keep the events in the queue sorted by created_at.
+   ^PriorityBlockingQueue queue])
 
 
 (defn days-ago
@@ -229,13 +230,14 @@
     (.minusDays n)
     .toInstant))
 
+(def initial-max-timeline-size 25)
+
 (defn new-timeline [thread?]
   ;; NOTE: we're querying and subscribing to all of time but for now, for ux
   ;; experience, we filter underlying data by n days
   ;; todo we'll really wish to query/subscribe at an epoch and only update it on scroll etc.
   (let [init-timeline-epoch (-> (days-ago 365) .getEpochSecond)
         timeline-epoch-vol (volatile! init-timeline-epoch)
-        max-size-vol (volatile! 20)
         observable-list (FXCollections/observableArrayList)
         filtered-list (FilteredList. observable-list
                                      (util-java/->Predicate #(> (:max-timestamp %) init-timeline-epoch)))
@@ -250,9 +252,12 @@
       (HashMap.)
       (HashMap.)
       (HashSet.)
-      max-size-vol
+      (atom (if thread?
+              (* 40 initial-max-timeline-size)
+              initial-max-timeline-size))  
       timeline-epoch-vol
-      (ConcurrentLinkedQueue.))))
+      (PriorityBlockingQueue. (int 100)
+                              (comparator #(> (:created_at %1) (:created_at %2)))))))
 
 (defrecord Identity
     [public-key secret-key])

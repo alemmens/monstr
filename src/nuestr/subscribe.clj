@@ -50,7 +50,7 @@
      {:kinds [1]
       :since since
       :authors (relevant-pubkeys-for-view view)
-      :limit 500}
+      :limit 2000}
      {:kinds [1 4]
       :#p account-pubkeys
       :since since}

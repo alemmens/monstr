@@ -376,7 +376,7 @@
   
   ([column]
    (let [last-refresh (:last-refresh @domain/*state)
-         since (or last-refresh (util/days-ago 15))]
+         since (or last-refresh (util/days-ago 60))]
      (add-column-subscriptions! column since))))
 
 (defn refresh! []

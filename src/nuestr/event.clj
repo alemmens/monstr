@@ -72,7 +72,7 @@
 
 (defn add-timeline-pair-to-column [pubkey column]
   (update-in column [:identity->timeline-pair]
-             #(conj %[pubkey (hydrate/new-timeline-pair (:id column))])))
+             #(conj %[pubkey (hydrate/new-timeline-pair (:id column) pubkey)])))
 
 (defn add-identity-and-close-dialog-effect
   [public-key maybe-private-key]

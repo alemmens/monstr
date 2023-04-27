@@ -21,10 +21,10 @@
 
 (defn new-timeline-pair
   "COLUMN-ID should be nil for timelines that are shown in Profile tabs."
-  [column-id]
+  [column-id pubkey]
   (let [flat-timeline (domain/new-timeline false)
         thread-timeline (domain/new-timeline true)
-        flat-listview (view-home/create-list-view column-id
+        flat-listview (view-home/create-list-view column-id pubkey
                                                   domain/*state store/db
                                                   metadata/cache
                                                   domain/daemon-scheduled-executor)
@@ -39,7 +39,7 @@
   [column-id pubkeys]
   (log/debugf "New timelines map with pubkeys=%s" (pr-str pubkeys))
   (into {}
-        (map (fn [pubkey] [pubkey (new-timeline-pair column-id)])
+        (map (fn [pubkey] [pubkey (new-timeline-pair column-id pubkey)])
              pubkeys)))
 
 (defn new-column
@@ -108,7 +108,6 @@
           closure-pubkeys (subscribe/whale-of-pubkeys* new-public-keys contact-lists)]
       ;; TODO: also limit timeline events to something, some cardinality?
       ;; TODO: also load watermarks and include in new subscriptions.
-      #_
       (fx/run-later
        (let [events (store/load-relays-events store/db
                                               (domain/read-relay-urls @*state)
@@ -162,7 +161,6 @@
               (:id column)
               (:name (:view column))
               (:relay-urls (:view column)))
-  #_
   (let [view (:view column)
         relevant-pubkeys (subscribe/relevant-pubkeys-for-view view)
         events (store/load-relays-events store/db (:relay-urls view) relevant-pubkeys)]
