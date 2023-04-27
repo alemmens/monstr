@@ -80,42 +80,7 @@
                                   (assoc event-obj :relays (list relay-url))
                                   false)))
 
-(defn hydrate!*
-  [*state db new-identities]
-  ;; TODO: consider transduce iterate over timeline-data and throttling dispatches via
-  ;; yielding of bg thread; this way we'd move on to subscriptions, allowing new stuff to
-  ;; come in sooner as we backfill.
-  (log/debugf "Hydrating with %d new identities" (count new-identities))
-  (let [new-public-keys (mapv :public-key new-identities)
-        identity-metadata (store/load-metadata db new-public-keys)
-        relay-urls (domain/relay-urls @*state)]
-    (swap! *state assoc
-           :identities (distinct (concat (:identities @*state) new-identities)))
-    (swap! *state update
-           :identity-metadata merge identity-metadata)
-    (when-let [pubkey (or (:active-key @domain/*state)
-                          (file-sys/load-active-key)
-                          (first new-public-keys))]
-      (log/debugf "Hydrating with key %s" pubkey)
-      (timeline/update-active-timelines! *state pubkey))
-    ;; Fetch notes from relays.
-    (swap! domain/*state assoc :last-refresh false)
-    (fx/run-later (relay-conn/refresh!))
-    ;; Load notes from database.
-    (let [contact-lists (hydrate-contact-lists! new-identities)
-          ;; TODO: Make sure that user follow lists for all views are also in
-          ;; this 'closure' list of public keys!
-          closure-pubkeys (subscribe/whale-of-pubkeys* new-public-keys contact-lists)]
-      ;; TODO: also limit timeline events to something, some cardinality?
-      ;; TODO: also load watermarks and include in new subscriptions.
-      (fx/run-later
-       (let [events (store/load-relays-events store/db
-                                              (domain/read-relay-urls @*state)
-                                              closure-pubkeys)]
-         (status-bar/message! (format "Loaded %d events from database"
-                                      (count events)))
-         (doseq [event events]
-           (timeline/dispatch-text-note! domain/*state false event false)))))))
+
 
 (defn dehydrate!* [*state _db dead-identities]
   (let [dead-public-keys-set (into #{} (map :public-key) dead-identities)]
@@ -144,9 +109,7 @@
       ;; watermark strategy.
       (relay-conn/refresh!))))
 
-(defn hydrate! [*state db executor new-identities]
-  (util/submit! executor
-                #(hydrate!* *state db new-identities)))
+
 
 (defn dehydrate! [*state db executor dead-identities]
   (util/submit! executor
@@ -193,4 +156,30 @@
                (:name (:view column)))
    (timeline/clear-column! column false)
    (hydrate-column! column)))
+
+
+(defn hydrate!*
+  [*state db new-identities]
+  ;; TODO: consider transduce iterate over timeline-data and throttling dispatches via
+  ;; yielding of bg thread; this way we'd move on to subscriptions, allowing new stuff to
+  ;; come in sooner as we backfill.
+  (log/debugf "Hydrating with %d new identities" (count new-identities))
+  (let [new-public-keys (mapv :public-key new-identities)
+        identity-metadata (store/load-metadata db new-public-keys)
+        relay-urls (domain/relay-urls @*state)]
+    (swap! *state assoc
+           :identities (distinct (concat (:identities @*state) new-identities)))
+    (swap! *state update
+           :identity-metadata merge identity-metadata)
+    (when-let [pubkey (or (:active-key @domain/*state)
+                          (file-sys/load-active-key)
+                          (first new-public-keys))]
+      (log/debugf "Hydrating with key %s" pubkey)
+      (timeline/update-active-timelines! *state pubkey))
+    (doseq [c (:all-columns @domain/*state)]
+      (hydrate-column! c))))
+
+(defn hydrate! [*state db executor new-identities]
+  (util/submit! executor
+                #(hydrate!* *state db new-identities)))
 
