@@ -187,7 +187,7 @@
                                    (join-strings event-ids))]
                        {:builder-fn rs/as-unqualified-lower-maps})))
 
-(defn timeline-query
+(defn- timeline-query
   [pubkeys]
   [(format (str "select raw_event_tuple from n_events"
                 " where pubkey in (%s) and kind = 1"
@@ -195,7 +195,7 @@
                 " limit 100")
                (join-strings pubkeys))])
 
-(defn load-timeline-events
+(defn- load-timeline-events
   [db pubkeys]
   (log/debugf "Loading timeline events for %d pubkeys" (count pubkeys))
   (when-not (empty? pubkeys)
@@ -204,18 +204,6 @@
                          (timeline-query pubkeys)
                          {:builder-fn rs/as-unqualified-lower-maps}))))
 
-
-(defn relay-events-query
-  [relay-url pubkeys]
-  [(format (str "select raw_event_tuple from n_events e"
-                " inner join relay_event_id r on e.id=r.event_id"
-                " where r.relay_url='" relay-url "'"
-                (when pubkeys
-                  " and e.pubkey in (%s) ")
-                " and e.kind = 1"
-                " order by e.created_at desc"
-                " limit 1000")
-           (str/join ", " (map #(str "'" % "'") pubkeys)))])
 
 (defn relays-events-query
   [relay-urls pubkeys]
@@ -226,7 +214,7 @@
                   " and e.pubkey in (%s) ")
                 " and e.kind = 1"
                 " order by e.created_at desc"
-                " limit 5000")
+                " limit 10000")
            (join-strings relay-urls)
            (join-strings pubkeys))])
 
@@ -239,6 +227,18 @@
           (jdbc/execute! db
                          (relays-events-query relay-urls pubkeys)
                          {:builder-fn rs/as-unqualified-lower-maps}))))
+
+(defn relay-events-query
+  [relay-url pubkeys]
+  [(format (str "select raw_event_tuple from n_events e"
+                " inner join relay_event_id r on e.id=r.event_id"
+                " where r.relay_url='" relay-url "'"
+                (when pubkeys
+                  " and e.pubkey in (%s) ")
+                " and e.kind = 1"
+                " order by e.created_at desc"
+                " limit 20000")
+           (str/join ", " (map #(str "'" % "'") pubkeys)))])
 
 (defn load-relay-events
   [db relay-url pubkeys]

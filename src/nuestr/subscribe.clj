@@ -49,8 +49,7 @@
       :limit 1000}
      {:kinds [1]
       :since since
-      :authors (relevant-pubkeys-for-view view)
-      :limit 2000}
+      :authors (relevant-pubkeys-for-view view)}
      {:kinds [1 4]
       :#p account-pubkeys
       :since since}
@@ -72,6 +71,6 @@
   #_(status-bar/debug! (format "Subscribing to meta for %s" pubkeys))
   (let [filter (if pubkeys
                  {:kinds [0 2] :authors [pubkeys]}
-                 {:kinds [2] :limit 3000})
+                 {:kinds [2]})
         subscription-id (format "meta:%s" (.toString (UUID/randomUUID)))]
     {subscription-id [filter]}))

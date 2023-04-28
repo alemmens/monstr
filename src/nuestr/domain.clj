@@ -230,7 +230,8 @@
     (.minusDays n)
     .toInstant))
 
-(def initial-max-timeline-size 25)
+(def initial-max-timeline-size 500)
+(def max-timeline-size-increment 50)
 
 (defn new-timeline [thread?]
   ;; NOTE: we're querying and subscribing to all of time but for now, for ux

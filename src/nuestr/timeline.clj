@@ -106,17 +106,16 @@
   ;; increase the max size of the timeline and move events from the waiting queue to the
   ;; timeline.
   (doseq [pair (timeline-pairs column-id pubkey)]
-    (let [timeline (:flat-timeline pair)
-          increment 10]
+    (let [timeline (:flat-timeline pair)]
       (when (<= @(:max-size timeline)
                 (.size ^ObservableList (:observable-list timeline)))
         ;; Increase the timeline's max size.          
-        (swap! (:max-size timeline) + increment)          
+        (swap! (:max-size timeline) + domain/max-timeline-size-increment)          
         (fx/run-later
          (let [^PriorityBlockingQueue queue (:queue timeline)]
            ;; And move events from the queue to the timeline.
            (loop [i 0]
-             (when-not (or (.isEmpty queue) (>= i increment))
+             (when-not (or (.isEmpty queue) (>= i domain/max-timeline-size-increment))
                (do (add-event-to-timeline! timeline (.poll queue) 0.0)
                    (recur (inc i)))))))))))
 
@@ -301,7 +300,7 @@
                                                   (:id (get (:open-profile-states @domain/*state) pubkey))
                                                   (rand-int 1000000000))]
                       (relay-conn/subscribe-all! subscription-id
-                                                 [{:authors [pubkey] :kinds [0 1] :limit 1000}]
+                                                 [{:authors [pubkey] :kinds [0 1] :limit 5000}]
                                                  #(or (:read? %) (:meta? %))))))))
 
 
