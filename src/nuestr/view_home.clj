@@ -39,8 +39,15 @@
 ;;; Content
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn url-summarize [url]
-  url)
+(defn url-summarize [url metadata-cache]
+  (if (str/starts-with? url "nostr:npub")
+    (let [npub (subs url (count "nostr:"))
+          [_ pubkey] (nip19/decode npub)]
+      (str "@"
+           (or (when pubkey
+                 (:name (metadata/get* metadata-cache pubkey)))
+               (util/format-string-short npub))))
+    url))
 
 (defn- hex-str? [s]
   (and (string? s) (re-matches #"[a-f0-9]{32,}" s)))
@@ -62,7 +69,6 @@
         (let [[resolved-tag-letter resolved-tag-val] (resolve-tag* tag-idx tags)
               p-tag? (= "p" resolved-tag-letter)
               e-tag? (= "e" resolved-tag-letter)
-              ;; TODO: we need to use metadata names instead of pubkeys when possible.
               tag-link-text (cond
                               p-tag? (format "@%s"
                                        (or (some->> resolved-tag-val
@@ -75,7 +81,6 @@
           (rich-text/append-text! x (subs content cursor i))
           (if resolved-tag-letter
             (rich-text/append-hyperlink! x tag-link-text
-              ;; todo this is all wrong of course
               (format "nostr:%s"
                 (cond p-tag? (format "%s" (nip19/encode "npub" resolved-tag-val))
                       e-tag? (format "%s" (nip19/encode "nevent" resolved-tag-val))
@@ -107,7 +112,7 @@
               link-url (subs content a b)]
           (append-content-with-nostr-tags!* x sub-content tags metadata-cache)
           (rich-text/append-hyperlink! x
-                                       (url-summarize link-url)
+                                       (url-summarize link-url metadata-cache)
                                        link-url)
           (recur b (next found)))
         (append-content-with-nostr-tags!*

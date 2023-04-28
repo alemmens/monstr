@@ -135,10 +135,7 @@
                                       (:id column)
                                       false)
                                     event
-                                    false)))
-  ;; TODO: pass relevant-pubkeys here so we don't have to recompute it
-  ;; in `add-column-subscriptions`.
-  (relay-conn/add-column-subscriptions! column))
+                                    false))))
 
 (defn add-column-for-view! [view]
   (let [column (new-column view (:identities @domain/*state))]
@@ -155,6 +152,7 @@
                (:id column)
                (:name (:view column)))
    (timeline/clear-column! column false)
+   (relay-conn/add-column-subscriptions! column)   
    (hydrate-column! column)))
 
 
@@ -176,6 +174,8 @@
                           (first new-public-keys))]
       (log/debugf "Hydrating with key %s" pubkey)
       (timeline/update-active-timelines! *state pubkey))
+    (doseq [c (:all-columns @domain/*state)]
+      (relay-conn/add-column-subscriptions! c))
     (doseq [c (:all-columns @domain/*state)]
       (hydrate-column! c))))
 
