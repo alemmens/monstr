@@ -40,14 +40,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn url-summarize [url metadata-cache]
-  (if (str/starts-with? url "nostr:npub")
-    (let [npub (subs url (count "nostr:"))
-          [_ pubkey] (nip19/decode npub)]
-      (str "@"
-           (or (when pubkey
-                 (:name (metadata/get* metadata-cache pubkey)))
-               (util/format-string-short npub))))
-    url))
+  (cond (str/starts-with? url "nostr:npub")
+        (let [npub (subs url (count "nostr:"))
+              [_ pubkey] (nip19/decode npub)]
+          (str "@"
+               (or (when pubkey
+                     (:name (metadata/get* metadata-cache pubkey)))
+                   (util/format-string-short npub))))
+        (str/starts-with? url "nostr:note")
+        (let [note (subs url (count "nostr:"))
+              [_ event] (nip19/decode note)]
+          (if event
+            (str "@" (util/format-string-short note))
+            url))
+        :else url))
 
 (defn- hex-str? [s]
   (and (string? s) (re-matches #"[a-f0-9]{32,}" s)))
@@ -62,7 +68,7 @@
         tag-val))))
 
 (defn- append-content-with-nostr-tags!*
-  [^GenericStyledArea x content tags metadata-cache]
+  [^GenericStyledArea x content tags column-id pubkey metadata-cache]
   (let [found-nostr-tags (links/detect-nostr-tags content)]
     (loop [cursor 0 [[i j tag-idx] :as more-found-nostr-tags] found-nostr-tags]
       (if i
@@ -80,16 +86,16 @@
                               :else (format "#[%d]" tag-idx))]
           (rich-text/append-text! x (subs content cursor i))
           (if resolved-tag-letter
-            (rich-text/append-hyperlink! x tag-link-text
-              (format "nostr:%s"
-                (cond p-tag? (format "%s" (nip19/encode "npub" resolved-tag-val))
-                      e-tag? (format "%s" (nip19/encode "nevent" resolved-tag-val))
-                      :else "<missing>")))
+            (let [url (format "nostr:%s"
+                              (cond p-tag? (format "%s" (nip19/encode "npub" resolved-tag-val))
+                                    e-tag? (format "%s" (nip19/encode "nevent" resolved-tag-val))
+                                    :else "<missing>"))]
+              (rich-text/append-hyperlink! x tag-link-text url column-id pubkey))
             (rich-text/append-text! x tag-link-text))
           (recur j (next more-found-nostr-tags)))
         (rich-text/append-text! x (subs content cursor (count content)))))))
 
-(defn create-content-node* [content links tags metadata-cache]
+(defn create-content-node* [content links tags column-id pubkey metadata-cache]
   (let [^GenericStyledArea x (rich-text/create*)]
     (util-fx/add-style-class! x "ndesk-timeline-item-content")
     (HBox/setHgrow x Priority/ALWAYS)
@@ -110,13 +116,19 @@
       (if a
         (let [sub-content (subs content cursor a)
               link-url (subs content a b)]
-          (append-content-with-nostr-tags!* x sub-content tags metadata-cache)
+          (append-content-with-nostr-tags!* x sub-content tags column-id pubkey metadata-cache)
           (rich-text/append-hyperlink! x
                                        (url-summarize link-url metadata-cache)
-                                       link-url)
+                                       link-url
+                                       column-id
+                                       pubkey)
           (recur b (next found)))
-        (append-content-with-nostr-tags!*
-         x (subs content cursor (count content)) tags metadata-cache)))
+        (append-content-with-nostr-tags!* x
+                                          (subs content cursor (count content))
+                                          tags
+                                          column-id
+                                          pubkey
+                                          metadata-cache)))
     ;; Shall we not argue with this? The mere presence of this listener seems
     ;; to fix height being left rendered too short.
     (.addListener (.totalHeightEstimateProperty x)
@@ -125,7 +137,7 @@
     x))
 
 (defn timeline-item-content
-  [{:keys [column-id content tags metadata-cache]}]
+  [{:keys [column-id pubkey event content tags metadata-cache]}]
   (let [column (domain/find-column-by-id column-id)
         view (:view column)
         clean-content (-> content
@@ -145,7 +157,9 @@
         content-node {:fx/type :h-box
                       :style-class ["ndesk-timeline-item-content-outer"]
                       :children [{:fx/type fx/ext-instance-factory
-                                  :create #(create-content-node* clean-content links tags metadata-cache)}]}]
+                                  :create #(create-content-node* clean-content links tags
+                                                                 column-id pubkey
+                                                                 metadata-cache)}]}]
     (if (and (:show-pictures view)
              (seq image-links))
       {:fx/type :v-box
@@ -189,7 +203,7 @@
                                 :on-action (fn [^ActionEvent e]
                                              (when-let [content
                                                         (some-> e ^Hyperlink .getSource .getUserData :event-id)]
-                                               (util/put-clipboard! content)))}]}
+                                               (util/put-clipboard! (nip19/encode "note" content))))}]}
                    {:fx/type :h-box
                     :spacing 8
                     :children [{:fx/type :label
@@ -212,8 +226,7 @@
                     :pref-width 160
                     :items []}]}]})))
 
-(defn- ready-popup!
-  ^Popup [db node-pos popup-width item-id author-pubkey]
+(defn- ready-popup! ^Popup [db node-pos popup-width item-id author-pubkey]
   (let [event-id-short (util/format-event-id-short item-id)
         seen-on-relays (store/get-seen-on-relays db item-id)
         ^VBox v-box (first (seq (.getContent singleton-popup)))
@@ -223,7 +236,7 @@
         ^Hyperlink copy-event-id-hyperlink (.lookup v-box ".ndesk-info-popup-copy-event-link")
         ^Hyperlink copy-author-pubkey-hyperlink (.lookup v-box ".ndesk-info-popup-copy-author-pubkey-link")]
     ;; Set the content.
-    (.setText event-id-label (str "Event id: " event-id-short))    
+    (.setText event-id-label (str "Event id: " (util/format-string-short (nip19/encode "note" item-id))))
     (.setUserData copy-event-id-hyperlink {:event-id item-id})
     (.setText pubkey-label (str "Author: " (util/format-string-short (nip19/encode "npub" author-pubkey))))
     (.setUserData copy-author-pubkey-hyperlink {:author-pubkey author-pubkey})
@@ -236,8 +249,7 @@
     (.setPrefWidth v-box popup-width)
     singleton-popup))
 
-(defn show-info!
-  [db item-id author-pubkey ^ActionEvent e]
+(defn show-info! [db item-id author-pubkey ^ActionEvent e]
   (let [node (.getSource e)
         popup-width 300
         bounds (.getBoundsInLocal node)
@@ -379,6 +391,8 @@
               :bottom {:fx/type :h-box
                        :children [{:fx/type timeline-item-content
                                    :column-id column-id
+                                   :pubkey pubkey
+                                   :event event-obj
                                    :h-box/hgrow :always
                                    :content (:content event-obj)
                                    :tags (:tags event-obj)

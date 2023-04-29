@@ -106,7 +106,7 @@
   ;; increase the max size of the timeline and move events from the waiting queue to the
   ;; timeline.
   (doseq [pair (timeline-pairs column-id pubkey)]
-    (let [timeline (:flat-timeline pair)]
+    (when-let [timeline (:flat-timeline pair)]
       (when (<= @(:max-size timeline)
                 (.size ^ObservableList (:observable-list timeline)))
         ;; Increase the timeline's max size.          
@@ -445,6 +445,13 @@
                                     ))
          (connect-wrappers-to-listview! wrappers id->event column-id pubkey)
          (select-thread-focus event-obj column-id pubkey))))))
+
+(defn find-event-with-id
+  "Returns nil if the event can't be found."
+  [id]
+  (or (store/load-event store/db id)
+      ;; TODO: try to fetch the event from relays.
+      nil))
 
 (defn refresh-column-thread!
   [*state column pubkey]

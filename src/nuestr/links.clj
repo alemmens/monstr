@@ -4,7 +4,7 @@
   (:import (java.util.regex Matcher)))
 
 (def ^:private http-or-nostr-regex
-  #"(((https?)://)|(nostr:(npub|nevent)))[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]")
+  #"(((https?)://)|(nostr:(npub|nevent|note)))[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]")
 
 (defn detect
   "Returns a vector of links, where each link is a `[start end]` vector."

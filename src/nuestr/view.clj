@@ -163,7 +163,12 @@
                          :style-class "nuestr-tooltip"
                          :text "refresh all subscriptions"}
                :style-class ["button" "nuestr-refresh-button"]
-               :on-mouse-pressed (fn [_] (relay-conn/refresh!))
+               :on-mouse-pressed (fn [_]
+                                   (doseq [c (:all-columns @domain/*state)]
+                                     (timeline/grow-timeline! (:id c) nil))
+                                   (doseq [s (:open-profile-states @domain/*state)]
+                                     (timeline/grow-timeline! nil (:pubkey s)))
+                                   (relay-conn/refresh!))
                :text (str (char 0x21bb)) ; clockwise open-circle arrow
                }
               {:fx/type :h-box :v-box/vgrow :always}]})

@@ -3,8 +3,11 @@
    [clojure.tools.logging :as log]
    [clojure.string :as str]
    [nuestr.byte-vector :as byte-vector]
+   [nuestr.domain :as domain]
+   [nuestr.modal :as modal]
    [nuestr.nip19 :as nip19]
    [nuestr.status-bar :as status-bar]
+   [nuestr.store :as store]
    [nuestr.timeline :as timeline]
    [nuestr.util-fx :as util-fx]
    [nuestr.util-java :as util-java]
@@ -18,10 +21,10 @@
 ;; --
 
 (defrecord HyperlinkSeg
-  [^String text ^String url])
+  [^String text ^String url column-id pubkey])
 
 (defonce hyperlink-ops
-  (proxy [SegmentOpsBase] [(->HyperlinkSeg "" "")]
+  (proxy [SegmentOpsBase] [(->HyperlinkSeg "" "" nil nil)]
     (^int length [o]
       (count (:text o)))
     (^char realCharAt [o idx]
@@ -67,17 +70,24 @@
     (.setTextOrigin VPos/TOP)
     (.setText text)))
 
-(defn hyperlink*
-  ^TextExt [{:keys [text url]}]
+(defn hyperlink* ^TextExt [{:keys [text url column-id pubkey]}]
   (doto (text-ext* text)
     (util-fx/add-style-class! "hyperlink")
     (util-fx/on-mouse-clicked!
      (fn [e]
-       (if (str/starts-with? url "nostr:npub")
-         (let [[_ pubkey] (nip19/decode (subs url (count "nostr:")))]
-           (status-bar/message! (format "Pubkey: %s" pubkey))
-           (timeline/open-profile e pubkey))
-         (util/open-url! url))))))
+       (cond (str/starts-with? url "nostr:npub")
+             (let [[_ pubkey] (nip19/decode (subs url (count "nostr:")))]
+               (status-bar/message! (format "Pubkey: %s" pubkey))
+               (timeline/open-profile e pubkey))
+             (str/starts-with? url "nostr:note")
+             (let [[_ event-id] (nip19/decode (subs url (count "nostr:")))]
+               (status-bar/message! (format "Note: %s" pubkey))
+               (let [column (and column-id (domain/find-column-by-id column-id))
+                     event (timeline/find-event-with-id event-id)]
+                 (if event
+                   (timeline/show-column-thread! domain/*state column pubkey event)
+                   (modal/info-popup (format "Can't find event %s" url)))))
+             :else (util/open-url! url))))))
 
 ;; --
 
@@ -116,10 +126,10 @@
     (.appendText n s)))
 
 (defn append-hyperlink!
-  [^GenericStyledArea n text url]
+  [^GenericStyledArea n text url column-id pubkey]
   (when (not-empty url)
     (.append n
-             (ReadOnlyStyledDocument/fromSegment (->HyperlinkSeg text url)
+             (ReadOnlyStyledDocument/fromSegment (->HyperlinkSeg text url column-id pubkey)
                                                  nil ;; paragraph style
                                                  nil ;; text style
                                                  seg-ops*))))

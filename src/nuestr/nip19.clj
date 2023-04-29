@@ -200,7 +200,7 @@
   Returns nil if decoding is not possible."
   [string]
   (let [[prefix rest] (str/split string #"1" 2)]
-    (when rest
+    (when-not (empty? rest)
       (let [size (- (count rest) 6)
             checksum (subs rest size)
             data (subs rest 0 size)]
