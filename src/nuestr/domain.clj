@@ -7,9 +7,10 @@
    (java.time ZonedDateTime Instant)
    (java.util.concurrent ThreadFactory Executors ScheduledExecutorService TimeUnit
                          PriorityBlockingQueue ConcurrentLinkedQueue)
-   (java.util HashMap HashSet UUID)
+   (java.util HashMap HashSet TreeSet UUID)
    (javafx.collections FXCollections ObservableList)
-   (javafx.collections.transformation FilteredList)))
+   (javafx.collections.transformation FilteredList))
+  (:use clojure.test))
 
 
 
@@ -106,6 +107,12 @@
 
 (defn active-identity []
   (find-identity-by-pubkey (:active-key @*state)))
+
+(defn days-ago
+  ^Instant [n]
+  (-> (ZonedDateTime/now)
+    (.minusDays n)
+    .toInstant))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Executor
@@ -208,8 +215,68 @@
           (or channels #{})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Rest
+;;; Timeline
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;
+;; Event queue
+;;
+
+(defrecord EventQueue
+    ;; We use a PriorityBlockingQueue to keep the events in the queue sorted by created_at.
+    [^HashMap id->event
+     ^PriorityBlockingQueue queue])
+
+(defn new-event-queue []
+  (->EventQueue
+   (HashMap. (int 100))
+   (PriorityBlockingQueue. (int 100)
+                           (comparator #(cond (> (:created_at %1) (:created_at %2)) 1
+                                              (= (:created_at %1) (:created_at %2)) 0
+                                              :else -1)))))
+
+(defn add-or-update-event-in-queue [^EventQueue queue event]
+  (let [id (:id event)
+        id->event ^HashMap (:id->event queue)
+        q ^PriorityBlockingQueue (:queue queue)]
+    (if-let [existing-event (.get id->event id)]
+      ;; We already have the event, but maybe not with the same set of relays.
+      ;; So we update the relay set.
+      (let [updated-event (assoc existing-event
+                                 :relays (distinct (concat (:relays event)
+                                                           (:relays existing-event))))]
+        (.put id->event id updated-event)
+        (.remove q existing-event)
+        (.add q updated-event))
+      (do (.put id->event id event)
+          (.add q event)))))
+
+(defn event-queue-size [^EventQueue q]
+  (.size (:id->event q)))
+
+(defn event-queue-is-empty? [^EventQueue q]
+  (.isEmpty (:queue q)))
+
+(defn event-queue-poll [^EventQueue q]
+  (let [event (.poll (:queue q))]
+    (.remove (:id->event q) (:id event))
+    event))
+
+(deftest test-queue
+  (let [q (new-event-queue)]
+    (add-or-update-event-in-queue q {:created_at 1 :id 1 :relays [:b :c]})
+    (add-or-update-event-in-queue q {:created_at 1 :id 1 :relays [:a]})
+    ;; Test that event relays are merged.
+    (is (= (.peek (:queue q))
+           {:created_at 1 :id 1 :relays [:a :b :c]}))
+    ;; Test that events are updated and not just added.
+    (is (= (.size (:queue q)) 1))
+    (is (= (.size (:id->event q)) 1))))
+
+
+;;
+;; Timeline
+;;
 
 (defrecord Timeline
   ;; these field values are only ever mutated on fx thread
@@ -220,18 +287,14 @@
    ^HashSet item-ids
    max-size ; an atom
    timeline-epoch-vol
-   ;; We use a PriorityBlockingQueue to keep the events in the queue sorted by created_at.
-   ^PriorityBlockingQueue queue])
+   ^EventQueue queue])
 
-
-(defn days-ago
-  ^Instant [n]
-  (-> (ZonedDateTime/now)
-    (.minusDays n)
-    .toInstant))
-
+(defn nr-new-notes [timeline]
+  (event-queue-size (:queue timeline)))
+     
 (def initial-max-timeline-size 500)
 (def max-timeline-size-increment 50)
+
 
 (defn new-timeline [thread?]
   ;; NOTE: we're querying and subscribing to all of time but for now, for ux
@@ -257,8 +320,11 @@
               (* 40 initial-max-timeline-size)
               initial-max-timeline-size))  
       timeline-epoch-vol
-      (PriorityBlockingQueue. (int 100)
-                              (comparator #(> (:created_at %1) (:created_at %2)))))))
+      (new-event-queue))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Rest
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defrecord Identity
     [public-key secret-key])

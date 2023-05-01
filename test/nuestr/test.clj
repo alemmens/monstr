@@ -7,3 +7,4 @@
 
 (run-tests 'nuestr.byte-vector)
 (run-tests 'nuestr.nip19)
+(run-tests 'nuestr.domain)

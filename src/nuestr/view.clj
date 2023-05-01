@@ -232,7 +232,7 @@
                          :text "Publish"}}]})
 
 
-(defn column-header [{:keys [column show-thread? listview visible-column-ids all-columns]}]
+(defn column-header [{:keys [column show-thread? listview timeline visible-column-ids all-columns]}]
   (let [column-id (:id column)
         name (:name (:view column))]
     {:fx/type :h-box
@@ -243,6 +243,12 @@
                        [{:fx/type :h-box :h-box/hgrow :always}
                         (when show-thread?
                           (timeline/back-from-thread-button column nil))
+                        #_
+                        (when-not show-thread?
+                          (let [new (domain/nr-new-notes timeline)]
+                            {:fx/type :button
+                             :padding 5
+                             :text (format " %s new notes " new)}))                        
                         {:fx/type :label
                          :text (if show-thread?
                                  (format "thread: %s" name)
@@ -260,12 +266,13 @@
                            :visible-column-ids visible-column-ids
                            :all-column-ids (map :id all-columns)})])}))
 
-(defn column-pane [{:keys [column show-thread? listview all-columns visible-column-ids]}]
+(defn column-pane [{:keys [column show-thread? listview timeline all-columns visible-column-ids]}]
   {:fx/type :v-box
    :children [{:fx/type column-header
                :column column
                :show-thread? show-thread?
                :listview listview
+               :timeline timeline
                :all-columns all-columns
                :visible-column-ids visible-column-ids}
               {:fx/type main-pane
@@ -297,7 +304,10 @@
                     pair (get (:identity->timeline-pair column) active-key)
                     listview (if show-thread?
                                (:thread-listview pair)
-                               (:flat-listview pair))]
+                               (:flat-listview pair))
+                    timeline (if show-thread?
+                               (:thread-timeline pair)
+                               (:flat-timeline pair))]
                 (if (nil? pair)
                   (log/debugf "No pair found for active key %s and column %s" active-key column-id)
                   (log/debugf "Creating pane for column %s with view %s (show-thread=%s pair=%s listview=%s)"
@@ -308,6 +318,7 @@
                  :column column
                  :show-thread? show-thread?
                  :listview listview
+                 :timeline timeline
                  :all-columns all-columns
                  :visible-column-ids visible-column-ids}))
             visible-column-ids)
