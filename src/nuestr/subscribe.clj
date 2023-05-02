@@ -82,8 +82,6 @@
   "Returns a map from subscription id to filters."
   [pubkeys]
   #_(status-bar/debug! (format "Subscribing to meta for %s" pubkeys))
-  (let [filter (if pubkeys
-                 {:kinds [0 2] :authors [pubkeys]}
-                 {:kinds [2]})
+  (let [filters [{:kinds [2]}]
         subscription-id (format "meta:%s" (.toString (UUID/randomUUID)))]
-    {subscription-id [filter]}))
+    {subscription-id filters}))

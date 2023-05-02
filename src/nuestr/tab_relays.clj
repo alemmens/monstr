@@ -111,7 +111,7 @@
                                     (:relays-sorted-by @domain/*state)
                                     (:connected-info @domain/*state)))
         ;; And try to get server recommendations from the new relay.
-        (relay-conn/add-meta-subscription! url)
+        (relay-conn/add-meta-subscription! url nil)
         ;; Return the new relay
         r))))
 

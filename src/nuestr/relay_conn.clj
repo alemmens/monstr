@@ -20,11 +20,13 @@
 
 
 (defn- websocket-client* [relay-url]
-  (http/websocket-client relay-url
-                         {:insecure? true
-                          :max-frame-payload 1966080 #_ 196608
-                          :max-frame-size 3145728
-                          :heartbeats {:send-after-idle 5000}}))
+  (try (http/websocket-client relay-url
+                              {:insecure? true
+                               :max-frame-payload 1966080 #_ 196608
+                               :max-frame-size 3145728
+                               :heartbeats {:send-after-idle 5000}})
+       (catch Exception e
+         nil)))
 
 (defn is-relay-url? [string]
   ;; TODO: This is a bit too simple.
@@ -103,24 +105,25 @@
       (when-not destroyed?
         (log/debugf "connect attempt %s" relay-url)
         ;; We contrive here for our deferred-conn to for-sure get an error or success.
-        (-> (websocket-client* relay-url)
-            ;; Timeout without a timeout-val produces an d/error! that is handled
-            ;; by the d/catch below.
-            (d/timeout! (* connect-timeout-secs 1000))
-            (d/chain
-             (util/wrap-exc-fn
-              (fn [raw-conn]
-                (locking conn-vol
-                  (log/debugf "connected %s" relay-url)
-                  (vswap! conn-vol assoc :num-successive-failures 0)
-                  (d/success! deferred-conn raw-conn)
-                  ;; :downstream? false means when raw-conn closes the sink-stream will not.
-                  (s/connect raw-conn sink-stream {:downstream? false})
-                  (s/on-closed raw-conn
-                               #(on-failure conn-vol :connection-closed))
-                  (send-subscribe-req!* conn-vol subscriptions-snapshot raw-conn))
-                :unused)))
-            (d/catch (fn [err] (on-failure conn-vol err))))))))
+        (when-let [socket (websocket-client* relay-url)]
+          (-> socket
+              ;; Timeout without a timeout-val produces an d/error! that is handled
+              ;; by the d/catch below.
+              (d/timeout! (* connect-timeout-secs 1000))
+              (d/chain
+               (util/wrap-exc-fn
+                (fn [raw-conn]
+                  (locking conn-vol
+                    (log/debugf "connected %s" relay-url)
+                    (vswap! conn-vol assoc :num-successive-failures 0)
+                    (d/success! deferred-conn raw-conn)
+                    ;; :downstream? false means when raw-conn closes the sink-stream will not.
+                    (s/connect raw-conn sink-stream {:downstream? false})
+                    (s/on-closed raw-conn
+                                 #(on-failure conn-vol :connection-closed))
+                    (send-subscribe-req!* conn-vol subscriptions-snapshot raw-conn))
+                  :unused)))
+              (d/catch (fn [err] (on-failure conn-vol err)))))))))
 
 (defn connect! [relay-url sink-stream]
   (doto (volatile! (->ReadConnection relay-url (d/deferred) {} sink-stream 0 false))
@@ -205,24 +208,24 @@
 (defn maybe-add-subscriptions!
   "SUBSCRIPTIONS is a map from subscription id to filters."
   [relay-url subscription-map]
-  (log/debugf (format "Maybe adding subscriptions for %s" relay-url))
-  (let [connection-vol (or (get @(:read-connections-vol conn-registry) relay-url)
-                           (new-read-connection-vol relay-url))]
-    (when-not (every? (fn [filters]
-                        (when connection-vol
-                          (connection-has-subscription? @connection-vol filters)))
-                      (vals subscription-map))
-      (doseq [[id filters] subscription-map]
-        (subscribe! connection-vol id filters))
-      (let [registry-sink-stream (:sink-stream conn-registry)]
-        (s/connect-via (:sink-stream @connection-vol)
-                       #(s/put! registry-sink-stream [relay-url %])
-                       registry-sink-stream
-                       ;; `:downstream? false` means when conn-sink-stream closes global conn-registry stream will not.                       
-                       {:downstream? false}))
-      ;; Add the relay-url to the registry.
-      (vswap! (:read-connections-vol conn-registry) assoc
-              relay-url connection-vol))))
+  (when (is-relay-url? relay-url)
+    (let [connection-vol (or (get @(:read-connections-vol conn-registry) relay-url)
+                             (new-read-connection-vol relay-url))]
+      (when-not (every? (fn [filters]
+                          (when connection-vol
+                            (connection-has-subscription? @connection-vol filters)))
+                        (vals subscription-map))
+        (doseq [[id filters] subscription-map]
+          (subscribe! connection-vol id filters))
+        (let [registry-sink-stream (:sink-stream conn-registry)]
+          (s/connect-via (:sink-stream @connection-vol)
+                         #(s/put! registry-sink-stream [relay-url %])
+                         registry-sink-stream
+                         ;; `:downstream? false` means when conn-sink-stream closes global conn-registry stream will not.                       
+                         {:downstream? false}))
+        ;; Add the relay-url to the registry.
+        (vswap! (:read-connections-vol conn-registry) assoc
+                relay-url connection-vol)))))
 
 (defn update-relays!
   "Change the set of relays and/or their read or write status."
