@@ -196,7 +196,20 @@
     (let [read-connections @(:read-connections-vol relay-conn/conn-registry)
           connection (get read-connections relay-url)]
       (when connection
-        (relay-conn/unsubscribe! connection subscription-id)))))
+        (relay-conn/unsubscribe! connection subscription-id)
+        (when (str/starts-with? subscription-id "flat:")
+          ;; Switch to the next subscription (with a bigger limit) for this relay.
+          (let [current-filter (first (get (:subscriptions connection) subscription-id))
+                new-filter (subscribe/increase-text-note-filter current-filter)]
+            (when-not (= new-filter current-filter)
+              (let [[prefix column-id raw-counter] (str/split subscription-id #":")
+                    counter (Integer/parseInt raw-counter)
+                    new-id (str prefix column-id (inc counter))]
+                (util/schedule! domain/daemon-scheduled-executor
+                                #(relay-conn/maybe-add-subscriptions! relay-url {new-id [new-filter]})
+                                ;; Add the new subscription after waiting a bit.
+                                (* 10 (:limit new-filter)))))))))))
+                
 
 (defn- consume*
   [db *state metadata-cache executor resubscribe-future-vol cache [relay-url event-str]]

@@ -292,8 +292,8 @@
 (defn nr-new-notes [timeline]
   (event-queue-size (:queue timeline)))
      
-(def initial-max-timeline-size 500)
-(def max-timeline-size-increment 50)
+(def initial-max-timeline-size 1000)
+(def max-timeline-size-increment 200)
 
 
 (defn new-timeline [thread?]
@@ -317,7 +317,7 @@
       (HashMap.)
       (HashSet.)
       (atom (if thread?
-              (* 40 initial-max-timeline-size)
+              (* 10 initial-max-timeline-size)
               initial-max-timeline-size))  
       timeline-epoch-vol
       (new-event-queue))))

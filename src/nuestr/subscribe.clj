@@ -31,6 +31,19 @@
                     (whale-of-pubkeys* account-keys contact-lists))
     :use-list (:follow-set view)))
 
+(defn initial-text-note-filter [view]
+  {:kinds [1]
+   :authors (relevant-pubkeys-for-view view)
+   :limit 16})
+
+(defn increase-text-note-filter [filter]
+  (let [limit (:limit filter)]
+    (assoc filter
+           :limit (if (>= limit 8196)
+                    ;; Start again, hopefully fetching some new notes.
+                    16
+                    (* limit 2)))))
+  
 (defn filters-for-view [view since]
   ;; 0: set_metadata
   ;; 1: text note

@@ -360,6 +360,7 @@
   [view]
   (:relay-urls view))
 
+#_
 (defn add-column-subscriptions!
   ([column since]
    ;; SINCE is a Java Instant.  
@@ -378,6 +379,20 @@
    (let [last-refresh (:last-refresh @domain/*state)
          since (or last-refresh (util/days-ago 90))]
      (add-column-subscriptions! column since))))
+
+(defn add-column-subscriptions!
+  ([column]
+   ;; SINCE is a Java Instant.  
+   ;; TODO: track a durable "watermark" for stable subscriptions.
+   (when-not (empty? (:identities @domain/*state))
+     (let [view (:view column)
+           filters [(subscribe/initial-text-note-filter view)]
+           relay-urls (relay-urls-for-view view)
+           subscription-id (format "flat:%s:0" (:id column))]
+       #_(swap! domain/*state assoc :last-refresh (Instant/now))
+       (log/debugf "Adding column subscriptions for '%s'" (:name view))
+       (doseq [r relay-urls]
+         (maybe-add-subscriptions! r {subscription-id filters}))))))
 
 (defn refresh! []
   (status-bar/message! "Fetching new notes...")

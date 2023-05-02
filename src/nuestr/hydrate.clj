@@ -176,8 +176,10 @@
       (timeline/update-active-timelines! *state pubkey))
     (doseq [c (:all-columns @domain/*state)]
       (relay-conn/add-column-subscriptions! c))
-    (doseq [c (:all-columns @domain/*state)]
-      (hydrate-column! c))))
+    (util/schedule! domain/daemon-scheduled-executor 
+                    #(doseq [c (:all-columns @domain/*state)]
+                       (hydrate-column! c))
+                    10000)))
 
 (defn hydrate! [*state db executor new-identities]
   (util/submit! executor
