@@ -22,7 +22,7 @@
 (defn- websocket-client* [relay-url]
   (try (http/websocket-client relay-url
                               {:insecure? true
-                               :max-frame-payload 1966080 #_ 196608
+                               :max-frame-payload 1966080
                                :max-frame-size 3145728
                                :heartbeats {:send-after-idle 5000}})
        (catch Exception e
@@ -152,7 +152,7 @@
 
 (defn subscribe! [conn-vol id filters]
   {:pre [(vector? filters) (every? map? filters)]}
-  (log/debugf  (format "Subscribing to events from %s" (:relay-url @conn-vol)))
+  (log/debugf "Subscribing %s to %s with limit %s" id (:relay-url @conn-vol) (:limit (first filters)))
   (locking conn-vol
     (vswap! conn-vol update :subscriptions
             assoc id filters)
@@ -251,15 +251,16 @@
           (destroy! read-conn-vol)
           (vswap! (:read-connections-vol conn-registry) dissoc relay-url))))))
 
-(defn add-meta-subscription! [relay-url pubkeys]
-  (log/debugf "Adding meta subscription for %s" relay-url)
+(defn add-server-recommendation-subscription! [relay-url]
+  (log/debugf "Adding server recommendation subscription for %s" relay-url)
   (locking conn-registry
-    (maybe-add-subscriptions! relay-url (subscribe/meta-subscription pubkeys))))
+    (maybe-add-subscriptions! relay-url
+                              (subscribe/server-recommendation-subscription))))
 
-(defn update-meta-info! [pubkeys]
+(defn update-server-recommendations! []
   #_(status-bar/message! (format "Updating meta info for %s" pubkeys))
   (doseq [r (domain/relay-urls @domain/*state)]
-    (add-meta-subscription! r pubkeys)))
+    (add-server-recommendation-subscription! r)))
 
 (defn subscribe-all!
   "Establish a subscription to all relays for which `relay-test` returns true.
@@ -383,19 +384,17 @@
          since (or last-refresh (util/days-ago 90))]
      (add-column-subscriptions! column since))))
 
-(defn add-column-subscriptions!
-  ([column]
-   ;; SINCE is a Java Instant.  
-   ;; TODO: track a durable "watermark" for stable subscriptions.
-   (when-not (empty? (:identities @domain/*state))
-     (let [view (:view column)
-           filters [(subscribe/initial-text-note-filter view)]
-           relay-urls (relay-urls-for-view view)
-           subscription-id (format "flat:%s:0" (:id column))]
-       #_(swap! domain/*state assoc :last-refresh (Instant/now))
-       (log/debugf "Adding column subscriptions for '%s'" (:name view))
-       (doseq [r relay-urls]
-         (maybe-add-subscriptions! r {subscription-id filters}))))))
+(defn add-column-subscriptions! [column]
+  (when-not (empty? (:identities @domain/*state))
+    (let [view (:view column)
+          filters [(subscribe/initial-text-note-filter view)]
+          relay-urls (relay-urls-for-view view)
+          subscription-id (format "flat:%s:0" (:id column))]
+      (log/debugf "Adding column subscriptions for '%s'" (:name view))
+      (doseq [r relay-urls]
+        ;; Add text note subscription.
+        (maybe-add-subscriptions! r {subscription-id filters})
+        (maybe-add-subscriptions! r (subscribe/userdata-subscription view))))))
 
 (defn refresh! []
   (status-bar/message! "Fetching new notes...")

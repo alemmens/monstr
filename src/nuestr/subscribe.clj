@@ -31,6 +31,18 @@
                     (whale-of-pubkeys* account-keys contact-lists))
     :use-list (:follow-set view)))
 
+
+;; 0: set_metadata
+;; 1: text note
+;; 2: recommend server
+;; 3: contact list
+;; 4: direct message
+;; 40: channel create
+;; 41: channel metadata
+;; 42: channel message
+;; 43: hide message
+;; 44: mute user
+
 (defn initial-text-note-filter [view]
   {:kinds [1]
    :authors (relevant-pubkeys-for-view view)
@@ -38,23 +50,13 @@
 
 (defn increase-text-note-filter [filter]
   (let [limit (:limit filter)]
-    (assoc filter
-           :limit (if (>= limit 8196)
-                    ;; Start again, hopefully fetching some new notes.
-                    16
-                    (* limit 2)))))
-  
+    (if (>= limit 8000)
+      filter
+      (do (status-bar/debug! (format "New limit: %s" (* limit 2)))
+          (assoc filter :limit (* limit 2))))))
+
+#_ ;; OLD
 (defn filters-for-view [view since]
-  ;; 0: set_metadata
-  ;; 1: text note
-  ;; 2: recommend server
-  ;; 3: contact list
-  ;; 4: direct message
-  ;; 40: channel create
-  ;; 41: channel metadata
-  ;; 42: channel message
-  ;; 43: hide message
-  ;; 44: mute user
   (let [account-pubkeys (map :public-key (:identities @domain/*state))]
     [{:kinds [0 2 3]
       :since since
@@ -78,9 +80,14 @@
       :limit 5000}
      ]))
 
-(defn meta-subscription
+(defn userdata-subscription [view]
+  (let [filters [{:kinds [0 3] :authors (relevant-pubkeys-for-view view)}]
+        subscription-id (format "meta:%s" (.toString (UUID/randomUUID)))]
+    {subscription-id filters}))
+
+(defn server-recommendation-subscription
   "Returns a map from subscription id to filters."
-  [pubkeys]
+  []
   #_(status-bar/debug! (format "Subscribing to meta for %s" pubkeys))
   (let [filters [{:kinds [2]}]
         subscription-id (format "meta:%s" (.toString (UUID/randomUUID)))]
