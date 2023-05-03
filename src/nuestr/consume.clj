@@ -23,25 +23,32 @@
 ;; todo add relay info to events
 ;; todo we're adding everything right now -- need to respect timeline ux watermarks
 
+
+(defn- update-metadata [*state metadata-cache pubkey parsed event]
+  (metadata/update! metadata-cache pubkey parsed)
+  ;; Update keycards.  
+  (swap! *state
+         (fn [{:keys [identity-metadata] :as curr-state}]
+           (if (contains? identity-metadata pubkey)
+             (update curr-state :identity-metadata assoc pubkey parsed)
+             curr-state)))
+  ;; Kick timelines.
+  (timeline/dispatch-metadata-update! *state event))
+
+
 (defn consume-set-metadata-event [_db *state metadata-cache relay-url event-obj]
   (try
     (let [{:keys [pubkey created_at]} event-obj
           {:keys [name about picture nip05]} (json/parse (:content event-obj))
           parsed (domain/->ParsedMetadata name about picture nip05 created_at)]
       (log/trace "metadata: " relay-url (:id event-obj) parsed)
-      ;; update cache...
-      (metadata/update! metadata-cache pubkey parsed)
-      ;; update keycards...
-      (swap! *state
-        (fn [{:keys [identity-metadata] :as curr-state}]
-          (if (contains? identity-metadata pubkey)
-            (update curr-state :identity-metadata assoc pubkey parsed)
-            curr-state)))
-      ;; kick timelines...
-      (timeline/dispatch-metadata-update! *state event-obj))
+      ;; Update cache if this metadata event is newer than any existing one.
+      (if-let [existing (metadata/get* metadata-cache pubkey)]
+        (when (> created_at (or (:created_at existing) 0))
+          (update-metadata *state metadata-cache pubkey parsed event-obj))
+        (update-metadata *state metadata-cache pubkey parsed event-obj)))
     (catch Exception e
       (log/warn e "while handling metadata event"))))
-
 
 
 (defn schedule-subscription!

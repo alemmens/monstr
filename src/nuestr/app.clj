@@ -114,7 +114,7 @@
   (util/schedule! domain/daemon-scheduled-executor update-relays! 3000)
   (util/schedule-with-fixed-delay!
    domain/daemon-scheduled-executor
-   #(relay-conn/update-server-recommendations!) 4000 60000)
+   relay-conn/update-server-recommendations! 4000 60000)
   (util/schedule-with-fixed-delay!
    domain/daemon-scheduled-executor update-connected-info! 5000 20000)  
   ;; CONSIDER shutdown hooks, graceful executor shutdown etc

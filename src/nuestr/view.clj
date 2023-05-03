@@ -590,6 +590,9 @@
   #_(log/debugf "Stage with %d identities and active key %s" (count identities) active-key)
   {:fx/type :stage
    :showing true
+   :on-close-request (fn [& _]
+                       (relay-conn/close-all-connections!)
+                       (System/exit 0))
    :title "Nuestr"
    :width 1272
    :height 800

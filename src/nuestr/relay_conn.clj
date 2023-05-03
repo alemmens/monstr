@@ -251,6 +251,12 @@
           (destroy! read-conn-vol)
           (vswap! (:read-connections-vol conn-registry) dissoc relay-url))))))
 
+(defn close-all-connections! []
+  ;; This is supposed to be called before exiting the program.
+  (locking conn-registry
+    (doseq [[_ read-conn-vol] @(:read-connections-vol conn-registry)]
+      (destroy! read-conn-vol))))
+  
 (defn add-server-recommendation-subscription! [relay-url]
   (log/debugf "Adding server recommendation subscription for %s" relay-url)
   (locking conn-registry
@@ -363,26 +369,6 @@
   "Returns a set of relay urls."
   [view]
   (:relay-urls view))
-
-#_
-(defn add-column-subscriptions!
-  ([column since]
-   ;; SINCE is a Java Instant.  
-   ;; TODO: track a durable "watermark" for stable subscriptions.
-   (when-not (empty? (:identities @domain/*state))
-     (let [view (:view column)
-           filters (subscribe/filters-for-view view (.getEpochSecond since))
-           relay-urls (relay-urls-for-view view)
-           subscription-id (format "flat:%s" (:id column))]
-       #_(swap! domain/*state assoc :last-refresh (Instant/now))
-       (log/debugf "Adding column subscriptions for '%s'" (:name view))
-       (doseq [r relay-urls]
-         (maybe-add-subscriptions! r {subscription-id filters})))))
-  
-  ([column]
-   (let [last-refresh (:last-refresh @domain/*state)
-         since (or last-refresh (util/days-ago 90))]
-     (add-column-subscriptions! column since))))
 
 (defn add-column-subscriptions! [column]
   (when-not (empty? (:identities @domain/*state))

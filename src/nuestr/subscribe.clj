@@ -50,9 +50,10 @@
 
 (defn increase-text-note-filter [filter]
   (let [limit (:limit filter)]
-    (if (>= limit 8000)
+    (if (>= limit 4000)
       filter
-      (assoc filter :limit (* limit 2)))))
+      (do #_(status-bar/debug! (format "New limit: %s" (* limit 2)))
+          (assoc filter :limit (* limit 2))))))
 
 #_ ;; OLD
 (defn filters-for-view [view since]
