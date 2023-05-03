@@ -491,7 +491,7 @@
                :max-width 500
                :min-width 400
                :padding 5
-               :prompt-text "npub or raw pubkey"
+               :prompt-text "npub or hex pubkey"
                :text (or search-text "")
                :style-class ["text-input"]
                :on-text-changed  (fn [new-text]

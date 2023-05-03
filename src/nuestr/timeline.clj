@@ -86,20 +86,24 @@
                 max-size
                 queue]}
         timeline]
-    (if (and (not (.contains item-ids id))
-             (<= (.size observable-list) @max-size))
-      ;; If there's room on the timeline, add the event immediately.
-      (do (.add item-ids id)
-          (.merge author-pubkey->item-id-set
-                  pubkey
-                  (HashSet. [id])
-                  (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
-          (let [index (.size observable-list)
-                note (domain/->TextNoteNew event created_at depth)]
-            (.put item-id->index id index)
-            (.add observable-list note)))
-      ;; Otherwise add it to the queue, so it can be added later.
-      (domain/add-or-update-event-in-queue queue event))))
+    (cond (.contains item-ids id)
+          false
+          (<= (.size observable-list) @max-size)
+          ;; If there's room on the timeline, add the event immediately.
+          (do (.add item-ids id)
+              (.merge author-pubkey->item-id-set
+                      pubkey
+                      (HashSet. [id])
+                      (util-java/->BiFunction (fn [^HashSet acc id] (doto acc (.addAll ^Set id)))))
+              (let [index (.size observable-list)
+                    note (domain/->TextNoteNew event created_at depth)]
+                (.put item-id->index id index)
+                (.add observable-list note))
+              true)
+          :else
+          ;; Otherwise add it to the queue, so it can be added later.
+          (do (domain/add-or-update-event-in-queue queue event)
+              true))))
 
 (defn grow-timeline! [column-id pubkey]
   ;; This is called when the user scrolls to the bottom of a timeline listview.  We
@@ -117,9 +121,9 @@
            ;; And move events from the queue to the timeline.
            (loop [i 0]
              (when-not (or (domain/event-queue-is-empty? q) (>= i domain/max-timeline-size-increment))
-               (do (let [event (domain/event-queue-poll q)]
-                     (add-event-to-timeline! timeline event 0.0))
-                   (recur (inc i)))))))))))
+               (do (let [event (domain/event-queue-poll q)
+                         added? (add-event-to-timeline! timeline event 0.0)]
+                     (recur (if added? (inc i) i))))))))))))
 
 (defn flat-dispatch!
   [*state timeline identity-pubkey {:keys [id pubkey created_at content] :as event-obj} column]
