@@ -214,7 +214,7 @@
                   " and e.pubkey in (%s) ")
                 " and e.kind = 1"
                 " order by e.created_at desc"
-                " limit 10000")
+                " limit 3000")
            (join-strings relay-urls)
            (join-strings pubkeys))])
 

@@ -10,6 +10,7 @@
             [nuestr.relay-conn :as relay-conn]
             [nuestr.status-bar :as status-bar]
             [nuestr.store :as store]
+            [nuestr.subscribe :as subscribe]
             [nuestr.timeline-support :as timeline-support]
             [nuestr.util :as util]
             [nuestr.util-java :as util-java])
@@ -173,7 +174,7 @@
   (let [listview ((if thread? :thread-listview :flat-listview) pair)
         timeline ((if thread? :thread-timeline :flat-timeline) pair)]
     ;; Clear the pair's timeline and listview    
-    #_(log/debugf "Clearing listview %s and timeline %s" listview timeline)    
+    #_(log/errorf "Clearing listview %s and timeline %s" listview timeline)    
     (doseq [property [:observable-list :adapted-list :author-pubkey->item-id-set
                       :item-id->index :item-ids]]
       (.clear (property timeline)))
@@ -305,11 +306,10 @@
                   (fn []
                     (let [subscription-id (format "profile:%s:%s"
                                                   (:id (get (:open-profile-states @domain/*state) pubkey))
-                                                  (rand-int 1000000000))]
-                      (relay-conn/subscribe-all! subscription-id
-                                                 [{:authors [pubkey] :kinds [0 1] :limit 5000}]
-                                                 #(or (:read? %) (:meta? %))))))))
-
+                                                  (rand-int 1000000000))
+                          filters [{:authors [pubkey] :kinds [0 1] :limit 5000}]]
+                      (doseq [r (domain/random-read-and-meta-relay-urls [] 20)]
+                        (relay-conn/maybe-add-subscriptions! r {subscription-id filters})))))))
 
 (defn open-profile [ui-event pubkey]
   ;; Add a new profile tab.
@@ -418,6 +418,10 @@
    (let [column-id (:id column)
          profile-state (get (:open-profile-states @*state) pubkey)]
      #_
+     (log/errorf "Show thread with column id = %s and profile state id = %s"
+                 column-id
+                 (:id profile-state))
+     #_
      (status-bar/debug! (format "Show thread for event %s" (:id event-obj)))
      ;; Clear the thread and update the :show-thread? and :thread-focus properties.
      (if column
@@ -453,12 +457,50 @@
          (connect-wrappers-to-listview! wrappers id->event column-id pubkey)
          (select-thread-focus event-obj column-id pubkey))))))
 
+(defonce event-continuations
+  ;; A map from subscription ids to functions that take an event as argument
+  ;; and will be run in the FX thread.
+  (atom {}))
+
+(defn find-continuation [id]
+  (get @event-continuations id))
+
 (defn find-event-with-id
-  "Returns nil if the event can't be found."
-  [id]
-  (or (store/load-event store/db id)
-      ;; TODO: try to fetch the event from relays.
-      nil))
+  "Calls the continuation with nil if the event can't be found within the
+  specified timeout."
+  [id priority-relay-urls continuation timeout-in-ms]
+  (if-let [event (store/load-event store/db id)]
+    (fx/run-later (continuation event))
+    ;; Try to fetch the event from relays.
+    (let [subscription (subscribe/to-events [id])
+          [id filters] (first subscription)
+          continuation-was-executed? (atom false)]
+      ;; Register the continuation.
+      (swap! event-continuations
+             assoc id (fn [event]
+                        (when-not @continuation-was-executed?
+                          (log/errorf "Executing continuation for %s" event)
+                          (reset! continuation-was-executed? true)
+                          (swap! event-continuations dissoc id) 
+                          (fx/run-later (continuation event)))))
+      ;; Add a subscription to priority relays, all read relays and
+      ;; a random selection of meta relays.
+      (let [relays (domain/random-read-and-meta-relay-urls priority-relay-urls 20)]
+        (log/errorf "Using relays %s" (pr-str relays))
+        (doseq [r relays]
+          (relay-conn/maybe-add-subscriptions! r subscription))
+        ;; Things to do after the specified timeout.
+        (util/schedule! domain/daemon-scheduled-executor
+                        (fn []
+                          ;; Unsubscribe.
+                          (doseq [r relays]
+                            (relay-conn/maybe-remove-subscription! r id))
+                          ;; Make sure the continuation doesn't get executed anymore.
+                          (swap! event-continuations dissoc id)
+                          ;; Run the continuation with `nil` as argument.
+                          (when-not @continuation-was-executed?
+                            (fx/run-later (continuation nil))))
+                        timeout-in-ms)))))
 
 (defn refresh-column-thread!
   [*state column pubkey]

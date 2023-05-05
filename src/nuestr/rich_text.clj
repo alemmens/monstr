@@ -8,6 +8,7 @@
    [nuestr.nip19 :as nip19]
    [nuestr.status-bar :as status-bar]
    [nuestr.store :as store]
+   [nuestr.tab-relays :as tab-relays]
    [nuestr.timeline :as timeline]
    [nuestr.util-fx :as util-fx]
    [nuestr.util-java :as util-java]
@@ -64,8 +65,7 @@
 
 ;; --
 
-(defn text-ext*
-  ^TextExt [^String text]
+(defn text-ext* ^TextExt [^String text]
   (doto (TextExt.)
     (.setTextOrigin VPos/TOP)
     (.setText text)))
@@ -75,19 +75,38 @@
     (util-fx/add-style-class! "hyperlink")
     (util-fx/on-mouse-clicked!
      (fn [e]
-       (cond (str/starts-with? url "nostr:npub")
-             (let [[_ pubkey] (nip19/decode (subs url (count "nostr:")))]
+       (if (str/starts-with? url "nostr:")
+         (let [url-rest (subs url (count "nostr:"))]
+           (cond (str/starts-with? url-rest "npub")
+             (let [[_ pubkey] (nip19/decode url-rest)]
                (status-bar/message! (format "Pubkey: %s" pubkey))
                (timeline/open-profile e pubkey))
-             (str/starts-with? url "nostr:note")
-             (let [[_ event-id] (nip19/decode (subs url (count "nostr:")))]
+             ;;
+             (str/starts-with? url-rest "note")
+             (let [[_ event-id] (nip19/decode url-rest)]
                (status-bar/message! (format "Note: %s" pubkey))
                (let [column (and column-id (domain/find-column-by-id column-id))
-                     event (timeline/find-event-with-id event-id)]
-                 (if event
-                   (timeline/show-column-thread! domain/*state column pubkey event)
-                   (modal/info-popup (format "Can't find event %s" url)))))
-             :else (util/open-url! url))))))
+                     continuation (fn [event]
+                                    (if event
+                                      (timeline/show-column-thread! domain/*state column pubkey event)
+                                      (modal/info-popup (format "Can't find %s" url-rest))))]
+                 (timeline/find-event-with-id event-id [] continuation 3000)))
+             ;;
+             (str/starts-with? url-rest "nevent")
+             (let [[_ {:keys [special relays author kind]}] (nip19/decode url-rest)]
+               (status-bar/message! (format "nevent: %s" pubkey))
+               (run! tab-relays/maybe-add-relay! relays)
+               (let [column (and column-id (domain/find-column-by-id column-id))
+                     continuation (fn [event]
+                                    (if event
+                                      (timeline/show-column-thread! domain/*state column pubkey event)
+                                      (modal/info-popup (format "Can't find event %s on %s"
+                                                                special
+                                                                (pr-str relays)))))]
+                 (timeline/find-event-with-id special relays continuation 5000)))
+             ;;
+             :else (util/open-url! url)))
+         (util/open-url! url))))))
 
 ;; --
 
@@ -97,15 +116,15 @@
     #(cond
        (instance? HyperlinkSeg %) hyperlink-ops)))
 
-(defn node-factory*
-  ^Node [^StyledSegment styled-seg]
+(defn node-factory* ^Node [^StyledSegment styled-seg column-id pubkey]
   (let [seg (.getSegment styled-seg)]
-    (cond
-      (instance? HyperlinkSeg seg) (hyperlink* seg)
-      :else (text-ext* seg))))
+    (if (instance? HyperlinkSeg seg)
+      (hyperlink* (assoc seg
+                         :column-id column-id
+                         :pubkey pubkey))
+      (text-ext* seg))))
 
-(defn create*
-  ^GenericStyledArea []
+(defn create* ^GenericStyledArea [column-id pubkey]
   (let [initial-paragraph-style nil
         apply-paragraph-style (util-java/->BiConsumer (fn [& _]))
         initial-text-style nil]
@@ -115,7 +134,7 @@
             apply-paragraph-style
             initial-text-style
             seg-ops*
-            (util-java/->Function node-factory*)]
+            (util-java/->Function #(node-factory* %1 column-id pubkey))]
       #_(computePrefHeight [^double width]
           ;(log/info 'computePrefHeight (proxy-super getText))
           (proxy-super computePrefHeight width)))))

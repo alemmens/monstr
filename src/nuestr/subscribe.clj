@@ -43,6 +43,8 @@
 ;; 43: hide message
 ;; 44: mute user
 
+
+
 (defn initial-text-note-filter [view]
   {:kinds [1]
    :authors (relevant-pubkeys-for-view view)
@@ -80,15 +82,23 @@
       :limit 5000}
      ]))
 
+(defn make-subscription
+  "Returns a map from subscription id to filters."
+  [prefix filters]
+  (let [id (format "%s:%s" prefix (.toString (UUID/randomUUID)))]
+    {id filters}))
+
 (defn userdata-subscription [view]
-  (let [filters [{:kinds [0 3] :authors (relevant-pubkeys-for-view view)}]
-        subscription-id (format "meta:%s" (.toString (UUID/randomUUID)))]
-    {subscription-id filters}))
+  (make-subscription "meta"
+                     [{:kinds [0 3] :authors (relevant-pubkeys-for-view view)}]))
 
 (defn server-recommendation-subscription
   "Returns a map from subscription id to filters."
   []
-  #_(status-bar/debug! (format "Subscribing to meta for %s" pubkeys))
-  (let [filters [{:kinds [2]}]
-        subscription-id (format "meta:%s" (.toString (UUID/randomUUID)))]
-    {subscription-id filters}))
+  (make-subscription "meta"
+                     [{:kinds [2]}]))
+
+(defn to-events [ids]
+  (make-subscription "cont"
+                     [{:kinds [0 1 2 3 4]
+                       :ids ids}]))

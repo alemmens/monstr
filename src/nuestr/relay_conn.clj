@@ -209,6 +209,7 @@
   "SUBSCRIPTIONS is a map from subscription id to filters."
   [relay-url subscription-map]
   (when (is-relay-url? relay-url)
+    #_(log/errorf "Maybe add subscriptions to %s for %s" relay-url subscription-map)
     (let [connection-vol (or (get @(:read-connections-vol conn-registry) relay-url)
                              (new-read-connection-vol relay-url))]
       (when-not (every? (fn [filters]
@@ -226,6 +227,10 @@
         ;; Add the relay-url to the registry.
         (vswap! (:read-connections-vol conn-registry) assoc
                 relay-url connection-vol)))))
+
+(defn maybe-remove-subscription! [relay-url subscription-id]
+  (when-let [connection-vol (get @(:read-connections-vol conn-registry) relay-url)]
+    (unsubscribe! connection-vol subscription-id)))
 
 (defn update-relays!
   "Change the set of relays and/or their read or write status."

@@ -96,7 +96,7 @@
         (rich-text/append-text! x (subs content cursor (count content)))))))
 
 (defn create-content-node* [content links tags column-id pubkey metadata-cache]
-  (let [^GenericStyledArea x (rich-text/create*)]
+  (let [^GenericStyledArea x (rich-text/create* column-id pubkey)]
     (util-fx/add-style-class! x "ndesk-timeline-item-content")
     (HBox/setHgrow x Priority/ALWAYS)
     (.setWrapText x true)

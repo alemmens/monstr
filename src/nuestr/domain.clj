@@ -74,6 +74,17 @@
 (defn all-relay-urls [state]
   (sort (map :url (:relays state))))
 
+(defn random-meta-relay-urls [n]
+  (take n (shuffle (map :url (filter #(and (:meta? %)
+                                           (not (:read? %))
+                                           (not (:write? %)))
+                                     (:relays @*state))))))
+
+(defn random-read-and-meta-relay-urls [priority-relay-urls n-meta]
+  (distinct (concat priority-relay-urls
+                    (read-relay-urls @*state)
+                    (random-meta-relay-urls n-meta))))
+
 (defn columns [state]
   (:all-columns state))
 
