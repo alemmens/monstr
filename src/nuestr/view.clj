@@ -591,7 +591,7 @@
   {:fx/type :stage
    :showing true
    :on-close-request (fn [& _]
-                       (relay-conn/close-all-connections!)
+                       #_(relay-conn/close-all-connections!)
                        (System/exit 0))
    :title "Nuestr"
    :width 1272

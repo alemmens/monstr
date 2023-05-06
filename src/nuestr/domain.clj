@@ -303,7 +303,7 @@
 (defn nr-new-notes [timeline]
   (event-queue-size (:queue timeline)))
      
-(def initial-max-timeline-size 1000)
+(def initial-max-timeline-size 500)
 (def max-timeline-size-increment 200)
 
 
@@ -328,7 +328,7 @@
       (HashMap.)
       (HashSet.)
       (atom (if thread?
-              (* 10 initial-max-timeline-size)
+              (* 2 initial-max-timeline-size)
               initial-max-timeline-size))  
       timeline-epoch-vol
       (new-event-queue))))
@@ -428,6 +428,8 @@
   (first (filter #(= (:id %) id)
                  (vals (:open-profile-states @*state)))))
 
+(defn find-profile-state-by-pubkey [pubkey]
+  (get (:open-profile-states @*state) pubkey))
 
 ;; --
 

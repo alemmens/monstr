@@ -159,16 +159,18 @@
          new-profile-state))
 
 (defn- update-thread-info! [*state column profile-state map]
+  #_(log/errorf "Update thread info with %s" map)
   (if column
     (update-column! *state (merge column map))
     (let [p (domain/find-profile-state-by-id (:id profile-state))]
       (update-profile-state! *state (:pubkey p) (merge p map)))))
 
-(defn thread-property [*state column profile-state key]
+(defn thread-property [column profile-state key]
   ;; Make sure we get the most recent updates by 'reloading' the column and profile-state.
   (let [c (domain/find-column-by-id (:id column))
-        p (domain/find-profile-state-by-id (:id profile-state))]
-    (get (or c p) key)))
+        p (domain/find-profile-state-by-id (:id profile-state))
+        result (get (or c p) key)]
+    result))
 
 (defn- clear-timeline-pair! [pair thread?]
   (let [listview ((if thread? :thread-listview :flat-listview) pair)
@@ -204,11 +206,17 @@
   [*state column profile-state event]
   (let [id (:id event)]
     ;; Add the event id to the set of found ids if it was missing.
-    (when (get (thread-property column profile-state :missing-ids) id)
-      (update-thread-info! *state column profile-state
-                           {:found-ids (conj (thread-property column profile-state :found-ids)
-                                             id)}))
-    (refresh-column-thread! column profile-state)))
+    (log/errorf "Thread dispatch for event %s to column %s and profile state %s and focus %s"
+                id
+                (:id column)
+                (:id profile-state)
+                (thread-property column profile-state :thread-focus))
+    (let [missing (thread-property column profile-state :missing-ids)]
+      (when (get missing id)
+        (update-thread-info! *state column profile-state
+                             {:found-ids (conj (thread-property column profile-state :found-ids)
+                                               id)})))
+    (refresh-column-thread! *state column (:pubkey profile-state))))
 
 (defn- flat-dispatch-for-column [*state event-obj column]
   ;; TODO: We probably don't need to dispatch for all identities?
@@ -349,6 +357,7 @@
                                   (rand-int 1000000000))]
       ;; TODO: Don't subscribe to all relays, but try to use only relevant relays.
       #_(status-bar/debug! (format "Fetching %d ids %s" (count ids) subscription-id))
+      (log/errorf "Fetching events %s for pubkey %s" ids pubkey)
       (relay-conn/subscribe-all! subscription-id
                                  [{:ids ids :kinds [1]}]
                                  #(or (:read? %) (:meta? %))))))
@@ -373,6 +382,8 @@
   events that could not be found in the database).
   `ids` and `existing-ids` are sets."
   [ids existing-ids]
+  (log/errorf "Load thread events for %s with existing ids %s"
+              ids existing-ids)
   (let [direct-events (store/load-events store/db (seq ids))
         missing-event-ids (set/difference ids (set (map :id direct-events)))
         missing-events (map (fn [id]
@@ -417,10 +428,10 @@
   (fx/run-later
    (let [column-id (:id column)
          profile-state (get (:open-profile-states @*state) pubkey)]
-     #_
-     (log/errorf "Show thread with column id = %s and profile state id = %s"
+     (log/errorf "Show thread with column id = %s and profile state id = %s and event=%s"
                  column-id
-                 (:id profile-state))
+                 (:id profile-state)
+                 (:id event-obj))
      #_
      (status-bar/debug! (format "Show thread for event %s" (:id event-obj)))
      ;; Clear the thread and update the :show-thread? and :thread-focus properties.
@@ -434,11 +445,15 @@
      (let [events (load-thread-events (set [(:id event-obj)])
                                       #{})
            missing-ids (set (map :id (filter :missing? events)))
-           old-missing-ids (thread-property *state column profile-state :missing-ids)
-           new-missing-ids (set/difference missing-ids old-missing-ids missing-ids)]
+           old-missing-ids (thread-property column profile-state :missing-ids)
+           new-missing-ids (set/difference missing-ids old-missing-ids)]
+       (log/errorf "Missing ids: %s, new missing: %s" missing-ids new-missing-ids)
        (update-thread-info! *state (domain/find-column-by-id column-id) profile-state
                             {:missing-ids missing-ids
-                             :found-ids #{}})       
+                             :found-ids #{}})
+       (log/errorf "Thread focus for profile state %s is %s"
+                   (:id profile-state)
+                   (thread-property (domain/find-column-by-id column-id) profile-state :thread-focus))
        (when (seq new-missing-ids)
          ;; We discovered new missing events (presumably because they are referenced by
          ;; events that we found in the previous round), so we try to fetch them from the
@@ -452,7 +467,7 @@
                                     (count wrappers)
                                     (pr-str (map timeline-support/tree-size wrappers))
                                     (count id->node)
-                                    (thread-property *state column profile-state :show-thread?)
+                                    (thread-property column profile-state :show-thread?)
                                     ))
          (connect-wrappers-to-listview! wrappers id->event column-id pubkey)
          (select-thread-focus event-obj column-id pubkey))))))
@@ -504,10 +519,14 @@
 
 (defn refresh-column-thread!
   [*state column pubkey]
-  (let [thread-focus (thread-property *state column pubkey :thread-focus)]
+  (let [thread-focus (thread-property column (domain/find-profile-state-by-pubkey pubkey)
+                                      :thread-focus)]
+    (log/errorf "Refresh column thread column=%s focus=%s"
+                (:id column)
+                (:id thread-focus))
     (show-column-thread! *state column pubkey thread-focus)
     (update-thread-info! *state column
-                         (get (:open-profile-states @*state) pubkey)
+                         (domain/find-profile-state-by-pubkey pubkey)
                          {:found-ids #{}})))
 
 (defn- unshow-thread!
