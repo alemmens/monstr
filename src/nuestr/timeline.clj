@@ -206,7 +206,7 @@
   [*state column profile-state event]
   (let [id (:id event)]
     ;; Add the event id to the set of found ids if it was missing.
-    (log/errorf "Thread dispatch for event %s to column %s and profile state %s and focus %s"
+    #_(log/errorf "Thread dispatch for event %s to column %s and profile state %s and focus %s"
                 id
                 (:id column)
                 (:id profile-state)
@@ -357,7 +357,7 @@
                                   (rand-int 1000000000))]
       ;; TODO: Don't subscribe to all relays, but try to use only relevant relays.
       #_(status-bar/debug! (format "Fetching %d ids %s" (count ids) subscription-id))
-      (log/errorf "Fetching events %s for pubkey %s" ids pubkey)
+      #_(log/errorf "Fetching events %s for pubkey %s" ids pubkey)
       (relay-conn/subscribe-all! subscription-id
                                  [{:ids ids :kinds [1]}]
                                  #(or (:read? %) (:meta? %))))))
@@ -382,7 +382,7 @@
   events that could not be found in the database).
   `ids` and `existing-ids` are sets."
   [ids existing-ids]
-  (log/errorf "Load thread events for %s with existing ids %s"
+  #_(log/errorf "Load thread events for %s with existing ids %s"
               ids existing-ids)
   (let [direct-events (store/load-events store/db (seq ids))
         missing-event-ids (set/difference ids (set (map :id direct-events)))
@@ -427,8 +427,8 @@
   [*state column pubkey event-obj]
   (fx/run-later
    (let [column-id (:id column)
-         profile-state (get (:open-profile-states @*state) pubkey)]
-     (log/errorf "Show thread with column id = %s and profile state id = %s and event=%s"
+         profile-state (domain/find-profile-state-by-pubkey pubkey)]
+     #_(log/errorf "Show thread with column id = %s and profile state id = %s and event=%s"
                  column-id
                  (:id profile-state)
                  (:id event-obj))
@@ -447,11 +447,11 @@
            missing-ids (set (map :id (filter :missing? events)))
            old-missing-ids (thread-property column profile-state :missing-ids)
            new-missing-ids (set/difference missing-ids old-missing-ids)]
-       (log/errorf "Missing ids: %s, new missing: %s" missing-ids new-missing-ids)
+       #_(log/errorf "Missing ids: %s, new missing: %s" missing-ids new-missing-ids)
        (update-thread-info! *state (domain/find-column-by-id column-id) profile-state
                             {:missing-ids missing-ids
                              :found-ids #{}})
-       (log/errorf "Thread focus for profile state %s is %s"
+       #_(log/errorf "Thread focus for profile state %s is %s"
                    (:id profile-state)
                    (thread-property (domain/find-column-by-id column-id) profile-state :thread-focus))
        (when (seq new-missing-ids)
@@ -494,14 +494,12 @@
       (swap! event-continuations
              assoc id (fn [event]
                         (when-not @continuation-was-executed?
-                          (log/errorf "Executing continuation for %s" event)
                           (reset! continuation-was-executed? true)
                           (swap! event-continuations dissoc id) 
                           (fx/run-later (continuation event)))))
       ;; Add a subscription to priority relays, all read relays and
       ;; a random selection of meta relays.
       (let [relays (domain/random-read-and-meta-relay-urls priority-relay-urls 20)]
-        (log/errorf "Using relays %s" (pr-str relays))
         (doseq [r relays]
           (relay-conn/maybe-add-subscriptions! r subscription))
         ;; Things to do after the specified timeout.
@@ -521,9 +519,6 @@
   [*state column pubkey]
   (let [thread-focus (thread-property column (domain/find-profile-state-by-pubkey pubkey)
                                       :thread-focus)]
-    (log/errorf "Refresh column thread column=%s focus=%s"
-                (:id column)
-                (:id thread-focus))
     (show-column-thread! *state column pubkey thread-focus)
     (update-thread-info! *state column
                          (domain/find-profile-state-by-pubkey pubkey)
