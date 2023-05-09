@@ -272,14 +272,14 @@
                (pr-str (domain/relay-urls @domain/*state)))
    (when-let [profile-state (get (:open-profile-states @domain/*state) pubkey)]
      (update-timeline-pair! (:timeline-pair profile-state))
-     (doseq [r (domain/relay-urls @domain/*state)]
-       (let [events (store/load-relay-events store/db r [pubkey])]
-         (doseq [e events]
-           (flat-dispatch! domain/*state
-                           (:flat-timeline (:timeline-pair profile-state))
-                           pubkey
-                           e
-                           nil)))))))
+     (let [relays (domain/relay-urls @domain/*state)
+           events (store/load-relays-events store/db relays [pubkey])]
+       (doseq [e events]
+         (flat-dispatch! domain/*state
+                         (:flat-timeline (:timeline-pair profile-state))
+                         pubkey
+                         e
+                         nil))))))
 
 (defn remove-open-profile-state! [pubkey]
   (swap! domain/*state util/dissoc-in
@@ -315,7 +315,7 @@
                     (let [subscription-id (format "profile:%s:%s"
                                                   (:id (get (:open-profile-states @domain/*state) pubkey))
                                                   (rand-int 1000000000))
-                          filters [{:authors [pubkey] :kinds [0 1] :limit 5000}]]
+                          filters [{:authors [pubkey] :kinds [0 1] :limit 500}]]
                       (doseq [r (domain/random-read-and-meta-relay-urls [] 20)]
                         (relay-conn/maybe-add-subscriptions! r {subscription-id filters})))))))
 
@@ -358,6 +358,9 @@
       ;; TODO: Don't subscribe to all relays, but try to use only relevant relays.
       #_(status-bar/debug! (format "Fetching %d ids %s" (count ids) subscription-id))
       #_(log/errorf "Fetching events %s for pubkey %s" ids pubkey)
+      (doseq [r (domain/random-read-and-meta-relay-urls [] 25)]
+        (relay-conn/maybe-add-subscriptions! r {subscription-id [{:ids ids :kinds [1] :limit 500}]}))
+      #_
       (relay-conn/subscribe-all! subscription-id
                                  [{:ids ids :kinds [1]}]
                                  #(or (:read? %) (:meta? %))))))
