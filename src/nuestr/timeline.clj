@@ -387,6 +387,7 @@
   (let [direct-events (store/load-events store/db (seq ids))
         missing-event-ids (set/difference ids (set (map :id direct-events)))
         missing-events (map (fn [id]
+                              (assert id)
                               {:id id
                                :missing? true
                                :tags ()
@@ -428,12 +429,7 @@
   (fx/run-later
    (let [column-id (:id column)
          profile-state (domain/find-profile-state-by-pubkey pubkey)]
-     #_(log/errorf "Show thread with column id = %s and profile state id = %s and event=%s"
-                 column-id
-                 (:id profile-state)
-                 (:id event-obj))
-     #_
-     (status-bar/debug! (format "Show thread for event %s" (:id event-obj)))
+     #_(status-bar/debug! (format "Show thread for event %s" (:id event-obj)))
      ;; Clear the thread and update the :show-thread? and :thread-focus properties.
      (if column
        (clear-column-thread! *state column)
@@ -442,18 +438,16 @@
                           {:show-thread? true
                            :thread-focus event-obj})
      ;; Load and dispatch all events for the thread.
+     (assert event-obj)
+     (assert :id event-obj)
      (let [events (load-thread-events (set [(:id event-obj)])
                                       #{})
            missing-ids (set (map :id (filter :missing? events)))
            old-missing-ids (thread-property column profile-state :missing-ids)
            new-missing-ids (set/difference missing-ids old-missing-ids)]
-       #_(log/errorf "Missing ids: %s, new missing: %s" missing-ids new-missing-ids)
        (update-thread-info! *state (domain/find-column-by-id column-id) profile-state
                             {:missing-ids missing-ids
                              :found-ids #{}})
-       #_(log/errorf "Thread focus for profile state %s is %s"
-                   (:id profile-state)
-                   (thread-property (domain/find-column-by-id column-id) profile-state :thread-focus))
        (when (seq new-missing-ids)
          ;; We discovered new missing events (presumably because they are referenced by
          ;; events that we found in the previous round), so we try to fetch them from the
@@ -517,8 +511,11 @@
 
 (defn refresh-column-thread!
   [*state column pubkey]
-  (let [thread-focus (thread-property column (domain/find-profile-state-by-pubkey pubkey)
-                                      :thread-focus)]
+  (assert (or column pubkey))
+  ;; It's possible that the thread focus is nil because the user
+  ;; has closed the thread already. In that case we do nothing.
+  (when-let [thread-focus (thread-property column (domain/find-profile-state-by-pubkey pubkey)
+                                           :thread-focus)]
     (show-column-thread! *state column pubkey thread-focus)
     (update-thread-info! *state column
                          (domain/find-profile-state-by-pubkey pubkey)

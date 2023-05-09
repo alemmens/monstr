@@ -334,25 +334,8 @@
       (new-event-queue))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Rest
+;;; Users
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defrecord Identity
-    [public-key secret-key])
-
-(defrecord Relay
-    [url
-     read?
-     write?
-     ;; A meta relay is a read relay that's only used for getting metadata.  Its websocket
-     ;; connection will be closed as soon as there are no more subscriptions.
-     meta?
-     ])
-
-(defn find-relay
-  "Returns the Relay with the given `url` (or nil if no relay was found)."
-  [url]
-  (first (filter #(= (:url %) url) (:relays @*state))))
 
 (defrecord ParsedContact
     [public-key main-relay-url petname])
@@ -364,6 +347,26 @@
 
 (defrecord ParsedMetadata
     [name about picture-url nip05-id created-at])
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Rest
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defrecord Identity
+    [public-key secret-key])
+
+(defrecord Relay
+    [url
+     read?
+     write?
+     ;; A meta relay is a read relay that's only used for getting metadata.
+     meta?
+     ])
+
+(defn find-relay
+  "Returns the Relay with the given `url` (or nil if no relay was found)."
+  [url]
+  (first (filter #(= (:url %) url) (:relays @*state))))
 
 (defrecord Channel
     [id pubkey name about picture-url recommended-relay-url])

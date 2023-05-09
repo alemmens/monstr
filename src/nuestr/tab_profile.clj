@@ -7,9 +7,10 @@
    ; [nuestr.event :as event]
    [nuestr.file-sys :as file-sys]
    [nuestr.media :as media]
+   [nuestr.metadata :as metadata]
+   [nuestr.nip05 :as nip05]
    [nuestr.nip19 :as nip19]
    [nuestr.status-bar :as status-bar]
-   [nuestr.store :as store]
    [nuestr.timeline :as timeline]
    [nuestr.util :as util])
   (:import (javafx.geometry Insets)
@@ -18,7 +19,7 @@
 
 
 (defn keycard
-  [{:keys [active? profile? public-key metadata identity_]}]
+  [{:keys [active? profile? public-key metadata identity_ nip05-user]}]
   (let [avatar-dim 75.0
         avatar-color (media/color public-key)
         picture-url (:picture-url metadata)]
@@ -44,19 +45,20 @@
                              :picture-url picture-url
                              :width avatar-dim})
                           {:fx/type :v-box
-                           :children [{:fx/type :label
-                                       :alignment :top-left
-                                       :style-class ["label" "ndesk-keycard-name"]
-                                       :text (or (:name metadata) "")}
-                                      {:fx/type :label
-                                       :alignment :top-left
-                                       :style-class ["label" "ndesk-keycard-pubkey"]
-                                       :text (let [npub (nip19/encode "npub" public-key)]
-                                               (if profile?
-                                                 ;; In the profile tab we have enough room to
-                                                 ;; show the whole public key.
-                                                 npub
-                                                 (util/format-string-short npub)))}]}]}
+                           :children (remove nil?
+                                             [{:fx/type :label
+                                               :alignment :top-left
+                                               :style-class ["label" "ndesk-keycard-name"]
+                                               :text (metadata/user-short-name public-key)}
+                                              {:fx/type :label
+                                               :alignment :top-left
+                                               :style-class ["label" "ndesk-keycard-pubkey"]
+                                               :text (let [npub (nip19/encode "npub" public-key)]
+                                                       (if profile?
+                                                         ;; In the profile tab we have enough room to
+                                                         ;; show the whole public key.
+                                                         npub
+                                                         (util/format-string-short npub)))}])}]}
                         {:fx/type :h-box
                          :children [{:fx/type :text
                                      :style-class "ndesk-keycard-about"
@@ -258,8 +260,8 @@
                                                    :active? false
                                                    :profile? true
                                                    :identity_ identity
-                                                   :metadata metadata}
-                                                  ]}
+                                                   :metadata metadata
+                                                   :nip05-user (nuestr.nip05/find-by-pubkey pubkey)}]}
                                       {:fx/type follows
                                        :pubkey pubkey
                                        :open-profile-states open-profile-states

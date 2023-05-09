@@ -409,19 +409,16 @@
                                 false]]
                               ;; Profile tabs.
                               (map (fn [pubkey]
-                                     (let [metadata (metadata/get* metadata-cache pubkey)]
-                                       [(format "Profile: %s" (or (:name metadata)
-                                                                  (util/format-pubkey-short pubkey)))
-                                        {:fx/type tab-profile/profile
-                                         :pubkey pubkey
-                                         :views views
-                                         :open-profile-states open-profile-states
-                                         :identities identities
-                                         :identity-metadata identity-metadata
-                                         :metadata metadata}
-                                        (not= pubkey active-key) ; not closable for active account
-                                        pubkey
-                                        ]))
+                                     [(format "Profile: %s" (metadata/user-short-name pubkey))
+                                      {:fx/type tab-profile/profile
+                                       :pubkey pubkey
+                                       :views views
+                                       :open-profile-states open-profile-states
+                                       :identities identities
+                                       :identity-metadata identity-metadata
+                                       :metadata (metadata/get* metadata-cache pubkey)}
+                                      (not= pubkey active-key) ; not closable for active account
+                                      pubkey])
                                    (keys open-profile-states)))]
                   {:fx/type tab*
                    :label label

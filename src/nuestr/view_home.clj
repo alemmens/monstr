@@ -330,27 +330,31 @@
                                         #_(log/debugf "Thread button clicked for column %s" (:name (:view column)))
                                         (timeline/show-column-thread! *state column pubkey event-obj)))})])})
 
+
 (defn- author-pane [name pubkey timestamp]
   {:fx/type :border-pane
    :style (BORDER| :white)
    :border-pane/margin (Insets. 0.0 5.0 0.0 5.0)
    :left {:fx/type :h-box
           :cursor :hand
+          :alignment :center
           :style-class "nuestr-author-hbox"
           :on-mouse-clicked (fn [e] (timeline/open-profile e pubkey))
-          :children (remove nil?
-                            [{:fx/type :label
-                              :style-class "ndesk-timeline-item-name"
-                              :text name}
-                             (when (empty? name)
-                               {:fx/type :label
-                                :style-class "ndesk-timeline-item-pubkey"
-                                :text (if (empty? pubkey)
-                                        "?"
-                                        (util/format-string-short (nip19/encode "npub" pubkey)))})])}
-   :right {:fx/type :label
-           :style-class "ndesk-timeline-item-timestamp"
-           :text (or (some-> timestamp util/format-timestamp) "?")}})
+          :children (let [[n domain] (str/split (metadata/user-short-name pubkey) #"@")]
+                      (remove nil?
+                              [{:fx/type :label
+                                :style-class "ndesk-timeline-item-name"
+                                :text n}
+                               #_
+                               (when domain
+                                 {:fx/type :label
+                                  :style-class "ndesk-timeline-item-pubkey"
+                                  :text (str "@" domain)})]))}
+   :right {:fx/type :h-box
+           :alignment :center
+           :children [{:fx/type :label
+                       :style-class "ndesk-timeline-item-timestamp"
+                       :text (or (some-> timestamp util/format-timestamp) "?")}]}})
 
 (defn show-timeline-item-info [e event-obj]
   (when-not (:missing? event-obj)
@@ -374,7 +378,7 @@
   (let [event-obj (:event-obj text-note-new)
         pubkey (:pubkey event-obj)
         pubkey-for-avatar (or (some-> pubkey (subs 0 3)) "?")
-        {:keys [name about picture-url nip05-id created-at]} (some->> pubkey (metadata/get* metadata-cache))
+        {:keys [name picture-url]} (some->> pubkey (metadata/get* metadata-cache))
         avatar-color (or (some-> pubkey media/color) :lightgray)]
     {:fx/type :border-pane
      :padding (Insets. ; top right bottom left

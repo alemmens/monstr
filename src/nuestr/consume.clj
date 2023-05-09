@@ -9,6 +9,7 @@
             [nuestr.domain :as domain]    
             [nuestr.json :as json]
             [nuestr.metadata :as metadata]
+            [nuestr.nip05 :as nip05]            
             [nuestr.parse :as parse]    
             [nuestr.relay-conn :as relay-conn]
             [nuestr.status-bar :as status-bar]
@@ -17,14 +18,17 @@
             [nuestr.tab-relays :as tab-relays]
             [nuestr.timeline :as timeline]
             [nuestr.util :as util])
-  (:import (java.util.concurrent ScheduledExecutorService ScheduledFuture TimeUnit)))
-
-;; todo where do we have stream buffers?
-;; todo add relay info to events
-;; todo we're adding everything right now -- need to respect timeline ux watermarks
+  (:import (java.util.concurrent ScheduledExecutorService ScheduledFuture TimeUnit)
+           (java.time ZonedDateTime Instant)))
 
 
+;; TODO where do we have stream buffers?
+;; TODO add relay info to events
+;; TODO we're adding everything right now -- need to respect timeline ux watermarks
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Consuming nostr events
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- update-metadata [*state metadata-cache pubkey parsed event]
   ;; Update the cache.
@@ -45,6 +49,22 @@
           {:keys [name about picture nip05]} (json/parse (:content event-obj))
           parsed (domain/->ParsedMetadata name about picture nip05 created_at)]
       (log/trace "metadata: " relay-url (:id event-obj) parsed)
+      ;; Handle NIP05 data (if applicable).
+      (when nip05
+        (let [[nip05-name nip-domain] (str/split nip05 #"@")
+              url (str "https://" nip-domain "/.well-known/nostr.json?name=" nip05-name)
+              response @(aleph.http/get url)]
+          (when-let [body-string (slurp (:body response))]
+            (let [body (json/parse body-string)
+                  names (:names body)
+                  relays (:relays body)]
+              (doseq [[n nip05-pubkey] names]
+                (let [user-relays (get relays (keyword nip05-pubkey))
+                      user-name (str (clojure.core/name n) "@" nip-domain)
+                      verified? (= pubkey nip05-pubkey)
+                      user (nip05/->User nip05-pubkey user-name user-relays created_at verified?)]
+                  (nip05/maybe-add-or-update! user))))
+            (timeline/dispatch-metadata-update! *state event-obj))))
       ;; Update cache if this metadata event is newer than any existing one.
       (if-let [existing (metadata/get* metadata-cache pubkey)]
         (when (> created_at (or (:created_at existing) 0))
@@ -153,9 +173,9 @@
               ;;
               (or thread? profile-thread?)
               (timeline/thread-dispatch! *state
-                                     (when thread? (domain/find-column-by-id column-or-profile-id))
-                                     (when profile-thread? (domain/find-profile-state-by-id column-or-profile-id))
-                                     event)
+                                         (when thread? (domain/find-column-by-id column-or-profile-id))
+                                         (when profile-thread? (domain/find-profile-state-by-id column-or-profile-id))
+                                         event)
               ;;
               :else (timeline/dispatch-text-note! *state
                                                   column-or-profile-id ; can be nil

@@ -8,8 +8,8 @@
    [nuestr.domain :as domain]
    [nuestr.file-sys :as file-sys]
    [nuestr.hydrate :as hydrate]
+   [nuestr.metadata :as metadata]
    [nuestr.status-bar :as status-bar]
-   [nuestr.util :as util]
    )
   (:import (javafx.geometry Insets)))
 
@@ -71,8 +71,7 @@
                :padding 10
                :pref-height 220
                :pref-width 120
-               :items (sort (map #(util/name-for-pubkey % metadata-cache)
-                                 (:follow-set temp-view)))}]})
+               :items (sort (map metadata/user-short-name (:follow-set temp-view)))}]})
 
 (defn- radio-group [{:keys [options value temp-view metadata-cache]}]
   {:fx/type fx/ext-let-refs
