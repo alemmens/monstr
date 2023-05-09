@@ -409,7 +409,9 @@
                                 false]]
                               ;; Profile tabs.
                               (map (fn [pubkey]
-                                     [(format "Profile: %s" (metadata/user-short-name pubkey))
+                                     [(format "Profile: %s"
+                                              (first (str/split (metadata/user-short-name pubkey)
+                                                                #"@")))
                                       {:fx/type tab-profile/profile
                                        :pubkey pubkey
                                        :views views
